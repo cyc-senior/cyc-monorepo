@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+.cache/
+
+.env
+.env.local
+.env.*.local
+
+.DS_Store
+*.tsbuildinfo
+.eslintcache
