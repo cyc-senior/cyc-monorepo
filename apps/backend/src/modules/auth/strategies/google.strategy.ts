@@ -22,6 +22,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     })
   }
 
+  /**
+   * Maps a Google profile to a local user, creating or linking it on first
+   * sign-in. Its return value becomes `request.user` in the callback.
+   *
+   * @throws UnauthorizedException when Google reports no verified email.
+   */
   async validate(
     _accessToken: string,
     _refreshToken: string,

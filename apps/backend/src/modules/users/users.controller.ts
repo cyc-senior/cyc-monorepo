@@ -17,6 +17,11 @@ import { UsersService } from './users.service'
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * Returns the profile of the user identified by the bearer token.
+   *
+   * @throws NotFoundException when the token's user no longer exists.
+   */
   @Get('me')
   @ApiOkResponse({ type: UserResponseDto })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })

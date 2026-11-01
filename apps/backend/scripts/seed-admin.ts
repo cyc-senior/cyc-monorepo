@@ -5,6 +5,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { assertDevelopment } from './lib/dev-only'
 import { adminEmail } from './lib/dev-config'
 
+/** Creates the dev admin user if missing; safe to run repeatedly. */
 async function main() {
   assertDevelopment()
 

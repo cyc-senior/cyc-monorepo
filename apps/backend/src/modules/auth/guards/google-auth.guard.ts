@@ -33,6 +33,13 @@ export class GoogleAuthGuard extends AuthGuard('google') {
     this.secure = config.get('NODE_ENV', { infer: true }) === 'production'
   }
 
+  /**
+   * Login leg: issues a random `state`, stores it in an httpOnly cookie and lets
+   * Passport redirect to Google. Callback leg: verifies Google echoed the same
+   * `state` before Passport exchanges the code.
+   *
+   * @throws UnauthorizedException when the state cookie is missing or differs.
+   */
   canActivate(context: ExecutionContext) {
     const http = context.switchToHttp()
     const req = http.getRequest<Request>()
@@ -55,16 +62,24 @@ export class GoogleAuthGuard extends AuthGuard('google') {
     return super.canActivate(context)
   }
 
+  /** Passes the state generated in `canActivate` to Passport for the login leg. */
   getAuthenticateOptions(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<Request>()
 
     return { state: this.pendingStates.get(req) }
   }
 
+  /** Google always sends `code` (success) or `error` (denied) to the callback. */
   private isCallback(req: Request): boolean {
     return 'code' in req.query || 'error' in req.query
   }
 
+  /**
+   * Compares the cookie and query `state` in constant time and clears the
+   * cookie so it cannot be replayed.
+   *
+   * @throws UnauthorizedException on a missing or mismatched state.
+   */
   private assertState(req: Request, res: Response): void {
     const expected = req.cookies?.[OAUTH_STATE_COOKIE]
     const received = req.query.state

@@ -46,6 +46,13 @@ export class EnvironmentVariables {
   GOOGLE_CALLBACK_URL: string
 }
 
+/**
+ * Validates and coerces the raw environment for `ConfigModule`.
+ *
+ * @param config - Raw key/value environment (e.g. `process.env` plus `.env`).
+ * @returns The typed environment with defaults applied.
+ * @throws Error listing every invalid variable, so startup fails fast.
+ */
 export function validateEnv(
   config: Record<string, unknown>,
 ): EnvironmentVariables {

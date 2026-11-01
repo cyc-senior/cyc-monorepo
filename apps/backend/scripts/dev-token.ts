@@ -7,7 +7,10 @@ import { assertDevelopment } from './lib/dev-only'
 import { adminEmail } from './lib/dev-config'
 
 /**
- * Usage: pnpm --filter backend dev:token [--email <email>] [--raw]
+ * Issues a real access/refresh token pair for an existing user, bypassing
+ * Google. Development only (see `assertDevelopment`).
+ *
+ * Usage: pnpm dev:token [--email <email>] [--raw]
  *   --email  user to sign in as (default: the seeded admin)
  *   --raw    print only the access token, for use in shell substitution
  */

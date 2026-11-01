@@ -72,6 +72,10 @@ export class AuthService {
     }
   }
 
+  /**
+   * Signs an access JWT and persists a new refresh token (hash only) in the
+   * given family.
+   */
   private async createTokens(
     user: AuthenticatedUser,
     familyId: string,

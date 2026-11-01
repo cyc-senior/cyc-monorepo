@@ -3,7 +3,12 @@ import { Request } from 'express'
 
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface'
 
-/** Injects the user resolved from the bearer token (or one of its fields). */
+/**
+ * Injects the user resolved from the bearer token by the JWT guard.
+ *
+ * @param field - Optional key to return a single field (e.g. `'id'`) instead
+ *   of the whole `AuthenticatedUser`.
+ */
 export const CurrentUser = createParamDecorator(
   (field: keyof AuthenticatedUser | undefined, ctx: ExecutionContext) => {
     const { user } = ctx.switchToHttp().getRequest<Request>()
