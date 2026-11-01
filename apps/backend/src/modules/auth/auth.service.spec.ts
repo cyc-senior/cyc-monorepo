@@ -9,6 +9,7 @@ import { AuthService } from './auth.service'
 describe('AuthService', () => {
   const user = { id: 'user-1', email: 'a@example.com' }
   const prisma = {
+    $transaction: jest.fn(),
     refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -25,7 +26,12 @@ describe('AuthService', () => {
   let service: AuthService
 
   beforeEach(async () => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
+    jwtService.signAsync.mockResolvedValue('access.jwt')
+    config.get.mockImplementation((key: string) =>
+      key === 'REFRESH_TOKEN_TTL_DAYS' ? 30 : 900,
+    )
+    prisma.$transaction.mockImplementation((fn) => fn(prisma))
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -74,6 +80,31 @@ describe('AuthService', () => {
       expect(prisma.refreshToken.create.mock.calls[0][0].data.familyId).toBe(
         'family-1',
       )
+    })
+
+    it('keeps the old token valid when issuing the new pair fails', async () => {
+      const revoked = new Set<string>()
+      prisma.refreshToken.findUnique.mockResolvedValue(stored)
+      // Model transaction semantics: writes are discarded if the callback throws.
+      prisma.$transaction.mockImplementation(async (fn) => {
+        const pending = new Set<string>()
+        const tx = {
+          refreshToken: {
+            updateMany: jest.fn(({ where }) => {
+              pending.add(where.id)
+              return { count: 1 }
+            }),
+            create: jest.fn(),
+          },
+        }
+        const result = await fn(tx)
+        pending.forEach((id) => revoked.add(id))
+        return result
+      })
+      jwtService.signAsync.mockRejectedValue(new Error('sign failed'))
+
+      await expect(service.refresh('raw-token')).rejects.toThrow('sign failed')
+      expect(revoked.size).toBe(0)
     })
 
     it('rejects an unknown token', async () => {

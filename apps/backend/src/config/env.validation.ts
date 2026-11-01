@@ -51,7 +51,8 @@ export class EnvironmentVariables {
  *
  * @param config - Raw key/value environment (e.g. `process.env` plus `.env`).
  * @returns The typed environment with defaults applied.
- * @throws Error listing every invalid variable, so startup fails fast.
+ * @throws Error listing every invalid variable, or any `.env.example`
+ *   placeholder left in production, so startup fails fast.
  */
 export function validateEnv(
   config: Record<string, unknown>,
@@ -65,5 +66,25 @@ export function validateEnv(
     throw new Error(`Invalid environment variables:\n${errors.toString()}`)
   }
 
+  if (validated.NODE_ENV === 'production') {
+    assertNoPlaceholders(validated)
+  }
+
   return validated
+}
+
+/** Values copied from `.env.example` that must never reach production. */
+function assertNoPlaceholders(env: EnvironmentVariables): void {
+  const placeholders = [
+    env.JWT_ACCESS_SECRET.startsWith('change-me') && 'JWT_ACCESS_SECRET',
+    env.GOOGLE_CLIENT_ID === 'local-dev-placeholder' && 'GOOGLE_CLIENT_ID',
+    env.GOOGLE_CLIENT_SECRET === 'local-dev-placeholder' &&
+      'GOOGLE_CLIENT_SECRET',
+  ].filter(Boolean)
+
+  if (placeholders.length > 0) {
+    throw new Error(
+      `Placeholder values from .env.example are not allowed in production: ${placeholders.join(', ')}`,
+    )
+  }
 }

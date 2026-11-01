@@ -104,6 +104,13 @@ For deployed environments, set a strong `JWT_ACCESS_SECRET` (`openssl rand
 - `GET /api/auth/google` → Google → `GET /api/auth/google/callback`.
   `POST /api/auth/refresh` rotates the token pair, `POST /api/auth/logout`
   revokes it, `GET /api/users/me` returns the current user.
+- Refresh tokens are single-use. If a rotation fails on the server, nothing is
+  consumed and the client can retry. If the *response* is lost in transit
+  (e.g. the connection drops), the client no longer has the new token and the
+  user must sign in again. This is accepted: allowing the old token to be
+  reused would defeat theft detection.
+- Startup fails in `NODE_ENV=production` if `JWT_ACCESS_SECRET` or the Google
+  credentials are still the `.env.example` placeholders.
 
 ### Database commands
 

@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 
 import { EnvironmentVariables } from '../../config/env.validation'
+import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuthTokensDto } from './dto/auth-tokens.dto'
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface'
@@ -46,20 +47,31 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired.')
     }
 
-    // Atomic claim: only one concurrent request can rotate a given token.
-    const claimed = await this.prisma.refreshToken.updateMany({
-      where: { id: stored.id, revokedAt: null },
-      data: { revokedAt: new Date() },
+    // Claim and re-issue in one transaction so a failure while issuing the new
+    // pair rolls the claim back instead of leaving the user without a valid
+    // refresh token.
+    const tokens = await this.prisma.$transaction(async (tx) => {
+      // Atomic claim: only one concurrent request can rotate a given token.
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: stored.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+      if (claimed.count === 0) {
+        return null
+      }
+
+      return this.createTokens(
+        { id: stored.user.id, email: stored.user.email },
+        stored.familyId,
+        tx,
+      )
     })
-    if (claimed.count === 0) {
+    if (!tokens) {
       await this.revokeFamily(stored.familyId)
       throw new UnauthorizedException('Invalid refresh token.')
     }
 
-    return this.createTokens(
-      { id: stored.user.id, email: stored.user.email },
-      stored.familyId,
-    )
+    return tokens
   }
 
   /** Ends the session the refresh token belongs to. Idempotent. */
@@ -75,16 +87,19 @@ export class AuthService {
   /**
    * Signs an access JWT and persists a new refresh token (hash only) in the
    * given family.
+   *
+   * @param db - Transaction client to write with; defaults to the shared client.
    */
   private async createTokens(
     user: AuthenticatedUser,
     familyId: string,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<AuthTokensDto> {
     const payload: JwtPayload = { sub: user.id, email: user.email }
     const refreshToken = randomBytes(48).toString('base64url')
     const ttlDays = this.config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true })
 
-    await this.prisma.refreshToken.create({
+    await db.refreshToken.create({
       data: {
         userId: user.id,
         familyId,
