@@ -51,6 +51,8 @@ export class AuthService {
     // pair rolls the claim back instead of leaving the user without a valid
     // refresh token.
     const tokens = await this.prisma.$transaction(async (tx) => {
+      await this.lockFamily(tx, stored.familyId)
+
       // Atomic claim: only one concurrent request can rotate a given token.
       const claimed = await tx.refreshToken.updateMany({
         where: { id: stored.id, revokedAt: null },
@@ -116,11 +118,29 @@ export class AuthService {
     }
   }
 
+  /** Revokes every live token of the family, serialized against rotation. */
   private revokeFamily(familyId: string) {
-    return this.prisma.refreshToken.updateMany({
-      where: { familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockFamily(tx, familyId)
+
+      return tx.refreshToken.updateMany({
+        where: { familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
     })
+  }
+
+  /**
+   * Takes a transaction-scoped lock on the family. Rotation and revocation both
+   * hold it, so a revocation can never run between a rotation's claim and its
+   * commit: under READ COMMITTED it would otherwise wait on the claimed row and
+   * then miss the successor inserted by the rotation, leaving a live session.
+   */
+  private async lockFamily(
+    tx: Prisma.TransactionClient,
+    familyId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${familyId}, 0))`
   }
 
   private hash(token: string): string {

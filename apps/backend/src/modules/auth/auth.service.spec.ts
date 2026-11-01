@@ -10,6 +10,7 @@ describe('AuthService', () => {
   const user = { id: 'user-1', email: 'a@example.com' }
   const prisma = {
     $transaction: jest.fn(),
+    $executeRaw: jest.fn(),
     refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -89,6 +90,7 @@ describe('AuthService', () => {
       prisma.$transaction.mockImplementation(async (fn) => {
         const pending = new Set<string>()
         const tx = {
+          $executeRaw: jest.fn(),
           refreshToken: {
             updateMany: jest.fn(({ where }) => {
               pending.add(where.id)
@@ -105,6 +107,17 @@ describe('AuthService', () => {
 
       await expect(service.refresh('raw-token')).rejects.toThrow('sign failed')
       expect(revoked.size).toBe(0)
+    })
+
+    it('locks the family before claiming the token', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue(stored)
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 })
+
+      await service.refresh('raw-token')
+
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.refreshToken.updateMany.mock.invocationCallOrder[0],
+      )
     })
 
     it('rejects an unknown token', async () => {
@@ -166,6 +179,9 @@ describe('AuthService', () => {
         expect.objectContaining({
           where: { familyId: 'family-1', revokedAt: null },
         }),
+      )
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.refreshToken.updateMany.mock.invocationCallOrder[0],
       )
     })
 

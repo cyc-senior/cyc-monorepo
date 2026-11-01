@@ -11,8 +11,9 @@ import {
 } from 'class-validator'
 
 export class EnvironmentVariables {
+  /** Required on purpose: an omitted value must not silently mean "development". */
   @IsIn(['development', 'production', 'test'])
-  NODE_ENV: string = 'development'
+  NODE_ENV: string
 
   @IsInt()
   @Min(1)
@@ -51,8 +52,9 @@ export class EnvironmentVariables {
  *
  * @param config - Raw key/value environment (e.g. `process.env` plus `.env`).
  * @returns The typed environment with defaults applied.
- * @throws Error listing every invalid variable, or any `.env.example`
- *   placeholder left in production, so startup fails fast.
+ * @throws Error listing every invalid variable (including an omitted
+ *   `NODE_ENV`), a published example signing key in any environment, or
+ *   Google placeholders in production, so startup fails fast.
  */
 export function validateEnv(
   config: Record<string, unknown>,
@@ -66,6 +68,12 @@ export function validateEnv(
     throw new Error(`Invalid environment variables:\n${errors.toString()}`)
   }
 
+  if (validated.JWT_ACCESS_SECRET.startsWith(WEAK_SECRET_PREFIX)) {
+    throw new Error(
+      'JWT_ACCESS_SECRET is a published example value; generate a real one ' +
+        '(`pnpm env:init` or `openssl rand -base64 48`).',
+    )
+  }
   if (validated.NODE_ENV === 'production') {
     assertNoPlaceholders(validated)
   }
@@ -73,10 +81,12 @@ export function validateEnv(
   return validated
 }
 
-/** Values copied from `.env.example` that must never reach production. */
+/** Example values that are never acceptable as a signing key, in any env. */
+const WEAK_SECRET_PREFIX = 'change-me'
+
+/** Google placeholders from `.env.example` that must never reach production. */
 function assertNoPlaceholders(env: EnvironmentVariables): void {
   const placeholders = [
-    env.JWT_ACCESS_SECRET.startsWith('change-me') && 'JWT_ACCESS_SECRET',
     env.GOOGLE_CLIENT_ID === 'local-dev-placeholder' && 'GOOGLE_CLIENT_ID',
     env.GOOGLE_CLIENT_SECRET === 'local-dev-placeholder' &&
       'GOOGLE_CLIENT_SECRET',

@@ -22,7 +22,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "ts-node scripts/seed-admin.ts",
-    "dev:token": "ts-node scripts/dev-token.ts"
+    "dev:token": "ts-node scripts/dev-token.ts",
+    "env:init": "ts-node scripts/init-env.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",

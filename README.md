@@ -41,7 +41,7 @@ Prerequisites: Node 20.19+, 22.12+ or 24+ (Prisma 7's minimum), pnpm 9 (`corepac
 ```bash
 pnpm install                                   # also runs `prisma generate`
 docker compose up -d                           # Postgres on :5432
-cp apps/backend/.env.example apps/backend/.env # defaults work for local dev
+pnpm env:init                                  # creates apps/backend/.env + a random JWT secret
 pnpm db:migrate                                # apply migrations
 pnpm db:seed                                   # create the dev admin user
 pnpm dev                                       # frontend :3000, backend :4000
@@ -109,8 +109,15 @@ For deployed environments, set a strong `JWT_ACCESS_SECRET` (`openssl rand
   (e.g. the connection drops), the client no longer has the new token and the
   user must sign in again. This is accepted: allowing the old token to be
   reused would defeat theft detection.
-- Startup fails in `NODE_ENV=production` if `JWT_ACCESS_SECRET` or the Google
-  credentials are still the `.env.example` placeholders.
+- `NODE_ENV` is required (`development`, `test` or `production`); startup fails
+  if it is omitted, so a forgotten variable never silently means "development".
+  `JWT_ACCESS_SECRET` has no default and is empty in `.env.example`:
+  `pnpm env:init` generates one per checkout, and the app refuses the old
+  published example value in every environment. In `production` it also refuses
+  the Google placeholders.
+- Refresh and logout are serialized per token family with a Postgres advisory
+  lock, so a logout (or reuse detection) racing a rotation cannot leave a live
+  session behind.
 
 ### Database commands
 

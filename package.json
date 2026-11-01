@@ -11,6 +11,7 @@
     "dev": "turbo run dev",
     "dev:frontend": "pnpm --filter frontend run dev",
     "dev:backend": "pnpm --filter backend run dev",
+    "env:init": "pnpm --filter backend run env:init",
     "db:generate": "pnpm --filter backend run db:generate",
     "db:migrate": "pnpm --filter backend run db:migrate",
     "db:deploy": "pnpm --filter backend run db:deploy",

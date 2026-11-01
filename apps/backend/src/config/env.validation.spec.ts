@@ -4,6 +4,7 @@ import { validateEnv } from './env.validation'
 
 describe('validateEnv', () => {
   const base = {
+    NODE_ENV: 'development',
     DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
     JWT_ACCESS_SECRET: 'a-real-secret-that-is-at-least-32-chars',
     GOOGLE_CLIENT_ID: 'real-id',
@@ -31,26 +32,43 @@ describe('validateEnv', () => {
     )
   })
 
-  it('allows the .env.example placeholders outside production', () => {
+  it('requires NODE_ENV instead of defaulting to development', () => {
+    expect(() => validateEnv({ ...base, NODE_ENV: undefined })).toThrow(
+      'NODE_ENV',
+    )
+  })
+
+  it.each(['development', 'test', 'production'])(
+    'rejects the published example JWT secret when NODE_ENV=%s',
+    (NODE_ENV) => {
+      expect(() =>
+        validateEnv({
+          ...base,
+          NODE_ENV,
+          JWT_ACCESS_SECRET: 'change-me-to-a-long-random-string',
+        }),
+      ).toThrow('published example value')
+    },
+  )
+
+  it('allows the Google placeholders outside production', () => {
     expect(() =>
       validateEnv({
         ...base,
-        JWT_ACCESS_SECRET: 'change-me-to-a-long-random-string',
         GOOGLE_CLIENT_ID: 'local-dev-placeholder',
         GOOGLE_CLIENT_SECRET: 'local-dev-placeholder',
       }),
     ).not.toThrow()
   })
 
-  it('rejects the .env.example placeholders in production', () => {
+  it('rejects the Google placeholders in production', () => {
     expect(() =>
       validateEnv({
         ...base,
         NODE_ENV: 'production',
-        JWT_ACCESS_SECRET: 'change-me-to-a-long-random-string',
         GOOGLE_CLIENT_ID: 'local-dev-placeholder',
         GOOGLE_CLIENT_SECRET: 'local-dev-placeholder',
       }),
-    ).toThrow('JWT_ACCESS_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET')
+    ).toThrow('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET')
   })
 })
