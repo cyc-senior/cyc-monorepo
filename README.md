@@ -36,7 +36,7 @@ module, all registered in `src/app.module.ts`.
 
 ## Development setup
 
-Prerequisites: Node 20+, pnpm 9 (`corepack enable`), Docker.
+Prerequisites: Node 20.19+, 22.12+ or 24+ (Prisma 7's minimum), pnpm 9 (`corepack enable`), Docker.
 
 ```bash
 pnpm install                                   # also runs `prisma generate`
