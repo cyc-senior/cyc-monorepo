@@ -5,12 +5,19 @@
   "description": "Senior monorepo: Next.js frontend + monolithic NestJS backend, managed by Turborepo.",
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": ">=20"
+    "node": "^20.19 || ^22.12 || >=24.0"
   },
   "scripts": {
     "dev": "turbo run dev",
     "dev:frontend": "pnpm --filter frontend run dev",
     "dev:backend": "pnpm --filter backend run dev",
+    "env:init": "pnpm --filter backend run env:init",
+    "db:generate": "pnpm --filter backend run db:generate",
+    "db:migrate": "pnpm --filter backend run db:migrate",
+    "db:deploy": "pnpm --filter backend run db:deploy",
+    "db:seed": "pnpm --filter backend run db:seed",
+    "db:studio": "pnpm --filter backend run db:studio",
+    "dev:token": "pnpm --filter backend run dev:token",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test:ci",

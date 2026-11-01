@@ -12,3 +12,4 @@ coverage/
 .DS_Store
 *.tsbuildinfo
 .eslintcache
+apps/backend/src/generated/
