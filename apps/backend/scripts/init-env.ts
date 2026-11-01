@@ -22,7 +22,7 @@ function main() {
     /^JWT_ACCESS_SECRET=.*$/m,
     `JWT_ACCESS_SECRET=${secret}`,
   )
-  writeFileSync(target, contents, { mode: 0o600 })
+  writeFileSync(target, contents, { mode: 0o600, flag: 'wx' })
   process.stdout.write(
     'Created apps/backend/.env with a generated JWT secret.\n',
   )
