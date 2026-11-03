@@ -163,7 +163,7 @@
   --shadow-lg: 0px 1px 3px 0px hsl(0 0% 0% / 0.17), 0px 4px 6px -1px hsl(0 0% 0% / 0.17);
   --shadow-xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.17), 0px 8px 10px -1px hsl(0 0% 0% / 0.17);
   --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.43);
-  --tracking-normal: 0em; /* brand PDF sets no tracking; 0 keeps Thai text clean */
+  --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
@@ -185,7 +185,7 @@
   --accent: var(--color-neutral-800); /* #262626 */
   --accent-foreground: var(--color-neutral-50); /* #FAFAFA */
   --destructive: var(--color-red-500); /* #F0382E  status/danger */
-  --destructive-foreground: var(--color-neutral-950); /* #0A0A0A  (derived: white on red-500 is only ~4.0:1) */
+  --destructive-foreground: var(--color-neutral-950); /* #0A0A0A */
   --border: var(--color-neutral-800); /* #262626  border/default */
   --input: var(--color-neutral-700); /* #404040  border/strong */
   --ring: var(--color-lime-400); /* #9AE600  border/focus */
