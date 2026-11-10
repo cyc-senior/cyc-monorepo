@@ -20,6 +20,14 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } })
   }
 
+  /** Updates the profile fields the user may edit themselves. */
+  update(
+    id: string,
+    data: { name?: string; image?: string | null },
+  ): Promise<User> {
+    return this.prisma.user.update({ where: { id }, data })
+  }
+
   /**
    * Resolves the local user for an external identity, creating the user and/or
    * linking the account on first sign-in. Callers must only pass profiles whose

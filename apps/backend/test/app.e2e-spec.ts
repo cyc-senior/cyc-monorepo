@@ -5,7 +5,9 @@ import cookieParser from 'cookie-parser'
 import request from 'supertest'
 
 import { AppModule } from './../src/app.module'
+import { GenerationModule } from './../src/modules/generation/generation.module'
 import { PrismaService } from './../src/prisma/prisma.service'
+import { FakeGenerationModule } from './fake-generation.module'
 
 describe('App (e2e)', () => {
   const user = {
@@ -30,6 +32,8 @@ describe('App (e2e)', () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideModule(GenerationModule)
+      .useModule(FakeGenerationModule)
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile()

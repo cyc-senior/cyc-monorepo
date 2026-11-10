@@ -1,30 +1,27 @@
-import { Controller, Get, NotFoundException } from '@nestjs/common'
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger'
+import { Body, Controller, Get, NotFoundException, Patch } from '@nestjs/common'
+import { ApiTags } from '@nestjs/swagger'
 
+import { User } from '../../generated/prisma/client'
+import { ApiAuthenticated } from '../auth/decorators/api-authenticated.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface'
+import { UpdateUserDto } from './dto/update-user.dto'
 import { UserResponseDto } from './dto/user-response.dto'
 import { UsersService } from './users.service'
 
 @ApiTags('users')
-@ApiBearerAuth()
+@ApiAuthenticated()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
-   * Returns the profile of the user identified by the bearer token.
+   * Get my profile.
    *
-   * @throws NotFoundException when the token's user no longer exists.
+   * @remarks The user identified by the bearer token.
+   * @throws {404} The token's user no longer exists.
    */
   @Get('me')
-  @ApiOkResponse({ type: UserResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token.' })
   async getMe(
     @CurrentUser() current: AuthenticatedUser,
   ): Promise<UserResponseDto> {
@@ -33,6 +30,19 @@ export class UsersController {
       throw new NotFoundException('User not found.')
     }
 
+    return this.toResponse(user)
+  }
+
+  /** Update my display name and avatar. */
+  @Patch('me')
+  async updateMe(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    return this.toResponse(await this.usersService.update(userId, dto))
+  }
+
+  private toResponse(user: User): UserResponseDto {
     return {
       id: user.id,
       email: user.email,
