@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiProperty } from '@nestjs/swagger'
 
 export class UserResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -7,15 +7,11 @@ export class UserResponseDto {
   @ApiProperty({ format: 'email' })
   email: string
 
-  @ApiProperty()
   emailVerified: boolean
 
-  @ApiPropertyOptional({ nullable: true })
   name: string | null
 
-  @ApiPropertyOptional({ nullable: true })
   image: string | null
 
-  @ApiProperty()
   createdAt: Date
 }

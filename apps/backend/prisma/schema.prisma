@@ -24,6 +24,12 @@ model User {
   accounts      Account[]
   refreshTokens RefreshToken[]
 
+  projectMemberships ProjectMember[]
+  projectsCreated    Project[]       @relation("ProjectCreator")
+  approvedRounds     DesignRound[]   @relation("RoundApprover")
+  generationJobs     GenerationJob[] @relation("JobRequester")
+  auditLogs          AuditLog[]      @relation("AuditActor")
+
   @@map("users")
 }
 
@@ -59,4 +65,242 @@ model RefreshToken {
   @@index([userId])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Workspace: projects, their members and their design brief
+// ---------------------------------------------------------------------------
+
+/// Role a user holds in one project. Drives every permission check; see
+/// `src/modules/access/permissions.ts` for the role → permission matrix.
+enum ProjectRole {
+  /// Owns the project and its design. Whoever creates a project is one.
+  DESIGNER
+  /// Reads everything.
+  PROJECT_MANAGER
+  /// Reads everything.
+  PRODUCT_OWNER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Component library the generated UI is built with.
+enum UiLibrary {
+  SHADCN
+  MUI
+}
+
+/// The top-level workspace. Whoever creates a project is its designer (owner)
+/// and invites the rest of the team. The design brief (intent, UI library, persona, brand,
+/// tone, tokens) lives on the project and grounds every generation.
+model Project {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String
+  description      String?
+  status           ProjectStatus @default(ACTIVE)
+  /// What the design must achieve, and for whom.
+  designIntent     String
+  uiLibrary        UiLibrary
+  targetPersona    Json          @default("{}")
+  designGuidelines Json          @default("{}")
+  brandIdentity    Json          @default("{}")
+  toneOfVoice      Json          @default("{}")
+  /// Colors, spacing, typography, ... applied on top of the UI library.
+  designTokens     Json          @default("{}")
+  /// Incremented whenever the brief changes; generation jobs keep a snapshot.
+  designVersion    Int           @default(1)
+  createdById      String?       @db.Uuid
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  createdBy   User?           @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members     ProjectMember[]
+  userStories UserStory[]
+  rounds      DesignRound[]
+  auditLogs   AuditLog[]
+
+  @@index([createdById])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @db.Uuid
+  userId    String      @db.Uuid
+  role      ProjectRole
+  joinedAt  DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+// ---------------------------------------------------------------------------
+// Design inputs
+// ---------------------------------------------------------------------------
+
+enum UserStoryStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+model UserStory {
+  id                 String          @id @default(uuid()) @db.Uuid
+  projectId          String          @db.Uuid
+  title              String
+  description        String?
+  acceptanceCriteria String?
+  problemStatement   String?
+  status             UserStoryStatus @default(DRAFT)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  project  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  variants UIVariant[] @relation("VariantStories")
+
+  @@index([projectId])
+  @@map("user_stories")
+}
+
+// ---------------------------------------------------------------------------
+// Design rounds, generation and variants
+// ---------------------------------------------------------------------------
+
+enum DesignRoundStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+model DesignRound {
+  id            String            @id @default(uuid()) @db.Uuid
+  projectId     String            @db.Uuid
+  /// Sequential per project, assigned by the server.
+  roundNumber   Int
+  title         String?
+  parentRoundId String?           @db.Uuid
+  status        DesignRoundStatus @default(DRAFT)
+  approvedById  String?           @db.Uuid
+  approvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentRound    DesignRound?    @relation("RoundLineage", fields: [parentRoundId], references: [id], onDelete: SetNull)
+  childRounds    DesignRound[]   @relation("RoundLineage")
+  approvedBy     User?           @relation("RoundApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  generationJobs GenerationJob[]
+  variants       UIVariant[]
+
+  @@unique([projectId, roundNumber])
+  @@index([parentRoundId])
+  @@index([approvedById])
+  @@map("design_rounds")
+}
+
+enum GenerationJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/// One LLM generation run: produces `variantCount` designs for the round from
+/// the project's design brief, constrained to its UI kit and checked against
+/// WCAG 2.0 AA. Processed by the `design-generation` BullMQ queue.
+model GenerationJob {
+  id             String              @id @default(uuid()) @db.Uuid
+  roundId        String              @db.Uuid
+  requestedById  String?             @db.Uuid
+  /// The project's UI kit when the job was created; the designs must use it.
+  uiLibrary      UiLibrary
+  /// Extra instructions on top of the design brief.
+  prompt         String?
+  variantCount   Int
+  modelProvider  String
+  modelName      String
+  status         GenerationJobStatus @default(QUEUED)
+  /// Copy of the brief (and selected user stories) the job generates from.
+  inputSnapshot  Json                @default("{}")
+  /// Token usage, attempts and the accessibility results per variant.
+  outputMetadata Json                @default("{}")
+  /// Why the job failed, for people.
+  error          String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  round       DesignRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  requestedBy User?       @relation("JobRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  variants    UIVariant[]
+
+  @@index([roundId])
+  @@index([requestedById])
+  @@map("generation_jobs")
+}
+
+enum UIVariantStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+/// A design alternative of a round, as a Figma-like node tree (`design`,
+/// JSON, not code) built from the project's UI kit. Every saved design passed
+/// the UI kit guardrail and the WCAG 2.0 AA checks (`accessibility`).
+model UIVariant {
+  id              String          @id @default(uuid()) @db.Uuid
+  roundId         String          @db.Uuid
+  generationJobId String?         @db.Uuid
+  name            String
+  label           String?
+  uiLibrary       UiLibrary
+  design          Json
+  /// Result of the last WCAG 2.0 AA check of `design`.
+  accessibility   Json            @default("{}")
+  /// Incremented on every update.
+  version         Int             @default(1)
+  status          UIVariantStatus @default(DRAFT)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  round         DesignRound    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  generationJob GenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  stories       UserStory[]    @relation("VariantStories")
+
+  @@index([roundId])
+  @@index([generationJobId])
+  @@map("ui_variants")
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+/// Append-only record of a project's mutations; deleted with the project.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?  @db.Uuid
+  changes    Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([actorId])
+  @@map("audit_logs")
 }

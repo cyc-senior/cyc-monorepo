@@ -1,8 +1,9 @@
 import { Controller, Get } from '@nestjs/common'
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger'
+import { ApiTags } from '@nestjs/swagger'
 
 import { Public } from '../auth/decorators/public.decorator'
-import { HealthService, HealthStatus } from './health.service'
+import { HealthStatusDto } from './dto/health-status.dto'
+import { HealthService } from './health.service'
 
 @Public()
 @ApiTags('health')
@@ -10,9 +11,9 @@ import { HealthService, HealthStatus } from './health.service'
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
+  /** Liveness probe. */
   @Get()
-  @ApiOkResponse({ description: 'Service liveness probe.' })
-  getHealth(): HealthStatus {
+  getHealth(): HealthStatusDto {
     return this.healthService.check()
   }
 }
