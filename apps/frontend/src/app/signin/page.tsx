@@ -295,7 +295,11 @@ function SignInContent() {
                     <p className="text-sm text-muted-foreground">
                       Don&apos;t have an account?{" "}
                       <Link
-                        href={sessionCode ? `/signup?session_code=${sessionCode}` : "/signup"}
+                        href={
+                          sessionCode
+                            ? `/signup?session_code=${encodeURIComponent(sessionCode)}`
+                            : "/signup"
+                        }
                         className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
                       >
                         Sign up

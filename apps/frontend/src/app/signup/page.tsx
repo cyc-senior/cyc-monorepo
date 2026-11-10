@@ -206,7 +206,7 @@ function SignUpContent() {
                           <Input
                             id="signup-password"
                             type={showPassword ? "text" : "password"}
-                            placeholder="At least 8 characters with eye icon on the right"
+                            placeholder="At least 8 characters"
                             value={password}
                             error={!!errors.password}
                             className="pr-10"
@@ -269,7 +269,11 @@ function SignUpContent() {
                       <p className="text-sm text-muted-foreground">
                         Already have an account?{" "}
                         <Link
-                          href={sessionCode ? `/signin?session_code=${sessionCode}` : "/signin"}
+                          href={
+                            sessionCode
+                              ? `/signin?session_code=${encodeURIComponent(sessionCode)}`
+                              : "/signin"
+                          }
                           className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
                         >
                           Sign in
