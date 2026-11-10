@@ -58,7 +58,7 @@ export function ABTestingPreview({
           {[0, 1, 2].map((index) => (
             <span
               key={index}
-              className="w-5 h-5 rounded-full bg-skeleton border border-border/70"
+              className="w-5 h-5 rounded-full bg-muted border border-border/70"
             />
           ))}
           <span className="w-5 h-5 rounded-full bg-muted border border-border/70 text-[9px] font-medium text-muted-foreground flex items-center justify-center">

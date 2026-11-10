@@ -95,7 +95,7 @@ export function HeroSection({
               {title}
             </h1>
 
-            <p className="text-[15px] leading-relaxed text-brand-description mb-6 max-w-2xl min-[900px]:max-w-xl">
+            <p className="text-[15px] leading-relaxed text-brand-200 mb-6 max-w-2xl min-[900px]:max-w-xl">
               {description}
             </p>
 

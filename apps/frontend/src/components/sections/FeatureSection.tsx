@@ -25,7 +25,7 @@ export function FeatureSection({
   const textContent = (
     <div className="min-w-0">
       <h2 className="section-heading text-brand-text mb-4">{title}</h2>
-      <p className="text-[15px] leading-relaxed text-brand-text-muted mb-7">
+      <p className="text-[15px] leading-relaxed text-brand-700 dark:text-brand-200 mb-7">
         {description}
       </p>
       {features.length > 0 && (

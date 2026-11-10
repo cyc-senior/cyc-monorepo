@@ -48,7 +48,7 @@ export function TesterRoundsPreview({
       <div className="px-3 sm:px-5 py-5 sm:py-6 overflow-x-auto">
         <div className="flex items-center">
           {/* Round 1 root box */}
-          <div className="shrink-0 rounded-lg bg-brand-subtle border border-brand-subtle-border px-2 sm:px-3.5 py-2 sm:py-3 text-center">
+          <div className="shrink-0 rounded-lg bg-brand-subtle border border-brand-muted px-2 sm:px-3.5 py-2 sm:py-3 text-center">
             <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5" aria-hidden="true">
               <span className="w-1.5 h-1.5 rounded-full bg-design-a" />
               <span className="w-1.5 h-1.5 rounded-full bg-design-b" />
@@ -100,11 +100,11 @@ export function TesterRoundsPreview({
                         className={cn(
                           "w-[18px] h-[18px] sm:w-6 sm:h-6 rounded-full text-[9px] sm:text-[11px] font-semibold flex items-center justify-center shrink-0",
                           round.status === "done" &&
-                            "bg-round-done border border-round-done-border text-round-done-foreground",
+                            "bg-primary-200 border border-primary-300 text-primary-950 dark:bg-success-subtle dark:border-primary-800 dark:text-primary-text",
                           round.status === "active" &&
                             "bg-card border-2 border-primary",
                           round.status === "review" &&
-                            "bg-warning-subtle border border-warning-border text-foreground",
+                            "bg-warning-subtle border border-warning/60 text-warning-foreground dark:border-warning dark:text-orange-100",
                           round.status === "empty" &&
                             "bg-card border border-border"
                         )}

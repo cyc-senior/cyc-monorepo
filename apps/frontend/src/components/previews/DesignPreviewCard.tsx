@@ -30,25 +30,25 @@ export function DesignPreviewCard({
         {layout === "stacked" ? (
           <>
             <div>
-              <div className="h-14 rounded-md bg-skeleton w-full mb-2.5" />
-              <div className="h-2 rounded bg-skeleton w-full mb-1.5" />
-              <div className="h-2 rounded bg-skeleton w-3/4" />
+              <div className="h-14 rounded-md bg-muted w-full mb-2.5" />
+              <div className="h-2 rounded bg-muted w-full mb-1.5" />
+              <div className="h-2 rounded bg-muted w-3/4" />
             </div>
-            <div className="h-6 rounded-md bg-skeleton w-full mt-3" />
+            <div className="h-6 rounded-md bg-muted w-full mt-3" />
           </>
         ) : (
           <>
             <div>
               <div className="flex items-center gap-2 mb-2.5">
-                <div className="w-5 h-5 rounded-full bg-skeleton shrink-0" />
-                <div className="h-2 rounded bg-skeleton flex-1" />
+                <div className="w-5 h-5 rounded-full bg-muted shrink-0" />
+                <div className="h-2 rounded bg-muted flex-1" />
               </div>
-              <div className="h-2 rounded bg-skeleton w-full mb-1.5" />
-              <div className="h-2 rounded bg-skeleton w-2/3 mb-2.5" />
-              <div className="h-11 rounded-md bg-skeleton w-full" />
+              <div className="h-2 rounded bg-muted w-full mb-1.5" />
+              <div className="h-2 rounded bg-muted w-2/3 mb-2.5" />
+              <div className="h-11 rounded-md bg-muted w-full" />
             </div>
             <div className="flex justify-end mt-3">
-              <div className="h-6 rounded-md bg-skeleton w-2/5" />
+              <div className="h-6 rounded-md bg-muted w-2/5" />
             </div>
           </>
         )}
@@ -56,4 +56,3 @@ export function DesignPreviewCard({
     </div>
   );
 }
-

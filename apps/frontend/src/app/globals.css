@@ -108,24 +108,14 @@
   /* --- CYC extras: primary --- */
   --primary-hover: var(--color-lime-500); /* #7CCF00 */
   --primary-subtle: var(--color-lime-100); /* #ECFCCA */
-  --primary-border: var(--color-lime-300); /* #BBF451 */
   --primary-text: var(--color-lime-700); /* #497D00  lime text on light bg (never lime-400) */
 
   /* --- CYC extras: brand --- */
   --brand: var(--color-indigo-900); /* #15095D  bg/brand */
   --brand-foreground: var(--color-neutral-0); /* #FFFFFF  text/on-brand (17.1:1 AAA) */
-  --brand-description: var(--color-indigo-200); /* #CBD1FA */
   --brand-subtle: var(--color-indigo-50); /* #F3F4FF */
-  --brand-subtle-border: var(--color-indigo-100); /* #E4E8FE */
   --brand-muted: var(--color-indigo-100); /* #E4E8FE */
   --brand-text: var(--color-indigo-900); /* #15095D  text/brand */
-  --brand-text-muted: #4C4B78;
-
-  /* --- CYC extras: landing preview & skeleton --- */
-  --round-done: var(--color-lime-200); /* #D8F999 */
-  --round-done-border: var(--color-lime-300); /* #BBF451 */
-  --round-done-foreground: var(--color-lime-950); /* #192E03 */
-  --skeleton: var(--color-neutral-100); /* #F5F5F5 */
 
   /* --- CYC extras: text, link, border, overlay --- */
   --link: var(--color-sky-700); /* #1F5FC2  text/link */
@@ -149,8 +139,6 @@
   --success-foreground: var(--color-lime-950); /* #192E03 */
   --warning: var(--color-orange-500); /* #FF8A3D */
   --warning-subtle: var(--color-orange-100); /* #FFE8D9 */
-  --warning-border: #F5B891;
-  --warning-text: var(--color-orange-700); /* #A8460A */
   --warning-foreground: var(--color-indigo-900); /* #15095D  */
   --danger: var(--color-red-700); /* #B4211A */
   --danger-subtle: var(--color-red-100); /* #FDE3E1 */
@@ -251,8 +239,6 @@
   --success-foreground: var(--color-lime-950); /* #192E03 */
   --warning: var(--color-orange-500); /* #FF8A3D */
   --warning-subtle: var(--color-orange-700); /* #A8460A */
-  --warning-border: var(--color-orange-500);
-  --warning-text: var(--color-orange-100);
   --warning-foreground: var(--color-indigo-900); /* #15095D */
   --danger: var(--color-red-500); /* #F0382E */
   --danger-subtle: var(--color-red-700); /* #B4211A */
@@ -260,68 +246,6 @@
   --info: var(--color-sky-500); /* #4D9BFF */
   --info-subtle: var(--color-sky-700); /* #1F5FC2 */
   --info-foreground: var(--color-indigo-900); /* #15095D */
-}
-
-/*  3b. LANDING PAGE LIGHT-SCHEME SCOPE (matches reference screenshot 100% regardless of OS dark mode) */
-.landing-theme,
-.dark .landing-theme {
-  color-scheme: only light;
-  background-color: var(--background);
-  color: var(--foreground);
-
-  --background: #FFFFFF;
-  --foreground: #202020;
-  --card: #FFFFFF;
-  --card-foreground: #202020;
-  --popover: #FFFFFF;
-  --popover-foreground: #202020;
-  --muted: #F5F5F5;
-  --muted-foreground: #757575;
-  --accent: #F5F5F5;
-  --accent-foreground: #202020;
-  --border: #E8E8E8;
-  --input: #E4E4E4;
-  --border-strong: #D4D4D4;
-
-  --primary: #80E900;
-  --primary-hover: #73D400;
-  --primary-foreground: #192E03;
-  --primary-subtle: #ECFCCA;
-  --primary-border: #C4F279;
-  --primary-text: #497D00;
-  --ring: #80E900;
-
-  --secondary: #E5E9FF;
-  --secondary-foreground: #170961;
-  --brand: #170961;
-  --brand-foreground: #FFFFFF;
-  --brand-description: #C7C2EE;
-  --brand-muted: #E5E9FF;
-  --brand-subtle: #F3F4FF;
-  --brand-subtle-border: #E0E4FC;
-  --brand-text: #170961;
-  --brand-text-muted: #4C4A78;
-
-  --design-a: #F5A3F0;
-  --design-b: #4D9BFF;
-
-  --success: #5EA500;
-  --success-subtle: #ECFCCA;
-  --success-foreground: #192E03;
-  --round-done: #DCF9A4;
-  --round-done-border: #BEEF6A;
-  --round-done-foreground: #1E3A06;
-
-  --warning: #FF8A3D;
-  --warning-subtle: #FFE8D9;
-  --warning-border: #F5B891;
-  --warning-text: #9A3412;
-  --warning-foreground: #170961;
-
-  --danger: #B4211A;
-  --danger-subtle: #FDE3E1;
-  --danger-foreground: #FFFFFF;
-  --skeleton: #F3F3F3;
 }
 
 /* 4. TAILWIND MAPPING */
@@ -363,7 +287,6 @@
   /* --- primary: semantic and lime color */
   --color-primary-hover: var(--primary-hover);
   --color-primary-subtle: var(--primary-subtle);
-  --color-primary-border: var(--primary-border);
   --color-primary-text: var(--primary-text);
   --color-primary-50: var(--color-lime-50);
   --color-primary-100: var(--color-lime-100);
@@ -380,12 +303,9 @@
   /* --- brand: semantic and indigo color */
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
-  --color-brand-description: var(--brand-description);
   --color-brand-subtle: var(--brand-subtle);
-  --color-brand-subtle-border: var(--brand-subtle-border);
   --color-brand-muted: var(--brand-muted);
   --color-brand-text: var(--brand-text);
-  --color-brand-text-muted: var(--brand-text-muted);
   --color-brand-50: var(--color-indigo-50);
   --color-brand-100: var(--color-indigo-100);
   --color-brand-200: var(--color-indigo-200);
@@ -418,13 +338,8 @@
   --color-success: var(--success);
   --color-success-subtle: var(--success-subtle);
   --color-success-foreground: var(--success-foreground);
-  --color-round-done: var(--round-done);
-  --color-round-done-border: var(--round-done-border);
-  --color-round-done-foreground: var(--round-done-foreground);
   --color-warning: var(--warning);
   --color-warning-subtle: var(--warning-subtle);
-  --color-warning-border: var(--warning-border);
-  --color-warning-text: var(--warning-text);
   --color-warning-foreground: var(--warning-foreground);
   --color-danger: var(--danger);
   --color-danger-subtle: var(--danger-subtle);
@@ -432,7 +347,6 @@
   --color-info: var(--info);
   --color-info-subtle: var(--info-subtle);
   --color-info-foreground: var(--info-foreground);
-  --color-skeleton: var(--skeleton);
 
   /* --- fonts --- */
   --font-sans: var(--font-ibm-plex-sans-thai, "IBM Plex Sans Thai"), ui-sans-serif, system-ui, sans-serif;

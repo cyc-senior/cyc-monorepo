@@ -7,7 +7,6 @@ export interface PageLayoutProps {
   children: React.ReactNode;
   navbarProps?: NavbarProps;
   footerProps?: FooterProps;
-  forceLightTheme?: boolean;
   className?: string;
 }
 
@@ -15,14 +14,12 @@ export function PageLayout({
   children,
   navbarProps,
   footerProps,
-  forceLightTheme = true,
   className,
 }: PageLayoutProps) {
   return (
     <div
       className={cn(
-        "flex flex-col min-h-screen overflow-x-clip",
-        forceLightTheme && "landing-theme",
+        "flex flex-col min-h-screen overflow-x-clip bg-background text-foreground",
         className
       )}
     >

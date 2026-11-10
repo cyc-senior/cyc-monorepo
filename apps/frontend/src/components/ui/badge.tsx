@@ -11,7 +11,7 @@ const badgeVariants = cva(
         lime: "bg-primary-subtle text-primary-text",
         neutral: "bg-muted text-muted-foreground",
         outline: "border border-border bg-card text-foreground",
-        warning: "bg-warning-subtle text-warning-text",
+        warning: "bg-warning-subtle text-orange-700 dark:text-orange-100",
       },
     },
     defaultVariants: {

@@ -33,7 +33,7 @@ export function CTASection({
             <h2 className="section-heading text-brand-foreground mb-2">
               {title}
             </h2>
-            <p className="text-[15px] text-brand-description">{description}</p>
+            <p className="text-[15px] text-brand-200">{description}</p>
           </div>
 
           {onButtonClick ? (

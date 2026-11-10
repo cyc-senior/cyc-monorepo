@@ -23,7 +23,7 @@ export function FeatureCard({
         <h3 className="font-sans text-sm font-semibold text-brand-text mb-1">
           {title}
         </h3>
-        <p className="text-xs leading-relaxed text-brand-text-muted">
+        <p className="text-xs leading-relaxed text-brand-700 dark:text-brand-200">
           {description}
         </p>
       </div>
