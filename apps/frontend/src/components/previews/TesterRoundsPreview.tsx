@@ -1,6 +1,12 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import {
   testerRoundsPreviewData,
   type TesterRoundRow,
 } from "@/config/landing-page-data";
@@ -27,36 +33,29 @@ export function TesterRoundsPreview({
   className,
 }: TesterRoundsPreviewProps) {
   return (
-    <div
-      className={cn(
-        "rounded-xl bg-card text-card-foreground overflow-hidden shadow-md border border-border",
-        className
-      )}
-    >
+    <Card className={cn("overflow-hidden shadow-md", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border px-5 py-3.5">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-foreground">{title}</span>
-          <span className="text-[11px] text-muted-foreground">{subtitle}</span>
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
-        <Badge variant="lime" className="px-2.5 py-0.5 text-[11px]">
-          {statusLabel}
-        </Badge>
-      </div>
+        <Badge variant="lime">{statusLabel}</Badge>
+      </CardHeader>
 
       {/* Flow diagram */}
-      <div className="px-3 sm:px-5 py-5 sm:py-6 overflow-x-auto">
+      <CardContent className="overflow-x-auto px-3 py-5 sm:px-5 sm:py-6">
         <div className="flex items-center">
           {/* Round 1 root box */}
-          <div className="shrink-0 rounded-lg bg-brand-subtle border border-brand-muted px-2 sm:px-3.5 py-2 sm:py-3 text-center">
-            <div className="flex items-center justify-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5" aria-hidden="true">
-              <span className="w-1.5 h-1.5 rounded-full bg-design-a" />
-              <span className="w-1.5 h-1.5 rounded-full bg-design-b" />
+          <div className="shrink-0 rounded-lg border border-brand-muted bg-brand-subtle px-2.5 py-2 text-center sm:px-3.5 sm:py-3">
+            <div className="mb-1 flex items-center justify-center gap-1.5 sm:mb-1.5" aria-hidden="true">
+              <span className="size-1.5 rounded-full bg-design-a" />
+              <span className="size-1.5 rounded-full bg-design-b" />
             </div>
-            <div className="text-[10px] sm:text-xs font-semibold text-foreground leading-tight whitespace-nowrap">
+            <div className="whitespace-nowrap text-xs font-semibold leading-tight text-foreground">
               {rootLabel}
             </div>
-            <div className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap">
+            <div className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">
               {rootSubtitle}
             </div>
           </div>
@@ -64,9 +63,10 @@ export function TesterRoundsPreview({
           {/* Curved connector branches */}
           <svg
             viewBox="0 0 36 108"
+            preserveAspectRatio="none"
             fill="none"
             aria-hidden="true"
-            className="w-4 sm:w-8 h-[92px] sm:h-[108px] shrink-0 text-border"
+            className="h-24 w-4 shrink-0 text-border sm:h-28 sm:w-8"
           >
             <path
               d="M0 54 C14 54, 14 14, 36 14"
@@ -86,10 +86,10 @@ export function TesterRoundsPreview({
           </svg>
 
           {/* Tester rows */}
-          <div className="flex-1 min-w-0 space-y-3 sm:space-y-3.5">
+          <div className="min-w-0 flex-1 space-y-3 sm:space-y-3.5">
             {testers.map((tester) => (
               <div key={tester.testerLabel} className="flex items-center gap-1.5 sm:gap-2.5">
-                <span className="text-[10px] sm:text-[11px] font-medium text-foreground w-10 sm:w-14 shrink-0 whitespace-nowrap">
+                <span className="w-12 shrink-0 whitespace-nowrap text-xs font-medium text-foreground sm:w-14">
                   {tester.testerLabel}
                 </span>
 
@@ -98,25 +98,25 @@ export function TesterRoundsPreview({
                     <div key={idx} className="flex items-center">
                       <span
                         className={cn(
-                          "w-[18px] h-[18px] sm:w-6 sm:h-6 rounded-full text-[9px] sm:text-[11px] font-semibold flex items-center justify-center shrink-0",
+                          "flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold sm:size-6",
                           round.status === "done" &&
-                            "bg-primary-200 border border-primary-300 text-primary-950 dark:bg-success-subtle dark:border-primary-800 dark:text-primary-text",
+                          "border border-primary-300 bg-primary-200 text-primary-950 dark:border-primary-800 dark:bg-success-subtle dark:text-primary-text",
                           round.status === "active" &&
-                            "bg-card border-2 border-primary",
+                          "border-2 border-primary bg-card",
                           round.status === "review" &&
-                            "bg-warning-subtle border border-warning/60 text-warning-foreground dark:border-warning dark:text-orange-100",
+                          "border border-warning/60 bg-warning-subtle text-warning-foreground dark:border-warning dark:text-orange-100",
                           round.status === "empty" &&
-                            "bg-card border border-border"
+                          "border border-border bg-card"
                         )}
                       >
                         {round.status === "active" ? (
-                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary" />
+                          <span className="size-1.5 rounded-full bg-primary sm:size-2" />
                         ) : (
                           round.value ?? null
                         )}
                       </span>
                       {idx < tester.rounds.length - 1 && (
-                        <div className="w-1 sm:w-2.5 h-px bg-border" />
+                        <div className="h-px w-1 bg-border sm:w-2.5" />
                       )}
                     </div>
                   ))}
@@ -124,7 +124,7 @@ export function TesterRoundsPreview({
 
                 <Badge
                   variant={tester.badge.variant}
-                  className="ml-auto text-[9px] sm:text-[10px] px-1.5 sm:px-2.5 py-0.5"
+                  className="ml-auto px-2 py-0.5 sm:px-2.5"
                 >
                   {tester.badge.label}
                 </Badge>
@@ -132,12 +132,12 @@ export function TesterRoundsPreview({
             ))}
           </div>
         </div>
-      </div>
+      </CardContent>
 
       {/* Footer note */}
-      <div className="px-5 pb-4">
-        <p className="text-[11px] text-muted-foreground">{footnote}</p>
-      </div>
-    </div>
+      <CardFooter className="px-5 pb-4 pt-0">
+        <p className="text-xs text-muted-foreground">{footnote}</p>
+      </CardFooter>
+    </Card>
   );
 }

@@ -12,10 +12,8 @@ const buttonVariants = cva(
           "bg-primary text-primary-foreground font-semibold hover:bg-primary-hover",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        primarySoft:
-          "bg-primary-subtle text-primary-text border border-primary-300 dark:border-primary-800 font-semibold hover:brightness-95",
         outline:
-          "border border-border bg-card text-foreground hover:bg-accent hover:text-accent-foreground",
+          "border border-border bg-background text-foreground shadow-2xs hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
@@ -38,10 +36,13 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 
+/**
+ * Reusable shadcn/ui button supporting standard variants, sizes, and `asChild` composition.
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, type, ...props }, ref) => {
     const Comp = asChild ? SlotPrimitive.Root : "button";

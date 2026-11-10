@@ -5,6 +5,7 @@ export const CYCLogo = ({ className }: { className?: string } = {}) => {
       height="25"
       viewBox="0 0 62 25"
       fill="none"
+      aria-hidden="true"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -48,4 +49,3 @@ export const CYCLogo = ({ className }: { className?: string } = {}) => {
     </svg>
   );
 };
-
