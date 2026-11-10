@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,27 @@ import {
 } from "@/components/ui/card";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COUNTDOWN_SECONDS = 60;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [submitted, setSubmitted] = React.useState(false);
+  const [countdown, setCountdown] = React.useState(COUNTDOWN_SECONDS);
+
+  React.useEffect(() => {
+    if (!submitted || countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [submitted, countdown]);
+
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +50,12 @@ export default function ForgotPasswordPage() {
     }
     setError(null);
     setSubmitted(true);
+    setCountdown(COUNTDOWN_SECONDS);
+  };
+
+  const handleResend = () => {
+    console.log("Resending reset password link to:", email);
+    setCountdown(COUNTDOWN_SECONDS);
   };
 
   return (
@@ -50,12 +71,12 @@ export default function ForgotPasswordPage() {
             <Card className="w-full shadow-sm">
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-semibold">
-                  Forgot password
+                  {submitted ? "Check your email" : "Reset your password"}
                 </CardTitle>
                 <CardDescription>
                   {submitted
-                    ? "Check your inbox. If an account exists, a reset link was sent."
-                    : "Enter your email address and we'll send you a link to reset your password."}
+                    ? `If an account exists for ${email}, we sent a link to reset your password.`
+                    : "Enter your email and we'll send you a reset link."}
                 </CardDescription>
               </CardHeader>
 
@@ -65,20 +86,18 @@ export default function ForgotPasswordPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full cursor-pointer"
-                      onClick={() => setSubmitted(false)}
+                      className="w-full cursor-pointer disabled:cursor-not-allowed"
+                      disabled={countdown > 0}
+                      onClick={handleResend}
                     >
-                      Resend email
+                      {countdown > 0
+                        ? `Resend email (${formatCountdown(countdown)})`
+                        : "Resend email"}
                     </Button>
-                    <div className="text-center">
-                      <Link
-                        href="/signin"
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to sign in
-                      </Link>
-                    </div>
+
+                    <Button variant="ghost" asChild className="w-full">
+                      <Link href="/signin">Back to sign in</Link>
+                    </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -104,14 +123,10 @@ export default function ForgotPasswordPage() {
                       Send reset link
                     </Button>
 
-                    <div className="text-center pt-2">
-                      <Link
-                        href="/signin"
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to sign in
-                      </Link>
+                    <div className="pt-2">
+                      <Button variant="ghost" asChild className="w-full">
+                        <Link href="/signin">Back to sign in</Link>
+                      </Button>
                     </div>
                   </form>
                 )}
@@ -123,4 +138,3 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-
