@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -10,19 +11,14 @@ import {
   MaxLength,
 } from 'class-validator'
 
-import {
-  JsonOutput,
-  RequiredJsonInput,
-} from '../../../common/decorators/json-field.decorator'
+import { JsonOutput } from '../../../common/decorators/json-field.decorator'
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
+import { MAX_HTML_BYTES } from '../../design/html/sanitize-html-design'
 import {
   Prisma,
   UiLibrary,
   UIVariantStatus,
 } from '../../../generated/prisma/client'
-
-const DESIGN_DESCRIPTION =
-  'Figma-like design document (DOCUMENT → CANVAS → FRAME screens of FRAME/TEXT/RECTANGLE/INSTANCE nodes) for the project’s UI kit. See `GET /ui-kits/{uiLibrary}` for its JSON Schema and components. It must pass the UI kit guardrail and WCAG 2.0 AA checks.'
 
 export class CreateUIVariantDto {
   /** @example 'Single-page checkout' */
@@ -37,8 +33,15 @@ export class CreateUIVariantDto {
   @MaxLength(40)
   label?: string | null
 
-  @RequiredJsonInput(DESIGN_DESCRIPTION)
-  design: Record<string, any>
+  /**
+   * The design as one self-contained HTML document (embedded CSS, no
+   * scripts). It is sanitized and must pass the structure, WCAG 2.1 AA markup
+   * and platform checks.
+   */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(MAX_HTML_BYTES)
+  html: string
 
   /** User stories of the project this variant addresses. */
   @ApiPropertyOptional({ type: [String], format: 'uuid' })
@@ -48,19 +51,40 @@ export class CreateUIVariantDto {
   @IsUUID('all', { each: true })
   storyIds?: string[]
 
-  @ApiPropertyOptional({ enum: UIVariantStatus, enumName: 'UIVariantStatus' })
+  /**
+   * DRAFT, READY or ARCHIVED. APPROVED can only be reached through
+   * `POST /variants/{variantId}/approve`.
+   */
+  @ApiPropertyOptional({
+    enum: ['DRAFT', 'READY', 'ARCHIVED'],
+    enumName: 'UIVariantEditableStatus',
+  })
   @IsOptional()
-  @IsEnum(UIVariantStatus)
-  status?: UIVariantStatus
+  @IsIn(['DRAFT', 'READY', 'ARCHIVED'])
+  status?: 'DRAFT' | 'READY' | 'ARCHIVED'
 }
 
 export class UpdateUIVariantDto extends PartialType(CreateUIVariantDto) {}
+
+export class ApproveUIVariantDto {
+  /** Why it is approved (kept in the decision history). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  rationale?: string
+}
 
 export class UIVariantQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: UIVariantStatus, enumName: 'UIVariantStatus' })
   @IsOptional()
   @IsEnum(UIVariantStatus)
   status?: UIVariantStatus
+}
+
+export class UIVariantHistoryDto {
+  /** The variant and its ancestors, newest first. */
+  @ApiProperty({ type: () => [UIVariantDto] })
+  lineage: UIVariantDto[]
 }
 
 export class UIVariantDto {
@@ -74,6 +98,16 @@ export class UIVariantDto {
   @ApiProperty({ format: 'uuid' })
   generationJobId: string | null
 
+  /** The variant this one was refined or iterated from. */
+  @ApiProperty({ format: 'uuid' })
+  parentVariantId: string | null
+
+  /** Who approved it; only a designer's explicit action sets this. */
+  @ApiProperty({ format: 'uuid' })
+  approvedById: string | null
+
+  approvedAt: Date | null
+
   name: string
 
   label: string | null
@@ -81,11 +115,20 @@ export class UIVariantDto {
   @ApiProperty({ enum: UiLibrary, enumName: 'UiLibrary' })
   uiLibrary: UiLibrary
 
-  @JsonOutput(DESIGN_DESCRIPTION)
-  design: Prisma.JsonValue
+  /**
+   * The high-fidelity design: a sanitized, self-contained HTML document.
+   * Render it in `<iframe sandbox srcdoc>` (no `allow-scripts`, no
+   * `allow-same-origin`). Null only for legacy JSON variants.
+   */
+  html: string | null
 
   @JsonOutput(
-    'WCAG 2.0 AA report of the design: `{ standard, level, passed, checkedAt, errors, warnings, issues[], autoFixed[] }`.',
+    'Legacy Figma-like JSON design of variants made before HTML generation; null for HTML variants.',
+  )
+  design: Prisma.JsonValue | null
+
+  @JsonOutput(
+    'Check report of the HTML: `{ standard, scope, passed, checkedAt, errors, warnings, issues[], removed[], bytes }`.',
   )
   accessibility: Prisma.JsonValue
 

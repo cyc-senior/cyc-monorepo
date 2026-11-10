@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common'
 
-import { DesignRound } from '../../generated/prisma/client'
+import { lockKey } from '../../common/db-lock'
+import { DesignRound, Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 
 /**
@@ -25,4 +26,29 @@ export async function requireWritableRound(
   }
 
   return round
+}
+
+/**
+ * Creates the project's next round inside the caller's transaction. Round
+ * numbers are sequential per project; the lock serializes concurrent creators.
+ */
+export async function createNextRound(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  data: { title?: string | null; parentRoundId?: string | null },
+): Promise<DesignRound> {
+  await lockKey(tx, `project-rounds:${projectId}`)
+  const last = await tx.designRound.aggregate({
+    where: { projectId },
+    _max: { roundNumber: true },
+  })
+
+  return tx.designRound.create({
+    data: {
+      projectId,
+      title: data.title,
+      parentRoundId: data.parentRoundId,
+      roundNumber: (last._max.roundNumber ?? 0) + 1,
+    },
+  })
 }

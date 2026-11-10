@@ -8,9 +8,14 @@ import {
   ProjectDto,
   ProjectQueryDto,
   ProjectWithRoleDto,
-  UpdateProjectDesignDto,
   UpdateProjectDto,
 } from './dto/project.dto'
+
+const WITH_INTENT = {
+  designIntent: { select: { id: true } },
+} satisfies Prisma.ProjectInclude
+
+type ProjectRow = Prisma.ProjectGetPayload<{ include: typeof WITH_INTENT }>
 
 @Injectable()
 export class ProjectsService {
@@ -23,6 +28,7 @@ export class ProjectsService {
   ): Promise<Page<ProjectWithRoleDto>> {
     const where: Prisma.ProjectMemberWhereInput = {
       userId,
+      organizationId: query.organizationId,
       project: {
         status: query.status,
         name: query.search
@@ -36,58 +42,80 @@ export class ProjectsService {
       async (page) => {
         const memberships = await this.prisma.projectMember.findMany({
           where,
-          include: { project: true },
+          include: { project: { include: WITH_INTENT } },
           orderBy: { project: { createdAt: 'desc' } },
           ...page,
         })
 
-        return memberships.map(({ project, role }) => ({ ...project, role }))
+        return memberships.map(({ project, role }) => ({
+          ...toDto(project),
+          role,
+        }))
       },
       () => this.prisma.projectMember.count({ where }),
     )
   }
 
   /**
-   * Creates the project with its design brief, makes the creator its
-   * designer (owner) and opens the first design round.
+   * Creates the project inside the organization, makes the creator its
+   * designer and opens the first design round. The design intent is defined
+   * in the next step.
+   *
+   * The caller's right to open projects in the organization was checked by
+   * the organization guard; `organizationId` never comes from the body.
    */
-  async create(
+  create(
     userId: string,
+    organizationId: string,
     dto: CreateProjectDto,
   ): Promise<ProjectWithRoleDto> {
-    const project = await this.prisma.project.create({
-      data: {
-        ...dto,
-        createdById: userId,
-        members: { create: { userId, role: 'DESIGNER' } },
-        rounds: { create: { roundNumber: 1 } },
-      },
-    })
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          ...dto,
+          organizationId,
+          createdById: userId,
+          rounds: { create: { roundNumber: 1 } },
+        },
+        include: WITH_INTENT,
+      })
+      await tx.projectMember.create({
+        data: {
+          projectId: project.id,
+          organizationId,
+          userId,
+          role: 'DESIGNER',
+        },
+      })
 
-    return { ...project, role: 'DESIGNER' }
+      return { ...toDto(project), role: 'DESIGNER' as ProjectRole }
+    })
   }
 
   async get(id: string, role: ProjectRole): Promise<ProjectWithRoleDto> {
     const project = await this.prisma.project.findUniqueOrThrow({
       where: { id },
+      include: WITH_INTENT,
     })
 
-    return { ...project, role }
+    return { ...toDto(project), role }
   }
 
-  update(id: string, dto: UpdateProjectDto): Promise<ProjectDto> {
-    return this.prisma.project.update({ where: { id }, data: dto })
-  }
-
-  /** Changes the design brief and bumps `designVersion`. */
-  updateDesign(id: string, dto: UpdateProjectDesignDto): Promise<ProjectDto> {
-    return this.prisma.project.update({
-      where: { id },
-      data: { ...dto, designVersion: { increment: 1 } },
-    })
+  async update(id: string, dto: UpdateProjectDto): Promise<ProjectDto> {
+    return toDto(
+      await this.prisma.project.update({
+        where: { id },
+        data: dto,
+        include: WITH_INTENT,
+      }),
+    )
   }
 
   async remove(id: string): Promise<void> {
     await this.prisma.project.delete({ where: { id } })
   }
+}
+
+function toDto({ designIntent, ...project }: ProjectRow): ProjectDto {
+  return { ...project, hasDesignIntent: designIntent !== null }
 }

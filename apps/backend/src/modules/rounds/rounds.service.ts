@@ -4,6 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common'
 
+import { recordDecision } from '../../common/decisions'
 import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
@@ -14,6 +15,7 @@ import {
   DesignRoundQueryDto,
   UpdateDesignRoundDto,
 } from './dto/design-round.dto'
+import { createNextRound } from './round-state'
 
 @Injectable()
 export class RoundsService {
@@ -49,22 +51,12 @@ export class RoundsService {
       await this.get(projectId, dto.parentRoundId)
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await lockKey(tx, `project-rounds:${projectId}`)
-      const last = await tx.designRound.aggregate({
-        where: { projectId },
-        _max: { roundNumber: true },
-      })
-
-      return tx.designRound.create({
-        data: {
-          projectId,
-          title: dto.title,
-          parentRoundId: dto.parentRoundId,
-          roundNumber: (last._max.roundNumber ?? 0) + 1,
-        },
-      })
-    })
+    return this.prisma.$transaction((tx) =>
+      createNextRound(tx, projectId, {
+        title: dto.title,
+        parentRoundId: dto.parentRoundId,
+      }),
+    )
   }
 
   get(projectId: string, id: string): Promise<DesignRoundDto> {
@@ -111,7 +103,14 @@ export class RoundsService {
     return this.prisma.designRound.update({ where: { id }, data: dto })
   }
 
-  /** Approves the round once; it is frozen afterwards. */
+  /**
+   * Approves the round once; it is frozen afterwards and becomes visible to
+   * stakeholders (client, developer, project manager). The approval is
+   * recorded in the decision history in the same transaction.
+   *
+   * @throws ConflictException when already approved/archived, or while a test
+   *   session of the round is still running.
+   */
   async approve(
     projectId: string,
     id: string,
@@ -119,31 +118,59 @@ export class RoundsService {
   ): Promise<DesignRoundDto> {
     await this.get(projectId, id)
 
-    // Conditional update: two concurrent approvals cannot both succeed.
-    const claimed = await this.prisma.designRound.updateMany({
-      where: { id, status: { notIn: ['APPROVED', 'ARCHIVED'] } },
-      data: {
-        status: 'APPROVED',
-        approvedById: userId,
-        approvedAt: new Date(),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const running = await tx.testSession.count({
+        where: { roundId: id, status: 'ACTIVE' },
+      })
+      if (running > 0) {
+        throw new ConflictException(
+          'End the round’s running test sessions before approving it.',
+        )
+      }
+      // Conditional update: two concurrent approvals cannot both succeed.
+      const claimed = await tx.designRound.updateMany({
+        where: { id, projectId, status: { notIn: ['APPROVED', 'ARCHIVED'] } },
+        data: {
+          status: 'APPROVED',
+          approvedById: userId,
+          approvedAt: new Date(),
+        },
+      })
+      if (claimed.count === 0) {
+        throw new ConflictException(
+          'The round is already approved or archived.',
+        )
+      }
+      await recordDecision(tx, {
+        projectId,
+        roundId: id,
+        type: 'ROUND_APPROVED',
+        decidedById: userId,
+      })
     })
-    if (claimed.count === 0) {
-      throw new ConflictException('The round is already approved or archived.')
-    }
 
     return this.get(projectId, id)
   }
 
   /**
-   * Deletes the round with its jobs, variants, sessions and results.
+   * Deletes the round with its jobs and variants.
    *
-   * @throws ConflictException for an approved round or the project's last one.
+   * @throws ConflictException for an approved round, one with test sessions,
+   *   or the project's last one.
    */
   async remove(projectId: string, id: string): Promise<void> {
     const round = await this.get(projectId, id)
     if (round.approvedAt) {
       throw new ConflictException('An approved round cannot be deleted.')
+    }
+    const sessions = await this.prisma.testSession.count({
+      where: { roundId: id },
+    })
+    if (sessions > 0) {
+      // Test results are research data; archive the round instead.
+      throw new ConflictException(
+        'A round with test sessions cannot be deleted; archive it instead.',
+      )
     }
 
     await this.prisma.$transaction(async (tx) => {

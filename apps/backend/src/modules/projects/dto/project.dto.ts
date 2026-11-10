@@ -1,87 +1,63 @@
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import {
-  ApiProperty,
-  ApiPropertyOptional,
-  IntersectionType,
-  PartialType,
-  PickType,
-} from '@nestjs/swagger'
-import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator'
 
-import {
-  JsonInput,
-  JsonOutput,
-} from '../../../common/decorators/json-field.decorator'
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
 import {
-  Prisma,
+  Platform,
   ProjectRole,
   ProjectStatus,
-  UiLibrary,
 } from '../../../generated/prisma/client'
 
-/** The design brief every generation in the project is grounded in. */
-export class ProjectDesignDto {
-  /**
-   * What the design must achieve, and for whom.
-   * @example 'Let returning customers check out in under a minute on mobile.'
-   */
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(10000)
-  designIntent: string
-
-  /** Component library the generated UI is built with. */
-  @ApiProperty({ enum: UiLibrary, enumName: 'UiLibrary' })
-  @IsEnum(UiLibrary)
-  uiLibrary: UiLibrary
-
-  @JsonInput('Who the design is for.')
-  targetPersona?: Record<string, any>
-
-  @JsonInput()
-  designGuidelines?: Record<string, any>
-
-  @JsonInput()
-  brandIdentity?: Record<string, any>
-
-  @JsonInput()
-  toneOfVoice?: Record<string, any>
-
-  @JsonInput(
-    'Colors, spacing, typography, ... applied on top of the UI library.',
-  )
-  designTokens?: Record<string, any>
-}
-
-/** Change the brief. Bumps `designVersion`. */
-export class UpdateProjectDesignDto extends PartialType(ProjectDesignDto) {}
-
-export class ProjectDetailsDto {
+/** What a project is created with. The design intent is defined afterwards. */
+export class CreateProjectDto {
   /** @example 'Checkout redesign' */
   @IsString()
   @IsNotEmpty()
   @MaxLength(160)
   name: string
 
+  /**
+   * The client the project is for, or the product it designs.
+   * @example 'Acme Bank mobile app'
+   */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
+  clientOrProduct: string
+
   @IsOptional()
   @IsString()
   @MaxLength(5000)
   description?: string | null
+
+  /** Platforms to design and test for (at least one). */
+  @ApiProperty({
+    enum: Platform,
+    enumName: 'Platform',
+    isArray: true,
+    example: ['DESKTOP', 'MOBILE'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsEnum(Platform, { each: true })
+  platforms: Platform[]
 }
 
-export class CreateProjectDto extends IntersectionType(
-  ProjectDetailsDto,
-  ProjectDesignDto,
-) {}
-
-/** Name, description and archiving. The brief has its own endpoint. */
-export class UpdateProjectDto extends PartialType(ProjectDetailsDto) {
+/** Project details and archiving. The design intent has its own endpoint. */
+export class UpdateProjectDto extends PartialType(CreateProjectDto) {
   @ApiPropertyOptional({ enum: ProjectStatus, enumName: 'ProjectStatus' })
   @IsOptional()
   @IsEnum(ProjectStatus)
@@ -99,39 +75,36 @@ export class ProjectQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(160)
   search?: string
+
+  /** Only projects of this organization. */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string
 }
 
-export class ProjectDto extends PickType(ProjectDesignDto, [
-  'designIntent',
-  'uiLibrary',
-] as const) {
+export class ProjectDto {
   @ApiProperty({ format: 'uuid' })
   id: string
 
+  /** The organization the project belongs to (fixed at creation). */
+  @ApiProperty({ format: 'uuid' })
+  organizationId: string
+
   name: string
 
+  clientOrProduct: string
+
   description: string | null
+
+  @ApiProperty({ enum: Platform, enumName: 'Platform', isArray: true })
+  platforms: Platform[]
 
   @ApiProperty({ enum: ProjectStatus, enumName: 'ProjectStatus' })
   status: ProjectStatus
 
-  @JsonOutput()
-  targetPersona: Prisma.JsonValue
-
-  @JsonOutput()
-  designGuidelines: Prisma.JsonValue
-
-  @JsonOutput()
-  brandIdentity: Prisma.JsonValue
-
-  @JsonOutput()
-  toneOfVoice: Prisma.JsonValue
-
-  @JsonOutput()
-  designTokens: Prisma.JsonValue
-
-  /** Starts at 1; incremented whenever the design brief changes. */
-  designVersion: number
+  /** Whether the design intent has been defined (needed before generating). */
+  hasDesignIntent: boolean
 
   @ApiProperty({ format: 'uuid' })
   createdById: string | null

@@ -51,20 +51,37 @@ export class MembersService {
     )
   }
 
-  /** Adds an already-registered user (looked up by email) to the project. */
-  async add(projectId: string, dto: AddMemberDto): Promise<MemberDto> {
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: dto.email, mode: 'insensitive' } },
-      select: { id: true },
+  /**
+   * Adds a member of the project's organization (looked up by email). Anyone
+   * else — unknown, or merely registered elsewhere — gets the same answer, so
+   * this cannot be used to find out who has an account. The composite foreign
+   * keys on `project_members` back this up in the database.
+   */
+  async add(
+    projectId: string,
+    organizationId: string,
+    dto: AddMemberDto,
+  ): Promise<MemberDto> {
+    const member = await this.prisma.organizationMember.findFirst({
+      where: {
+        organizationId,
+        user: { email: { equals: dto.email, mode: 'insensitive' } },
+      },
+      select: { userId: true },
     })
-    if (!user) {
+    if (!member) {
       throw new NotFoundException(
-        'No registered user has that email. They need to sign in once first.',
+        'That person is not a member of this project’s organization. Ask an organization owner to add them first.',
       )
     }
 
     return this.prisma.projectMember.create({
-      data: { projectId, userId: user.id, role: dto.role },
+      data: {
+        projectId,
+        organizationId,
+        userId: member.userId,
+        role: dto.role,
+      },
       include: MEMBER_INCLUDE,
     })
   }

@@ -15,12 +15,17 @@ import { logEvent } from './common/logging/log-event'
 import { RequestLoggerMiddleware } from './common/logging/request-logger.middleware'
 import { validateEnv } from './config/env.validation'
 import { AccessModule } from './modules/access/access.module'
+import { AiModule } from './modules/ai/ai.module'
 import { AuditModule } from './modules/audit/audit.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { DesignModule } from './modules/design/design.module'
 import { HealthModule } from './modules/health/health.module'
+import { IterationModule } from './modules/iteration/iteration.module'
+import { TestingModule } from './modules/testing/testing.module'
+import { OrganizationsModule } from './modules/organizations/organizations.module'
 import { ProjectsModule } from './modules/projects/projects.module'
 import { RoundsModule } from './modules/rounds/rounds.module'
+import { StakeholdersModule } from './modules/stakeholders/stakeholders.module'
 import { UsersModule } from './modules/users/users.module'
 import { PrismaModule } from './prisma/prisma.module'
 
@@ -39,9 +44,14 @@ import { PrismaModule } from './prisma/prisma.module'
     AuthModule,
     UsersModule,
     HealthModule,
+    OrganizationsModule,
     ProjectsModule,
     DesignModule,
     RoundsModule,
+    IterationModule,
+    TestingModule,
+    AiModule,
+    StakeholdersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: PrismaExceptionFilter },

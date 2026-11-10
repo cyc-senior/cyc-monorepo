@@ -133,101 +133,190 @@ For deployed environments, set a strong `JWT_ACCESS_SECRET` (`openssl rand
 
 ### Domain, roles and permissions
 
-The API models LLM-driven UI design: **project** (with its design brief)
-**→ design rounds** (plus user stories) **→ generation jobs → UI variants**,
-and an audit log. The full, interactive reference (every endpoint, DTO, and
-which roles may call it) is the Swagger UI at `/api`; the raw document is at
-`/api-json`.
+CYC supports the life cycle *design intent & personas → AI-generated HTML alternatives → human
+approval → usability testing → AI feedback analysis → designer review →
+next iteration → stakeholder reports*. **The AI proposes; designers decide**:
+nothing generated or analysed is approved, selected or applied without an
+explicit designer action. The full, interactive reference (every endpoint, DTO,
+and which roles may call it) is the Swagger UI at `/api`. Design documents:
+[`docs/backend-architecture.md`](docs/backend-architecture.md),
+[`docs/authorization.md`](docs/authorization.md),
+[`docs/api-authorization-matrix.md`](docs/api-authorization-matrix.md),
+[`docs/backend-audit.md`](docs/backend-audit.md),
+[`docs/backend-implementation-report.md`](docs/backend-implementation-report.md).
 
-**Projects are the workspace.** Any signed-in user can create one
-(`POST /api/projects`) and becomes its **DESIGNER**, the owner of the project
-and its design. They invite the team by the email of a user who has signed in
-once (`POST /api/projects/:projectId/members`, `{ email, role }`): more
-designers, or a **PROJECT_MANAGER** / **PRODUCT_OWNER**, who read everything
-and change nothing (their say in design decisions is planned to carry a
-role-specific weight).
+**Organizations are the tenant boundary.** Any signed-in user can found one
+(`POST /api/organizations`) and becomes its **ADMIN** (organization roles:
+ADMIN, MEMBER). ADMINs create projects in it
+(`POST /api/organizations/:organizationId/projects`) and add
+people by email (people who have signed in once). Organization membership
+never grants project access, and only organization members can be added to a
+project (also enforced by composite foreign keys).
 
-**The design brief lives on the project:** `designIntent` and `uiLibrary`
-(`SHADCN` or `MUI`) are required on creation; `targetPersona`,
-`designGuidelines`, `brandIdentity`, `toneOfVoice` and `designTokens` are
-optional JSON. Change it with `PATCH /api/projects/:projectId/design`, which
-bumps `designVersion`.
+**Projects are the workspace.** The creator becomes the project's **DESIGNER**
+and adds the team: more designers, a **PROJECT_MANAGER**, a **CLIENT**, a
+**DEVELOPER**, a **PRODUCT_OWNER** (same permissions as the project manager for
+now); `CLIENT` is also available. Project roles are separate from
+organization roles. A user
+has one role per project (`ProjectMember`). **Testers are not accounts or
+project members**: a tester is a participant of one test session, invited by a
+designer and let in with a secret invitation (see *Testing space*).
 
-A user has one **role per project** (`ProjectMember`); a role grants
-**permissions** (`src/modules/access/permissions.ts` is the single source of
-truth, and the table below is generated from it):
+**Creating a project** takes its name, the client or product, a description
+and the platforms to design and test for (`DESKTOP`, `MOBILE`, `TABLET`).
+**The design intent is the next step** (`PUT
+/api/projects/:projectId/design-intent`): design system (`SHADCN` or `MUI`) and
+standards (default `WCAG 2.1 AA`), design guidelines, brand & CI (three hex
+colors — primary, secondary, accent — and brand notes), tone of voice for the
+LLM and the intent statement; every change bumps `version`. **User personas**
+(`/api/projects/:projectId/personas`: name, age, short description, behavioral
+considerations, frustrations, goals, tasks) belong to the project
+(Organization → Project → User Persona). All of it goes into every design
+prompt.
 
-| Permission       | DESIGNER | PROJECT_MANAGER | PRODUCT_OWNER |
-| ---------------- | :------: | :-------------: | :-----------: |
-| `project:read`   |    ✓     |        ✓        |       ✓       |
-| `project:update` |    ✓     |                 |               |
-| `project:delete` |    ✓     |                 |               |
-| `member:read`    |    ✓     |        ✓        |       ✓       |
-| `member:manage`  |    ✓     |                 |               |
-| `design:read`    |    ✓     |        ✓        |       ✓       |
-| `design:write`   |    ✓     |                 |               |
-| `design:approve` |    ✓     |                 |               |
-| `audit:read`     |    ✓     |        ✓        |       ✓       |
+A role grants **permissions** (`src/modules/access/permissions.ts` is the single
+source of truth, and the table below is generated from it):
 
-How it is enforced:
+| Permission | DESIGNER | PROJECT_MANAGER | PRODUCT_OWNER | CLIENT | DEVELOPER |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `project:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `project:update` | ✓ |  |  |  |  |
+| `project:delete` | ✓ |  |  |  |  |
+| `member:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `member:manage` | ✓ |  |  |  |  |
+| `design:read` | ✓ |  |  |  |  |
+| `design:write` | ✓ |  |  |  |  |
+| `design:approve` | ✓ |  |  |  |  |
+| `testing:read` | ✓ |  |  |  |  |
+| `testing:manage` | ✓ |  |  |  |  |
+| `feedback:read` | ✓ |  |  |  |  |
+| `analysis:read` | ✓ |  |  |  |  |
+| `analysis:write` | ✓ |  |  |  |  |
+| `iteration:manage` | ✓ |  |  |  |  |
+| `shared-round:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `shared-round:respond` |  |  |  | ✓ |  |
+| `handoff:read` |  |  |  |  | ✓ |
+| `status:read` | ✓ | ✓ | ✓ |  |  |
+| `report:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `report:generate` | ✓ |  |  |  |  |
+| `audit:read` | ✓ |  |  |  |  |
 
-- A controller method declares `@Authorize(Permission.X)`. The guard reads
-  `:projectId` from the route, loads the caller's role in that project, and
-  checks the permission. Not a member → `404` (ids cannot be probed); member
-  without the permission → `403`. A guarded route with no `:projectId` fails
-  closed.
-- `test/rbac.e2e-spec.ts` fails if any route with `:projectId` lacks
-  `@Authorize`, so a forgotten decorator cannot ship.
-- Item routes (`/projects/:projectId/variants/:variantId`) are always looked up
-  _through_ the project (`common/scopes.ts`), and ids inside request bodies
-  (e.g. `storyIds`) are checked against the same project.
-- Membership rules: a project always keeps at least one DESIGNER (checked under
-  an advisory lock); anyone can leave.
-- Approving a round records the approver and freezes it (it can then only be
-  archived); deleting a project/round cascades its data, the audit log
-  included.
+How it is enforced (details in `docs/authorization.md`):
+
+- A controller method declares `@Authorize(Permission.X)` (project) or
+  `@AuthorizeOrg(OrgPermission.X)` (organization). The guard reads the id from
+  the route, loads the caller's role from the database, and checks the
+  permission. Not a member → `404` (ids cannot be probed); member without the
+  permission → `403`. A guarded route with no id parameter fails closed.
+- `test/rbac.e2e-spec.ts` is meant to fail if any route with `:projectId`
+  lacks `@Authorize`, so a forgotten decorator cannot ship (this spec predates
+  the current permission matrix and has not been updated yet).
+- Item routes are always looked up _through_ the project
+  (`common/scopes.ts`, `where { id, projectId }`), and ids inside request
+  bodies (`storyIds`, `baseVariantId`, `variantIds`, `feedbackIds`, ...) are
+  checked against the same project. Composite foreign keys make cross-project
+  and cross-session links impossible to store.
+- Membership rules: a project always keeps at least one DESIGNER, an
+  organization at least one ADMIN (checked under advisory locks); anyone can
+  leave.
+- Approving a variant or a round records the approver and freezes it;
+  approving a round shares it with stakeholders. Deleting a project cascades its
+  data, the audit log included; run test sessions and their results are research
+  data and cannot be deleted piecemeal.
 - Every successful `POST`/`PUT`/`PATCH`/`DELETE` on a controller marked
   `@AuditEntity('…')` is written to `AuditLog` (actor, action such as
-  `DesignRound.approve`, entity, redacted request body). Read it with
-  `GET /api/projects/:projectId/audit-logs`.
+  `DesignRound.approve`, entity, redacted request body) and logged as a domain
+  event. Read it with `GET /api/projects/:projectId/audit-logs`.
 
-### LLM design generation
+### Testing space (usability tests)
+
+1. A designer creates a session for **approved** variants of a round
+   (`POST /api/projects/:projectId/test-sessions`; one variant = usability test,
+   several = comparative), adds tasks, invites testers by email
+   (`POST …/participants`, `assignment: ALL | BALANCED` for within/between-group
+   designs) and activates it (a deadline ≤ 60 days is required).
+2. Each invitation is a secret shown once (only its SHA-256 is stored), returned
+   as a link with the token in the URL **fragment**. The tester exchanges it at
+   `POST /api/testing/join` (public, rate-limited) for a short-lived tester
+   token (audience `cyc-testing`) that works only on `/api/testing/...` and
+   expires with the session. Every tester request re-checks that the participant
+   and session are still allowed (not revoked/withdrawn, session `ACTIVE` and
+   inside its window).
+3. **PDPA consent** is per session and per notice version, append-only, with
+   the hash of the text shown; nothing (prototype, tasks, events, feedback) works
+   without it, and withdrawing ends access.
+4. Testers start/finish tasks, send interaction events and **contextual
+   feedback** (component or whole page, or skip). Raw feedback is immutable.
+   Designers read progress, raw feedback, events and the consent history.
+
+### AI feedback analysis and iteration
+
+`POST …/analyses` queues an analysis (BullMQ `ai-tasks`, SSE progress). The
+worker sends the text of the round's feedback (no participant identity, contact
+details masked, withdrawn participants excluded) to the text model, validates
+the answer and saves proposed **themes**. The designer reviews them: edit,
+accept/reject, **merge**, **split**, add, mark **won't fix** (with a reason),
+then approves the analysis and **selects** accepted themes.
+`POST …/rounds/:roundId/iterate` opens the next round, records which themes it
+addresses (the reviewed text becomes part of the next generation prompt) and
+optionally carries variants forward; `GET …/rounds/:roundId/trace` and
+`GET …/decisions` explain how feedback led to the next design. AI-drafted user
+stories (`POST …/story-generations`) arrive as `DRAFT` for review.
+
+### Stakeholders and reports
+
+Approved rounds are shared: `GET …/shared-rounds` (all non-tester roles),
+`…/acknowledge` and `…/comments` (client), `GET …/handoff` (developer: design system,
+tokens, components used, technical risks, design spec), `GET …/status`
+(designer, PM). Designers generate **reports** (`POST …/reports`, types `CLIENT`,
+`DEVELOPER`, `PROJECT_MANAGER`, `DESIGNER`); each role reads only the audience
+written for it. Stakeholder views never include drafts, participants, raw or AI
+feedback, or consent records.
+
+### LLM design generation (persona artifact + high-fidelity HTML)
 
 `POST /api/projects/:projectId/rounds/:roundId/generation-jobs`
-(`{ prompt?, variantCount? (1–4, default 2), storyIds? }`, designers) answers
-`202` with a QUEUED job. The worker then, for each variant:
+(`{ prompt, variantCount? (1–4, default 2), personaIds?, storyIds?,
+synthesizePersona? (default true), baseVariantId?, idempotencyKey? }`,
+designers) answers `202` with a QUEUED job. The project needs a design intent
+first (`409` otherwise). With `baseVariantId` the job *refines* that HTML
+variant following `prompt`; repeating a request with the same `idempotencyKey`
+returns the original job. The worker then:
 
-1. Prompts the model (`LLM_MODEL` on the OpenAI-compatible `LLM_BASE_URL`) with
-   the project's design brief, the chosen user stories, the UI kit's component
-   catalog and the WCAG rules, and constrains the answer with a **JSON schema
-   built for the kit**: an `INSTANCE` node can only name a component of that
-   kit. Earlier variants are listed so each one takes a different approach.
-2. Checks the design: the **UI kit guardrail** (only the kit's components,
-   props and values; containers only where the kit has them; kit fonts) and
-   **WCAG 2.0 AA** as far as a static design shows it: 1.1.1 text
-   alternatives, 1.3.1/3.3.2 labels and headings, 1.4.3 contrast (alpha
-   blended over the real background, including the colors the kit itself
-   draws, e.g. MUI's warning button fails), 2.4.2 screen titles, 2.4.4 link
-   purpose, 3.1.1 language, 4.1.2 names of controls.
-3. Sends a failing design back to the model with the list of issues, up to
-   `DESIGN_REPAIR_ATTEMPTS` (default 2) times; text contrast still failing after
-   that is recolored deterministically (recorded in `autoFixed`). A design that
-   still fails is dropped, with its issues in the job's `outputMetadata`.
+1. **Saves a persona artifact**: the text model (`LLM_ANALYSIS_MODEL`)
+   synthesizes a user persona from the prompt and the project context; it is
+   validated and stored as a project persona (`origin: AI`, linked to the job)
+   before any design is made, and leads the persona list of the prompt.
+2. **Fills the design prompt template** with the project (name, client or
+   product, description, platforms), the design intent (statement, design
+   system & standards, brand colors and notes, tone of voice), the personas
+   (the artifact plus the picked ones, or every designer-written persona), the
+   user stories and the request. Earlier variants are listed so each takes a
+   different approach.
+3. **Generates high-fidelity HTML** with `LLM_MODEL` (`{ title, rationale,
+   html }` under a JSON schema), **sanitizes** it (no scripts, handlers,
+   frames, `javascript:` URLs or external resources except Google Fonts) and
+   **checks** it: document structure, WCAG 2.1 AA as far as markup shows it
+   (3.1.1 language, 2.4.2 title, 1.3.1 headings/landmarks, 1.1.1 alt text,
+   3.3.2 labels, 4.1.2 control names, 2.4.4 link purpose), viewport and media
+   queries for the target platforms, and use of the brand colors. A failing
+   design goes back to the model with its issues, up to
+   `DESIGN_REPAIR_ATTEMPTS` (default 2) times, then is dropped with its issues
+   in the job's `outputMetadata`.
 
 Passing designs are saved, in one transaction, as READY variants of the round
-with `design` (the document) and `accessibility` (the WCAG report). If none
-passes, the job is FAILED.
+(never APPROVED: a designer approves with `POST …/variants/:variantId/approve`)
+with `html` and `accessibility` (the check report). If none passes, the job is
+FAILED (the persona artifact stays).
 
-**Design format.** Figma-like JSON, not code: `DOCUMENT → CANVAS → FRAME`
-screens made of `FRAME` (auto layout: `layoutMode`, `itemSpacing`,
-`padding*`, `fills`, ...), `TEXT` (`characters`, `style`), `RECTANGLE` (shapes,
-image placeholders) and `INSTANCE` (`componentKey` +
-`componentProperties` of the kit), with `a11y` annotations (role, heading
-level, label, decorative). `GET /api/ui-kits/{SHADCN|MUI}` returns the kit's
-components, the theme the checks assume and the document's JSON Schema.
-Hand-made or edited designs (`POST …/rounds/:roundId/variants`,
-`PATCH …/variants/:variantId`) go through the same checks and are rejected with
-`422` and the list of `issues` when they fail.
+**Rendering.** A variant's `html` is a self-contained document (one `<style>`,
+no scripts). The frontend must render it in `<iframe sandbox srcdoc="…">`
+without `allow-scripts` or `allow-same-origin`. Hand-made or edited designs
+(`POST …/rounds/:roundId/variants`, `PATCH …/variants/:variantId`, `{ html }`)
+go through the same sanitizer and checks and are rejected with `422` and the
+list of `issues` when they fail. Variants from before the switch keep their
+Figma-like JSON in `design` (read-only). Full contract:
+[`docs/design-generation-and-personas.md`](docs/design-generation-and-personas.md).
 
 **Queue (BullMQ).** Jobs run on the `design-generation` queue in Redis
 (`REDIS_URL`, namespace `QUEUE_PREFIX`). The database row is the source of
@@ -240,6 +329,13 @@ stops a running one within seconds without saving anything.
 `GENERATION_CONCURRENCY` (default 2) sets jobs per worker. Give each
 environment sharing a Redis its own `QUEUE_PREFIX`, or their workers take each
 other's jobs.
+
+**AI analysis queue.** Feedback analysis and user-story drafting run on a second
+queue, `ai-tasks`, with the same guarantees (row id as payload, retries with
+backoff, cancel, idempotency keys, boot-time reconciliation, requester
+re-authorized at execution time, answers validated before saving) and the same
+SSE shape (`GET …/analyses/:id/events`, `GET …/story-generations/:id/events`).
+`LLM_ANALYSIS_MODEL` picks the text model (default `LLM_MODEL`).
 
 **Live progress (SSE).** `GET …/generation-jobs/:jobId/events` is a
 `text/event-stream` (bearer auth, so use a fetch-based EventSource such as
@@ -297,7 +393,7 @@ a well-formed incoming `X-Request-Id` or generated, and echoed in the response.
   Events without a member behind them are logged where they happen: sign-in,
   refresh, refresh-token reuse, logout; generation `queued`/`started`/
   `succeeded`/`failed`/`cancelled`, every design check (`design.checked`
-  with structure/UI kit/WCAG error counts) and LLM call (`llm.completion`
+  with error/warning counts and size; `persona.synthesized` / `persona.saved`) and LLM call (`llm.completion`
   with duration and token usage).
 - **Security signals:** access denials with the reason (`not_a_member`,
   `missing_permission`) are `warn`.
@@ -311,8 +407,12 @@ Lines read `event key=value …` so they grep well in both formats. Use
 
 Not included yet: rendering designs (the frontend draws the document with the
 kit), checks that need a running UI (keyboard focus order, 1.4.4 resize,
-dark themes), design-decision weights per role, and email invitations (team
-members are added by the email of a user who has already signed in).
+dark themes), design-decision weights per role, email delivery (invitations to
+tester sessions are links the designer sends; team members are added by the
+email of a user who has already signed in), email/password sign-in with
+verification and password recovery (Google is the only identity provider),
+account disabling, a queue dashboard, and distributed rate limiting. See
+`docs/backend-implementation-report.md` for the full list of remaining gaps.
 
 ### Database commands
 

@@ -1,50 +1,56 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { z } from 'zod'
 
+import { llmJsonSchema } from '../../common/json-schema'
 import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
+import { checkHtml, HtmlIssue, HtmlReport } from '../design/html/check-html'
+import { MAX_HTML_BYTES } from '../design/html/sanitize-html-design'
 import {
-  AccessibilityReport,
-  accessibilityReport,
-  checkDesign,
-  DesignIssue,
-  applyFixes,
-} from '../design/document/check-design'
-import {
-  DesignDocument,
-  GeneratedDesign,
-  generatedDesignJsonSchema,
-  generatedDesignSchema,
-  toDesignDocument,
-  toGeneratedDesign,
-} from '../design/document/design-document'
-import { UiKit } from '../design/document/ui-kits'
-import { asConversation, GenerationInput, repairPrompt } from './design-prompts'
+  asConversation,
+  GenerationInput,
+  PersonaInput,
+  repairPrompt,
+} from './design-prompts'
 import { GenerationProgress } from './generation.constants'
 import { LlmClient, LlmMessage } from './llm.client'
 
-export type VariantResult =
-  | {
-      passed: true
-      document: DesignDocument
-      accessibility: AccessibilityReport
-      attempts: number
-      autoFixed: string[]
-      usage: Usage
-    }
-  | { passed: false; issues: DesignIssue[]; attempts: number; usage: Usage }
+const designSchema = z
+  .object({
+    title: z.string().min(1).max(160),
+    rationale: z.string().min(1).max(2000),
+    html: z.string().min(50).max(MAX_HTML_BYTES),
+  })
+  .strict()
+
+const DESIGN_JSON_SCHEMA = llmJsonSchema(designSchema)
 
 interface Usage {
   promptTokens: number
   completionTokens: number
 }
 
+export type VariantResult =
+  | {
+      passed: true
+      title: string
+      rationale: string
+      /** Sanitized document. */
+      html: string
+      report: HtmlReport
+      attempts: number
+      usage: Usage
+    }
+  | { passed: false; issues: HtmlIssue[]; attempts: number; usage: Usage }
+
 export interface VariantRequest {
-  kit: UiKit
   input: GenerationInput
+  /** Personas to design for; the persona artifact of the prompt comes first. */
+  personas: PersonaInput[]
   index: number
   total: number
-  previous: GeneratedDesign[]
+  previous: Array<{ title: string; rationale: string }>
 }
 
 export interface GenerationHooks {
@@ -53,11 +59,11 @@ export interface GenerationHooks {
 }
 
 /**
- * Generates one design with the LLM, constrained by a JSON schema of the
- * project's UI kit, then checks it (UI kit guardrail + WCAG 2.0 AA). Failing
- * designs go back to the model with the list of issues, up to
- * `DESIGN_REPAIR_ATTEMPTS` times; text contrast left over after that is fixed
- * deterministically. A design that still fails is not returned.
+ * Generates one high-fidelity HTML design with the LLM from the prompt
+ * template (project, design intent, personas, stories, request), then
+ * sanitizes and checks it (structure, WCAG 2.1 AA markup, brand colors,
+ * platforms). A failing design goes back to the model with its issues, up to
+ * `DESIGN_REPAIR_ATTEMPTS` times; one that still fails is not returned.
  */
 @Injectable()
 export class DesignGenerator {
@@ -75,14 +81,20 @@ export class DesignGenerator {
     request: VariantRequest,
     hooks: GenerationHooks = {},
   ): Promise<VariantResult> {
-    const { kit } = request
-    const schema = generatedDesignJsonSchema(kit)
-    const parser = generatedDesignSchema(kit)
-    const messages: LlmMessage[] = asConversation(kit, request.input, request)
+    const { input } = request
+    const messages: LlmMessage[] = asConversation(input, request.personas, {
+      index: request.index,
+      total: request.total,
+      previous: request.previous,
+    })
+    const context = {
+      platforms: input.project.platforms,
+      brandColors: Object.values(input.intent.colors).filter(
+        (color): color is string => Boolean(color),
+      ),
+    }
     const usage: Usage = { promptTokens: 0, completionTokens: 0 }
-    let issues: DesignIssue[] = []
-    let last: DesignDocument | undefined
-    let autoFixed: string[] = []
+    let issues: HtmlIssue[] = []
 
     for (let attempt = 1; attempt <= this.repairs + 1; attempt++) {
       hooks.progress?.({
@@ -91,11 +103,10 @@ export class DesignGenerator {
       })
       const completion = await this.llm.structured({
         messages,
-        schemaName: 'ui_design',
-        schema,
+        schemaName: 'html_design',
+        schema: DESIGN_JSON_SCHEMA,
+        temperature: attempt === 1 ? 0.8 : 0.4,
         signal: hooks.signal,
-        // Repairs should change only what is wrong.
-        temperature: attempt === 1 ? 0.7 : 0.2,
         onDelta: (receivedChars) =>
           hooks.progress?.({
             stage: attempt === 1 ? 'generating' : 'repairing',
@@ -107,65 +118,41 @@ export class DesignGenerator {
       usage.completionTokens += completion.usage.completionTokens
 
       hooks.progress?.({ stage: 'checking', attempt })
-      const parsed = this.parse(
-        completion.content,
-        completion.finishReason,
-        parser,
-      )
-      if (!parsed.design) {
+      const parsed = this.parse(completion.content, completion.finishReason)
+      if ('issues' in parsed) {
         issues = parsed.issues
-        last = undefined
-        // A broken answer is no basis for a repair: ask again from scratch.
-        messages.splice(2)
-        this.logAttempt(request, attempt, issues)
-        continue
-      }
-
-      // Unmarked headings are fixed mechanically: not worth a model round trip.
-      const marked = applyFixes(toDesignDocument(parsed.design, kit), kit, [
-        'headings',
-      ])
-      last = marked.document
-      autoFixed = marked.fixed
-      const check = checkDesign(last, kit)
-      issues = check.issues.filter((issue) => issue.severity === 'error')
-      this.logAttempt(request, attempt, issues)
-      if (check.passed) {
-        return {
-          passed: true,
-          document: last,
-          accessibility: accessibilityReport(check, autoFixed),
-          attempts: attempt,
-          autoFixed,
-          usage,
+      } else {
+        const check = checkHtml(parsed.html, context)
+        this.logger.log(
+          logEvent('design.checked', {
+            variant: request.index,
+            attempt,
+            passed: check.report.passed,
+            errors: check.report.errors,
+            warnings: check.report.warnings,
+            bytes: check.report.bytes,
+          }),
+        )
+        if (check.report.passed) {
+          return {
+            passed: true,
+            title: parsed.title,
+            rationale: parsed.rationale,
+            html: check.html,
+            report: check.report,
+            attempts: attempt,
+            usage,
+          }
         }
+        issues = check.report.issues.filter(
+          (issue) => issue.severity === 'error',
+        )
       }
       hooks.progress?.({ stage: 'checking', attempt, errors: issues.length })
-      messages.splice(
-        2,
-        messages.length,
-        { role: 'assistant', content: JSON.stringify(toGeneratedDesign(last)) },
+      messages.push(
+        { role: 'assistant', content: completion.content },
         { role: 'user', content: repairPrompt(issues) },
       )
-    }
-
-    if (last) {
-      const { document, fixed } = applyFixes(last, kit, [
-        'contrast',
-        'headings',
-      ])
-      const check = checkDesign(document, kit)
-      if (check.passed) {
-        return {
-          passed: true,
-          document,
-          accessibility: accessibilityReport(check, [...autoFixed, ...fixed]),
-          attempts: this.repairs + 1,
-          autoFixed: [...autoFixed, ...fixed],
-          usage,
-        }
-      }
-      issues = check.issues.filter((issue) => issue.severity === 'error')
     }
 
     return { passed: false, issues, attempts: this.repairs + 1, usage }
@@ -174,63 +161,29 @@ export class DesignGenerator {
   private parse(
     content: string,
     finishReason: string | null,
-    parser: ReturnType<typeof generatedDesignSchema>,
-  ): { design?: GeneratedDesign; issues: DesignIssue[] } {
+  ): z.infer<typeof designSchema> | { issues: HtmlIssue[] } {
+    const fail = (message: string) => ({
+      issues: [
+        { rule: 'structure' as const, severity: 'error' as const, message },
+      ],
+    })
     if (finishReason === 'length') {
-      return {
-        issues: [
-          {
-            rule: 'structure',
-            severity: 'error',
-            message: 'The design was cut off (too long); make it more compact.',
-          },
-        ],
-      }
+      return fail(
+        'The answer was cut off: make the document shorter (less repetition, simpler SVGs).',
+      )
     }
     let json: unknown
     try {
       json = JSON.parse(content)
     } catch {
-      return {
-        issues: [
-          {
-            rule: 'structure',
-            severity: 'error',
-            message: 'Output is not valid JSON.',
-          },
-        ],
-      }
+      return fail('The answer was not valid JSON.')
     }
-    const result = parser.safeParse(json)
-    if (!result.success) {
-      return {
-        issues: result.error.issues.slice(0, 20).map((issue) => ({
-          rule: 'structure' as const,
-          severity: 'error' as const,
-          message: `${issue.path.join('.')}: ${issue.message}`,
-        })),
-      }
-    }
+    const parsed = designSchema.safeParse(json)
 
-    return { design: result.data, issues: [] }
-  }
-
-  private logAttempt(
-    request: VariantRequest,
-    attempt: number,
-    issues: DesignIssue[],
-  ) {
-    const count = (rule: DesignIssue['rule']) =>
-      issues.filter((i) => i.rule === rule).length
-    this.logger.log(
-      logEvent('design.checked', {
-        variant: request.index,
-        attempt,
-        passed: issues.length === 0,
-        structure: count('structure'),
-        uiKit: count('ui-kit'),
-        wcag: count('wcag'),
-      }),
-    )
+    return parsed.success
+      ? parsed.data
+      : fail(
+          `The answer did not match the schema: ${parsed.error.issues[0]?.message ?? 'invalid'}.`,
+        )
   }
 }

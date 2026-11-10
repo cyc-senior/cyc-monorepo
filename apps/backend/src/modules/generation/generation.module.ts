@@ -9,9 +9,10 @@ import { DESIGN_GENERATION_QUEUE } from './generation.constants'
 import { GenerationEvents } from './generation-events.service'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmClient } from './llm.client'
+import { PersonaSynthesizer } from './persona-synthesizer'
 
 /**
- * LLM design generation on BullMQ: the producer ({@link GenerationQueue}),
+ * LLM design generation (persona artifact + high-fidelity HTML) on BullMQ: the producer ({@link GenerationQueue}),
  * the worker ({@link DesignGenerationProcessor}, on when `GENERATION_WORKER`)
  * and queue events for SSE ({@link GenerationEvents}).
  */
@@ -33,6 +34,7 @@ import { LlmClient } from './llm.client'
   providers: [
     LlmClient,
     DesignGenerator,
+    PersonaSynthesizer,
     DesignGenerationProcessor,
     GenerationQueue,
     GenerationEvents,

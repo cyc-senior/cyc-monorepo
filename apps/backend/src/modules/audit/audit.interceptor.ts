@@ -12,7 +12,11 @@ import { Observable, mergeMap } from 'rxjs'
 import { logEvent } from '../../common/logging/log-event'
 import { Prisma } from '../../generated/prisma/client'
 import { AccessRequest } from '../access/access.types'
-import { AUDIT_ACTION_KEY, AUDIT_ENTITY_KEY } from './audit.decorators'
+import {
+  AUDIT_ACTION_KEY,
+  AUDIT_ENTITY_KEY,
+  AUDIT_NO_BODY_KEY,
+} from './audit.decorators'
 import { AuditService } from './audit.service'
 
 const VERBS: Record<string, string> = {
@@ -59,7 +63,11 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       mergeMap(async (result: unknown) => {
-        await this.write(request, entityType, action ?? verb, result)
+        const noBody = this.reflector.getAllAndOverride<boolean | undefined>(
+          AUDIT_NO_BODY_KEY,
+          [context.getHandler(), context.getClass()],
+        )
+        await this.write(request, entityType, action ?? verb, result, !noBody)
 
         return result
       }),
@@ -71,6 +79,7 @@ export class AuditInterceptor implements NestInterceptor {
     entityType: string,
     verb: string,
     result: unknown,
+    withBody: boolean,
   ): Promise<void> {
     const resultId = (result as { id?: unknown } | null)?.id
     const entityId =
@@ -78,19 +87,28 @@ export class AuditInterceptor implements NestInterceptor {
     // Creating a project happens outside any project; its creator is its designer.
     const creatingProject = entityType === 'Project' && verb === 'create'
     const projectId = creatingProject ? entityId : request.access?.projectId
-    const role = creatingProject ? 'DESIGNER' : request.access?.role
-    if (!projectId) {
+    const role = creatingProject
+      ? 'DESIGNER'
+      : (request.access?.role ?? request.orgAccess?.role)
+    const organizationId =
+      request.access?.organizationId ?? request.orgAccess?.organizationId
+    if (!projectId && !organizationId) {
       return
     }
 
     this.logger.log(
       logEvent(`${entityType}.${verb}`, {
         id: entityId,
+        organization: organizationId,
         project: projectId,
         actor: request.user.id,
         role,
       }),
     )
+    // The audit log is per project: organization-level changes are logged only.
+    if (!projectId) {
+      return
+    }
     // Deleting a project cascades its audit log away; there is nothing left
     // to attach an entry to.
     if (entityType === 'Project' && verb === 'delete') {
@@ -103,7 +121,10 @@ export class AuditInterceptor implements NestInterceptor {
       action: `${entityType}.${verb}`,
       entityType,
       entityId,
-      changes: verb === 'delete' ? {} : { body: this.summarise(request.body) },
+      changes:
+        verb === 'delete' || !withBody
+          ? {}
+          : { body: this.summarise(request.body) },
     })
   }
 

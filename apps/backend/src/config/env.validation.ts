@@ -147,6 +147,31 @@ export class EnvironmentVariables {
   @IsBoolean()
   GENERATION_WORKER: boolean = true
 
+  /** Longest life of a tester (session participant) access token; it also ends with the session. */
+  @IsInt()
+  @Min(60)
+  TESTER_TOKEN_TTL_SECONDS: number = 14_400
+
+  /**
+   * The API sits behind one reverse proxy (client IPs come from
+   * `X-Forwarded-For`). Needed for per-client rate limits to see real IPs.
+   */
+  @EnvBoolean()
+  @IsBoolean()
+  TRUST_PROXY: boolean = false
+
+  /** Serve the Swagger UI and `/api-json`. Defaults to on, except in production. */
+  @IsOptional()
+  @EnvBoolean()
+  @IsBoolean()
+  SWAGGER_ENABLED?: boolean
+
+  /** Model for feedback analysis and story drafting (proposal: qwen3.8-27b). */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  LLM_ANALYSIS_MODEL?: string
+
   /** Generation jobs one worker runs at once. */
   @IsInt()
   @Min(1)
@@ -198,6 +223,7 @@ export function validateEnv(
       )
     }
   }
+  validated.SWAGGER_ENABLED ??= validated.NODE_ENV !== 'production'
   validated.LOG_FORMAT ??=
     validated.NODE_ENV === 'production' ? 'json' : 'pretty'
 

@@ -2,13 +2,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator'
 
 import { JsonOutput } from '../../../common/decorators/json-field.decorator'
@@ -18,16 +21,19 @@ import {
   UiLibrary,
 } from '../../../generated/prisma/client'
 
-/** The design intent and UI kit come from the project's design brief. */
+/**
+ * The designer's prompt. The project, its design intent and personas come
+ * from the project; the backend fills them into the prompt template.
+ */
 export class CreateGenerationJobDto {
   /**
-   * Extra instructions on top of the brief.
+   * What to design now (with a `baseVariantId`: how to change it).
    * @example 'Checkout for returning customers with a saved card.'
    */
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(4000)
-  prompt?: string
+  prompt: string
 
   /** How many alternative designs to make. */
   @IsOptional()
@@ -43,6 +49,45 @@ export class CreateGenerationJobDto {
   @ArrayMaxSize(20)
   @IsUUID('all', { each: true })
   storyIds?: string[]
+
+  /**
+   * Personas of the project to design for. Default: every persona written by
+   * a designer (up to 5).
+   */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUUID('all', { each: true })
+  personaIds?: string[]
+
+  /**
+   * Synthesize a user persona from this prompt and save it to the project
+   * (origin AI) before designing. On by default.
+   */
+  @IsOptional()
+  @IsBoolean()
+  synthesizePersona?: boolean = true
+
+  /**
+   * Refine an existing variant of the project instead of designing from
+   * scratch: `prompt` then holds the instruction ("make the CTA more
+   * prominent"). The results are new variants whose parent is this one.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  baseVariantId?: string
+
+  /**
+   * Any unique string (e.g. a UUID) chosen by the client. Repeating the request
+   * with the same key returns the original job instead of queuing a second one.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(100)
+  idempotencyKey?: string
 }
 
 export class GenerationJobDto {
@@ -55,11 +100,17 @@ export class GenerationJobDto {
   @ApiProperty({ format: 'uuid' })
   requestedById: string | null
 
-  /** The UI kit the designs are built with (the project's, at creation). */
+  /** The design system of the design intent when the job was created. */
   @ApiProperty({ enum: UiLibrary, enumName: 'UiLibrary' })
   uiLibrary: UiLibrary
 
   prompt: string | null
+
+  /** The variant being refined, if this is a refinement job. */
+  @ApiProperty({ format: 'uuid' })
+  baseVariantId: string | null
+
+  idempotencyKey: string | null
 
   variantCount: number
 
@@ -73,12 +124,12 @@ export class GenerationJobDto {
   status: GenerationJobStatus
 
   @JsonOutput(
-    'The design brief, user stories and prompt the job generates from.',
+    'Everything the prompt template used: project, design intent, personas, stories, prompt.',
   )
   inputSnapshot: Prisma.JsonValue
 
   @JsonOutput(
-    'Token usage and, per variant, attempts, auto-fixes or the issues that made it fail.',
+    'Token usage, the persona artifact id (`personaId`) and, per variant, attempts, warnings or the issues that made it fail.',
   )
   outputMetadata: Prisma.JsonValue
 

@@ -9,7 +9,8 @@ export interface DesignGenerationJobData {
 
 /** Progress a worker reports while generating (relayed over SSE). */
 export interface GenerationProgress {
-  stage: 'started' | 'generating' | 'checking' | 'repairing' | 'saving'
+  stage:
+    'started' | 'persona' | 'generating' | 'checking' | 'repairing' | 'saving'
   /** 1-based variant being worked on, and how many the job makes. */
   variant?: number
   of: number
@@ -25,6 +26,7 @@ export interface GenerationProgress {
 /**
  * Transient failures (LLM timeouts, network, 5xx) are retried with backoff;
  * designs that cannot pass the checks fail for good (`UnrecoverableError`).
+ * A retry reuses the persona artifact an earlier attempt saved.
  * Finished jobs are trimmed from Redis; the database keeps the record.
  */
 export const DESIGN_JOB_OPTIONS: JobsOptions = {

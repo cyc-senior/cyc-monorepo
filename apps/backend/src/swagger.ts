@@ -11,13 +11,21 @@ const TAGS: Array<[string, string]> = [
   ['auth', 'Sign-in and token refresh.'],
   ['users', 'The signed-in user.'],
   [
+    'organizations',
+    'The tenant boundary: an organization, its members and who may open projects.',
+  ],
+  [
     'projects',
-    'The workspace: a project, its design brief (intent, UI kit) and the caller’s role.',
+    'The workspace inside an organization: name, client or product, description, platforms, and the caller’s role.',
   ],
   ['members', 'The project team, and each member’s role.'],
   [
-    'ui-kits',
-    'The UI kits designs are built with (shadcn, MUI) and the design document format.',
+    'design-intent',
+    'The project’s design intent: design system & standards, brand & CI (three colors), tone of voice — reused in every design prompt.',
+  ],
+  [
+    'personas',
+    'User personas of a project (Organization → Project → User Persona), written by designers or synthesized from design prompts.',
   ],
   ['user-stories', 'Problems and acceptance criteria designs address.'],
   ['design-rounds', 'Iterations of a project; approving one freezes it.'],
@@ -27,7 +35,27 @@ const TAGS: Array<[string, string]> = [
   ],
   [
     'ui-variants',
-    'Design alternatives of a round: Figma-like JSON, checked against the UI kit and WCAG 2.0 AA.',
+    'Design alternatives of a round: high-fidelity, sanitized HTML documents, checked for WCAG 2.1 AA markup, platforms and brand colors.',
+  ],
+  [
+    'test-sessions',
+    'Usability test sessions: tasks, invited testers, consent history, progress and raw results (designers).',
+  ],
+  [
+    'testing',
+    'What a tester (session participant) does: join with an invitation, consent, tasks, events, feedback. Separate tester tokens.',
+  ],
+  [
+    'feedback-analysis',
+    'AI analysis of raw feedback (queued, SSE) and the designer’s review: themes, merge/split, won’t-fix, selection.',
+  ],
+  [
+    'stakeholders',
+    'Approved rounds, acknowledgements and comments (client), development handoff (developer), project status (PM).',
+  ],
+  [
+    'reports',
+    'Role-specific reports: client, developer, project manager, designer.',
   ],
   ['audit', 'Who changed what, and when.'],
   ['health', 'Liveness probe.'],
@@ -46,38 +74,57 @@ function permissionTable(): string {
 }
 
 const DESCRIPTION = `
-Backend for designing UIs with an LLM: a project's design intent and UI kit
-(shadcn or MUI) drive generation of alternative designs, delivered as
-Figma-like JSON documents that meet WCAG 2.0 AA.
+Backend of CYC, an AI-assisted UX/UI development life cycle: designers define
+a design intent and user personas, the AI proposes alternative high-fidelity
+HTML designs, designers refine and
+approve them, testers try the approved prototypes, the AI analyses their
+feedback, designers review it and decide what goes into the next iteration, and
+stakeholders follow the approved result. **The AI proposes; people decide**:
+nothing generated or analysed is approved, selected or applied without an
+explicit designer action.
 
-## Workflow
-1. Any signed-in user creates a **project** with its design brief:
-   \`designIntent\` and \`uiLibrary\` (\`SHADCN\` or \`MUI\`), plus optional
-   persona, guidelines, brand, tone and tokens. They become its DESIGNER (the
-   owner) and invite the team.
-2. In a **design round**, \`POST .../rounds/{roundId}/generation-jobs\` queues
-   an LLM job (\`202\`). Follow it with
-   \`GET .../generation-jobs/{jobId}/events\` (server-sent events).
-3. Each design is constrained to the UI kit's components, checked against the
-   kit and WCAG 2.0 AA, and sent back to the model to fix until it passes.
-   Passing designs become READY **variants**; \`GET /ui-kits/{uiLibrary}\`
-   describes the kit and the document format.
+## Workflow (milestones M1–M3, designer)
+1. **Sign in** with Google, then **create an organization** (you become its ADMIN).
+2. **Create a project** in it (org ADMIN): name, client or product, description
+   and the platforms to test (\`DESKTOP\`, \`MOBILE\`, \`TABLET\`). You become the
+   project's DESIGNER; project roles (DESIGNER, PROJECT_MANAGER, PRODUCT_OWNER,
+   DEVELOPER, CLIENT) are separate from organization roles (ADMIN, MEMBER).
+3. **Define the design intent**: \`PUT .../design-intent\` (design system &
+   standards, brand & CI with three colors, tone of voice, intent statement) and
+   **user personas** (\`POST .../personas\`: name, age, short description,
+   behavioral considerations, frustrations, goals, tasks).
+4. **Prompt a design**: \`POST .../rounds/{roundId}/generation-jobs\` with your
+   prompt (\`202\`, follow it over SSE). The worker first **synthesizes a persona
+   artifact** from the prompt and saves it as a project persona (origin AI),
+   then fills the project, intent, personas, stories and prompt into the design
+   template and generates **high-fidelity HTML** variants (sanitized, checked,
+   repaired by the model when checks fail).
+5. Refine (\`baseVariantId\`), then **approve** variants. Later milestones:
+   testing, AI feedback analysis, iteration and stakeholder reports.
+
+**Rendering designs**: a variant's \`html\` is a self-contained document with no
+scripts. Show it in \`<iframe sandbox srcdoc="...">\` without \`allow-scripts\`
+or \`allow-same-origin\`.
 
 ## Authentication
-Sign in with Google and send \`Authorization: Bearer <access token>\` (also on
-event streams: use a fetch-based EventSource).
+Users sign in with Google and send \`Authorization: Bearer <access token>\` (also
+on event streams: use a fetch-based EventSource). **Testers are not users**:
+they enter with a session invitation at \`POST /testing/join\` and receive a
+separate, short-lived tester token that only works on \`/testing/...\`.
 
 ## Access control
-Everything lives inside a **project**. A user has one **role** per project, and
-a role grants **permissions**. Designers own the project and its design;
-project managers and product owners read everything and change nothing. Each
-endpoint lists the permission it needs and the roles that hold it. A caller who
-is not a member gets \`404\` (never \`403\`), so ids cannot be probed.
+Two scopes, both checked on the server on every request:
+- **Organization** roles (ADMIN, MEMBER) decide who manages the organization
+  and who opens projects (ADMIN). They never grant project access.
+- **Project** roles (below) decide everything inside a project. Each endpoint
+  lists the permission it needs and the roles that hold it. A caller who is not
+  a member gets \`404\` (never \`403\`), so ids cannot be probed.
 
 ${permissionTable()}
 
-Membership rules: a project always keeps at least one DESIGNER; anyone can leave
-a project.
+Membership rules: a project member must belong to the project's organization;
+a project always keeps at least one DESIGNER; an organization always keeps one
+ADMIN; anyone can leave.
 
 ## Conventions
 - List endpoints take \`limit\` (1–100, default 50) and \`offset\`, and return

@@ -15,3 +15,11 @@ export const AuditEntity = (entityType: string) =>
  * `update` or `delete` from the HTTP method), e.g. `approve`.
  */
 export const AuditAction = (verb: string) => SetMetadata(AUDIT_ACTION_KEY, verb)
+
+export const AUDIT_NO_BODY_KEY = 'auditNoBody'
+
+/**
+ * Class-level: the audit entry records who did what, but not the request body
+ * (it holds personal data, e.g. participant emails).
+ */
+export const AuditNoBody = () => SetMetadata(AUDIT_NO_BODY_KEY, true)

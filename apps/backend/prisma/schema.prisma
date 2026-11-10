@@ -24,11 +24,22 @@ model User {
   accounts      Account[]
   refreshTokens RefreshToken[]
 
-  projectMemberships ProjectMember[]
-  projectsCreated    Project[]       @relation("ProjectCreator")
-  approvedRounds     DesignRound[]   @relation("RoundApprover")
-  generationJobs     GenerationJob[] @relation("JobRequester")
-  auditLogs          AuditLog[]      @relation("AuditActor")
+  organizationMemberships OrganizationMember[]
+  organizationsCreated    Organization[]         @relation("OrganizationCreator")
+  projectMemberships      ProjectMember[]
+  projectsCreated         Project[]              @relation("ProjectCreator")
+  approvedRounds          DesignRound[]          @relation("RoundApprover")
+  approvedVariants        UIVariant[]            @relation("VariantApprover")
+  generationJobs          GenerationJob[]        @relation("JobRequester")
+  storyGenerations        StoryGeneration[]      @relation("StoryGenerationRequester")
+  auditLogs               AuditLog[]             @relation("AuditActor")
+  testSessionsCreated     TestSession[]          @relation("SessionCreator")
+  analysesRequested       FeedbackAnalysis[]     @relation("AnalysisRequester")
+  analysesReviewed        FeedbackAnalysis[]     @relation("AnalysisReviewer")
+  decisions               DesignDecision[]       @relation("DecisionMaker")
+  roundComments           RoundComment[]         @relation("CommentAuthor")
+  roundAcknowledgements   RoundAcknowledgement[]
+  reportsGenerated        Report[]               @relation("ReportAuthor")
 
   @@map("users")
 }
@@ -68,6 +79,52 @@ model RefreshToken {
 }
 
 // ---------------------------------------------------------------------------
+// Organizations: the tenant boundary above projects
+// ---------------------------------------------------------------------------
+
+/// Role a user holds in one organization. Decides who may manage the
+/// organization and who may open projects in it; it never grants access to a
+/// project by itself (that is `ProjectMember`).
+enum OrganizationRole {
+  /// Manages the organization and its members, and creates projects. Whoever
+  /// creates an organization is one.
+  ADMIN
+  /// Belongs to the organization and can be added to its projects.
+  MEMBER
+}
+
+model Organization {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User?                @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members   OrganizationMember[]
+  projects  Project[]
+
+  @@index([createdById])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  role           OrganizationRole
+  joinedAt       DateTime         @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects     ProjectMember[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+// ---------------------------------------------------------------------------
 // Workspace: projects, their members and their design brief
 // ---------------------------------------------------------------------------
 
@@ -76,10 +133,14 @@ model RefreshToken {
 enum ProjectRole {
   /// Owns the project and its design. Whoever creates a project is one.
   DESIGNER
-  /// Reads everything.
+  /// Follows project status, approved rounds and reports.
   PROJECT_MANAGER
-  /// Reads everything.
+  /// Legacy stakeholder role (same access as PROJECT_MANAGER).
   PRODUCT_OWNER
+  /// Stakeholder: views and comments on shared (approved) rounds.
+  CLIENT
+  /// Reads the development handoff of approved rounds.
+  DEVELOPER
 }
 
 enum ProjectStatus {
@@ -97,47 +158,129 @@ enum UiLibrary {
 /// and invites the rest of the team. The design brief (intent, UI library, persona, brand,
 /// tone, tokens) lives on the project and grounds every generation.
 model Project {
-  id               String        @id @default(uuid()) @db.Uuid
-  name             String
-  description      String?
-  status           ProjectStatus @default(ACTIVE)
-  /// What the design must achieve, and for whom.
-  designIntent     String
-  uiLibrary        UiLibrary
-  targetPersona    Json          @default("{}")
-  designGuidelines Json          @default("{}")
-  brandIdentity    Json          @default("{}")
-  toneOfVoice      Json          @default("{}")
-  /// Colors, spacing, typography, ... applied on top of the UI library.
-  designTokens     Json          @default("{}")
-  /// Incremented whenever the brief changes; generation jobs keep a snapshot.
-  designVersion    Int           @default(1)
-  createdById      String?       @db.Uuid
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @db.Uuid
+  name            String
+  /// The client the project is for, or the product it designs.
+  clientOrProduct String
+  description     String?
+  /// Platforms the design must work on and be tested on.
+  platforms       Platform[]    @default([DESKTOP])
+  status          ProjectStatus @default(ACTIVE)
+  createdById     String?       @db.Uuid
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  createdBy   User?           @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  members     ProjectMember[]
-  userStories UserStory[]
-  rounds      DesignRound[]
-  auditLogs   AuditLog[]
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy        User?              @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  designIntent     DesignIntent?
+  personas         UserPersona[]
+  members          ProjectMember[]
+  userStories      UserStory[]
+  rounds           DesignRound[]
+  auditLogs        AuditLog[]
+  testSessions     TestSession[]
+  analyses         FeedbackAnalysis[]
+  decisions        DesignDecision[]
+  reports          Report[]
+  storyGenerations StoryGeneration[]
 
+  /// Target of the composite foreign key that pins a member to the project's organization.
+  @@unique([id, organizationId])
+  @@index([organizationId])
   @@index([createdById])
   @@map("projects")
 }
 
-model ProjectMember {
-  id        String      @id @default(uuid()) @db.Uuid
-  projectId String      @db.Uuid
-  userId    String      @db.Uuid
-  role      ProjectRole
-  joinedAt  DateTime    @default(now())
+enum Platform {
+  DESKTOP
+  MOBILE
+  TABLET
+}
+
+/// The design intent of a project: the reusable context every generation is
+/// grounded in (together with the project's user personas). Defined after the
+/// project is created; one per project.
+model DesignIntent {
+  id               String    @id @default(uuid()) @db.Uuid
+  projectId        String    @unique @db.Uuid
+  /// What the design must achieve.
+  statement        String?
+  /// Design system the HTML follows (look, components, spacing conventions).
+  designSystem     UiLibrary @default(SHADCN)
+  /// Standards the design must meet, e.g. "WCAG 2.1 AA".
+  designStandards  String[]  @default(["WCAG 2.1 AA"])
+  /// Extra design-system / standards guidance.
+  designGuidelines String?
+  /// Brand & corporate identity: three hex colors (#RRGGBB) and notes.
+  primaryColor     String?
+  secondaryColor   String?
+  accentColor      String?
+  brandGuidelines  String?
+  /// How the copy in the design should sound (also steers the LLM's wording).
+  toneOfVoice      String?
+  /// Brief fields of the earlier free-form model, kept read-only so the
+  /// migration loses nothing (`{ designTokens, brandIdentity, ... }`).
+  legacyBrief      Json      @default("{}")
+  /// Incremented on every change; generation jobs keep a snapshot.
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("design_intents")
+}
+
+enum PersonaOrigin {
+  /// Written by a designer.
+  MANUAL
+  /// Persona artifact synthesized by the LLM from a design prompt.
+  AI
+}
+
+/// A user persona of the project (Organization → Project → User Persona).
+model UserPersona {
+  id                       String        @id @default(uuid()) @db.Uuid
+  projectId                String        @db.Uuid
+  origin                   PersonaOrigin @default(MANUAL)
+  /// For AI personas: the generation job whose prompt it was synthesized from.
+  generationJobId          String?       @unique @db.Uuid
+  name                     String
+  age                      Int?
+  shortDescription         String
+  behavioralConsiderations String[]
+  frustrations             String[]
+  goals                    String[]
+  tasks                    String[]
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationJob GenerationJob? @relation("PersonaArtifact", fields: [generationJobId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@map("user_personas")
+}
+
+/// A user's role in one project. `organizationId` is repeated on purpose: two
+/// composite foreign keys make it impossible, in the database itself, to add
+/// someone who is not a member of the project's organization.
+model ProjectMember {
+  id             String      @id @default(uuid()) @db.Uuid
+  projectId      String      @db.Uuid
+  organizationId String      @db.Uuid
+  userId         String      @db.Uuid
+  role           ProjectRole
+  joinedAt       DateTime    @default(now())
+
+  project            Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationMember OrganizationMember @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Restrict)
 
   @@unique([projectId, userId])
   @@index([userId])
+  @@index([organizationId, userId])
   @@map("project_members")
 }
 
@@ -151,9 +294,17 @@ enum UserStoryStatus {
   ARCHIVED
 }
 
+enum StoryOrigin {
+  MANUAL
+  /// Drafted by the LLM; a designer reviews and sets it READY.
+  AI
+}
+
 model UserStory {
   id                 String          @id @default(uuid()) @db.Uuid
   projectId          String          @db.Uuid
+  origin             StoryOrigin     @default(MANUAL)
+  generationId       String?         @db.Uuid
   title              String
   description        String?
   acceptanceCriteria String?
@@ -162,10 +313,12 @@ model UserStory {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  project  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  variants UIVariant[] @relation("VariantStories")
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generation StoryGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  variants   UIVariant[]      @relation("VariantStories")
 
   @@index([projectId])
+  @@index([generationId])
   @@map("user_stories")
 }
 
@@ -192,13 +345,22 @@ model DesignRound {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentRound    DesignRound?    @relation("RoundLineage", fields: [parentRoundId], references: [id], onDelete: SetNull)
-  childRounds    DesignRound[]   @relation("RoundLineage")
-  approvedBy     User?           @relation("RoundApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  generationJobs GenerationJob[]
-  variants       UIVariant[]
+  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentRound      DesignRound?           @relation("RoundLineage", fields: [parentRoundId], references: [id], onDelete: SetNull)
+  childRounds      DesignRound[]          @relation("RoundLineage")
+  approvedBy       User?                  @relation("RoundApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  generationJobs   GenerationJob[]
+  variants         UIVariant[]
+  testSessions     TestSession[]
+  analyses         FeedbackAnalysis[]
+  decisions        DesignDecision[]
+  feedbackLinks    RoundFeedbackLink[]
+  comments         RoundComment[]
+  acknowledgements RoundAcknowledgement[]
+  reports          Report[]
 
+  /// Target of composite foreign keys that keep a round's children in its project.
+  @@unique([id, projectId])
   @@unique([projectId, roundNumber])
   @@index([parentRoundId])
   @@index([approvedById])
@@ -213,17 +375,22 @@ enum GenerationJobStatus {
   CANCELLED
 }
 
-/// One LLM generation run: produces `variantCount` designs for the round from
-/// the project's design brief, constrained to its UI kit and checked against
-/// WCAG 2.0 AA. Processed by the `design-generation` BullMQ queue.
+/// One LLM generation run: synthesizes a persona artifact from the designer's
+/// prompt, then produces `variantCount` high-fidelity HTML designs for the
+/// round from the project and its design intent, sanitized and checked for
+/// accessibility. Processed by the `design-generation` BullMQ queue.
 model GenerationJob {
   id             String              @id @default(uuid()) @db.Uuid
   roundId        String              @db.Uuid
   requestedById  String?             @db.Uuid
-  /// The project's UI kit when the job was created; the designs must use it.
+  /// The design system of the intent when the job was created.
   uiLibrary      UiLibrary
-  /// Extra instructions on top of the design brief.
+  /// The designer's prompt (what to design now).
   prompt         String?
+  /// When set, the job refines this variant instead of designing from scratch.
+  baseVariantId  String?             @db.Uuid
+  /// Client-chosen key; repeating a request with the same key returns the same job.
+  idempotencyKey String?
   variantCount   Int
   modelProvider  String
   modelName      String
@@ -239,18 +406,26 @@ model GenerationJob {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  round       DesignRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  requestedBy User?       @relation("JobRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  round       DesignRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  requestedBy User?        @relation("JobRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  baseVariant UIVariant?   @relation("VariantRefinements", fields: [baseVariantId], references: [id], onDelete: SetNull)
   variants    UIVariant[]
+  /// The persona artifact synthesized from this job's prompt.
+  persona     UserPersona? @relation("PersonaArtifact")
 
+  @@unique([roundId, idempotencyKey])
   @@index([roundId])
   @@index([requestedById])
+  @@index([baseVariantId])
   @@map("generation_jobs")
 }
 
 enum UIVariantStatus {
   DRAFT
+  /// Passed the checks; waiting for a designer's decision.
   READY
+  /// Explicitly approved by a designer. Only approved variants can be tested.
+  APPROVED
   ARCHIVED
 }
 
@@ -261,11 +436,20 @@ model UIVariant {
   id              String          @id @default(uuid()) @db.Uuid
   roundId         String          @db.Uuid
   generationJobId String?         @db.Uuid
+  /// The variant this one was refined or iterated from (lineage).
+  parentVariantId String?         @db.Uuid
+  approvedById    String?         @db.Uuid
+  approvedAt      DateTime?
   name            String
   label           String?
+  /// Design system the HTML follows.
   uiLibrary       UiLibrary
-  design          Json
-  /// Result of the last WCAG 2.0 AA check of `design`.
+  /// The high-fidelity design: one self-contained, sanitized HTML document
+  /// (embedded CSS, no scripts) that the frontend renders in a sandboxed iframe.
+  html            String?
+  /// Legacy Figma-like JSON design of variants made before the switch to HTML (read-only).
+  design          Json?
+  /// Result of the last accessibility / safety check of `html`.
   accessibility   Json            @default("{}")
   /// Incremented on every update.
   version         Int             @default(1)
@@ -273,12 +457,20 @@ model UIVariant {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  round         DesignRound    @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  generationJob GenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
-  stories       UserStory[]    @relation("VariantStories")
+  round          DesignRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  generationJob  GenerationJob?   @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  parentVariant  UIVariant?       @relation("VariantLineage", fields: [parentVariantId], references: [id], onDelete: SetNull)
+  childVariants  UIVariant[]      @relation("VariantLineage")
+  approvedBy     User?            @relation("VariantApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  refinementJobs GenerationJob[]  @relation("VariantRefinements")
+  stories        UserStory[]      @relation("VariantStories")
+  sessionLinks   SessionVariant[]
 
+  /// Target of the composite foreign key that keeps session variants in the session's round.
+  @@unique([id, roundId])
   @@index([roundId])
   @@index([generationJobId])
+  @@index([parentVariantId])
   @@map("ui_variants")
 }
 
@@ -303,4 +495,578 @@ model AuditLog {
   @@index([projectId, createdAt])
   @@index([actorId])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// AI story generation (async, results are DRAFT stories for a designer to review)
+// ---------------------------------------------------------------------------
+
+model StoryGeneration {
+  id             String              @id @default(uuid()) @db.Uuid
+  projectId      String              @db.Uuid
+  requestedById  String?             @db.Uuid
+  /// Extra guidance from the designer on top of the design brief.
+  instruction    String?
+  /// How many stories to draft.
+  count          Int
+  idempotencyKey String?
+  modelProvider  String
+  modelName      String
+  status         GenerationJobStatus @default(QUEUED)
+  /// Copy of the brief the stories were drafted from.
+  inputSnapshot  Json                @default("{}")
+  outputMetadata Json                @default("{}")
+  error          String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy User?       @relation("StoryGenerationRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  stories     UserStory[]
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, createdAt])
+  @@index([requestedById])
+  @@map("story_generations")
+}
+
+// ---------------------------------------------------------------------------
+// Testing space
+//
+// A tester is NOT an account role: it is a participant identity scoped to one
+// test session, created by a designer (email + invitation) and proven with a
+// short-lived token. Everything a participant produces hangs off a
+// `SessionParticipant`; composite foreign keys keep it inside its session.
+// ---------------------------------------------------------------------------
+
+enum TestSessionStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model TestSession {
+  id             String            @id @default(uuid()) @db.Uuid
+  projectId      String            @db.Uuid
+  roundId        String            @db.Uuid
+  title          String
+  description    String?
+  status         TestSessionStatus @default(DRAFT)
+  /// PDPA notice shown to participants, and its version. Consent is recorded
+  /// against the version and a hash of the text, per session.
+  consentVersion String
+  consentText    String
+  /// Participants can only enter between these moments (expiresAt is required to activate).
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  activatedAt    DateTime?
+  endedAt        DateTime?
+  endedById      String?           @db.Uuid
+  createdById    String?           @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  project      Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  round        DesignRound          @relation(fields: [roundId, projectId], references: [id, projectId], onDelete: Cascade)
+  createdBy    User?                @relation("SessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  variants     SessionVariant[]
+  tasks        TestTask[]
+  participants SessionParticipant[]
+  consents     ConsentRecord[]
+  taskRuns     TaskRun[]
+  events       InteractionEvent[]
+  feedback     Feedback[]
+  analyses     FeedbackAnalysis[]
+  decisions    DesignDecision[]
+
+  @@unique([id, roundId])
+  @@index([projectId, status])
+  @@index([roundId, status])
+  @@index([createdById])
+  @@map("test_sessions")
+}
+
+/// An approved variant under test in a session. `roundId` is stored so that
+/// both foreign keys prove the variant belongs to the session's round.
+model SessionVariant {
+  sessionId String  @db.Uuid
+  variantId String  @db.Uuid
+  roundId   String  @db.Uuid
+  /// Group label shown to the designer ("A", "B").
+  label     String?
+
+  session TestSession @relation(fields: [sessionId, roundId], references: [id, roundId], onDelete: Cascade)
+  variant UIVariant   @relation(fields: [variantId, roundId], references: [id, roundId], onDelete: Cascade)
+
+  participants SessionParticipant[]
+  taskRuns     TaskRun[]
+  events       InteractionEvent[]
+  feedback     Feedback[]
+
+  @@id([sessionId, variantId])
+  @@index([variantId])
+  @@map("session_variants")
+}
+
+enum ParticipantStatus {
+  /// Invitation issued, not opened yet.
+  INVITED
+  JOINED
+  COMPLETED
+  /// The participant withdrew their consent.
+  WITHDRAWN
+  /// A designer removed their access.
+  REVOKED
+}
+
+model SessionParticipant {
+  id                String            @id @default(uuid()) @db.Uuid
+  sessionId         String            @db.Uuid
+  /// Identifies the participant; lower-cased. The only personal data kept.
+  email             String
+  displayName       String?
+  status            ParticipantStatus @default(INVITED)
+  /// Variant (group) this participant tests; empty = every variant of the session.
+  /// Composite foreign key below proves it is one of the session's variants.
+  assignedVariantId String?           @db.Uuid
+  /// SHA-256 of the invitation token; the token itself is shown once.
+  inviteTokenHash   String            @unique
+  inviteIssuedAt    DateTime          @default(now())
+  joinedAt          DateTime?
+  onboardedAt       DateTime?
+  completedAt       DateTime?
+  withdrawnAt       DateTime?
+  createdAt         DateTime          @default(now())
+
+  session      TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  groupVariant SessionVariant?    @relation(fields: [sessionId, assignedVariantId], references: [sessionId, variantId], onDelete: NoAction)
+  consents     ConsentRecord[]
+  taskRuns     TaskRun[]
+  events       InteractionEvent[]
+  feedback     Feedback[]
+
+  @@unique([sessionId, email])
+  @@unique([id, sessionId])
+  @@map("session_participants")
+}
+
+enum ConsentDecision {
+  GRANTED
+  DECLINED
+  WITHDRAWN
+}
+
+/// Append-only PDPA consent history. The effective consent is the newest row
+/// of the participant for the session's current version; a row for one
+/// session never covers another.
+model ConsentRecord {
+  id             String          @id @default(uuid()) @db.Uuid
+  sessionId      String          @db.Uuid
+  participantId  String          @db.Uuid
+  consentVersion String
+  /// SHA-256 of the notice text that was shown.
+  textHash       String
+  decision       ConsentDecision
+  createdAt      DateTime        @default(now())
+
+  session     TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant SessionParticipant @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
+
+  @@index([participantId, createdAt])
+  @@index([sessionId])
+  @@map("consent_records")
+}
+
+model TestTask {
+  id              String   @id @default(uuid()) @db.Uuid
+  sessionId       String   @db.Uuid
+  position        Int
+  title           String
+  instructions    String
+  successCriteria String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  session TestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  runs    TaskRun[]
+
+  @@unique([id, sessionId])
+  @@index([sessionId, position])
+  @@map("test_tasks")
+}
+
+enum TaskRunStatus {
+  IN_PROGRESS
+  COMPLETED
+  /// The participant gave up on the task.
+  ABANDONED
+}
+
+/// One participant doing one task on one variant (comparative sessions run the
+/// same task on each variant).
+model TaskRun {
+  id            String        @id @default(uuid()) @db.Uuid
+  sessionId     String        @db.Uuid
+  taskId        String        @db.Uuid
+  participantId String        @db.Uuid
+  variantId     String        @db.Uuid
+  status        TaskRunStatus @default(IN_PROGRESS)
+  startedAt     DateTime      @default(now())
+  finishedAt    DateTime?
+  durationMs    Int?
+
+  session     TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task        TestTask           @relation(fields: [taskId, sessionId], references: [id, sessionId], onDelete: Cascade)
+  participant SessionParticipant @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
+  variant     SessionVariant     @relation(fields: [sessionId, variantId], references: [sessionId, variantId], onDelete: Cascade)
+  events      InteractionEvent[]
+  feedback    Feedback[]
+
+  @@unique([taskId, participantId, variantId])
+  @@index([participantId])
+  @@index([sessionId])
+  @@map("task_runs")
+}
+
+enum InteractionType {
+  VIEW
+  CLICK
+  INPUT
+  NAVIGATE
+  SCROLL
+  HOVER
+  ERROR
+  OTHER
+}
+
+/// What a participant did on a prototype (metadata only; never typed text).
+model InteractionEvent {
+  id            String          @id @default(uuid()) @db.Uuid
+  sessionId     String          @db.Uuid
+  participantId String          @db.Uuid
+  variantId     String          @db.Uuid
+  taskRunId     String?         @db.Uuid
+  type          InteractionType
+  /// Screen (top-level frame) and node of the design the event happened on.
+  screenId      String?
+  nodeId        String?
+  metadata      Json            @default("{}")
+  /// Client clock; `createdAt` is the server's.
+  occurredAt    DateTime
+  createdAt     DateTime        @default(now())
+
+  session     TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant SessionParticipant @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
+  variant     SessionVariant     @relation(fields: [sessionId, variantId], references: [sessionId, variantId], onDelete: Cascade)
+  taskRun     TaskRun?           @relation(fields: [taskRunId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, participantId, occurredAt])
+  @@index([taskRunId])
+  @@map("interaction_events")
+}
+
+enum FeedbackScope {
+  /// About one component / node of a screen.
+  COMPONENT
+  /// About a whole screen or the prototype.
+  PAGE
+}
+
+/// RAW participant feedback. Written once, never edited, never replaced by an
+/// AI interpretation (analysis lives in `FeedbackTheme`).
+model Feedback {
+  id            String        @id @default(uuid()) @db.Uuid
+  sessionId     String        @db.Uuid
+  participantId String        @db.Uuid
+  variantId     String        @db.Uuid
+  taskRunId     String?       @db.Uuid
+  scope         FeedbackScope
+  screenId      String?
+  /// Required for COMPONENT scope.
+  nodeId        String?
+  /// 1–5 satisfaction, optional.
+  rating        Int?
+  comment       String?
+  /// The participant chose to skip giving feedback here.
+  skipped       Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+
+  session     TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant SessionParticipant @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
+  variant     SessionVariant     @relation(fields: [sessionId, variantId], references: [sessionId, variantId], onDelete: Cascade)
+  taskRun     TaskRun?           @relation(fields: [taskRunId], references: [id], onDelete: SetNull)
+  themes      ThemeFeedback[]
+
+  @@index([sessionId, createdAt])
+  @@index([participantId])
+  @@map("feedback")
+}
+
+// ---------------------------------------------------------------------------
+// AI feedback analysis and the designer's review of it
+//
+// Four layers, never merged: raw `Feedback` → AI output (`ai*` columns,
+// written once by the worker) → designer-reviewed values (the plain columns,
+// edited by people) → `DesignDecision` (what the designer decided).
+// ---------------------------------------------------------------------------
+
+enum AnalysisStatus {
+  QUEUED
+  RUNNING
+  /// The AI finished; waiting for a designer to review it.
+  READY
+  APPROVED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+model FeedbackAnalysis {
+  id               String         @id @default(uuid()) @db.Uuid
+  projectId        String         @db.Uuid
+  roundId          String         @db.Uuid
+  /// Limits the analysis to one session; null = every session of the round.
+  sessionId        String?        @db.Uuid
+  requestedById    String?        @db.Uuid
+  idempotencyKey   String?
+  status           AnalysisStatus @default(QUEUED)
+  modelProvider    String
+  modelName        String
+  /// Ids of the raw feedback the job analyses, fixed when the job is created.
+  inputFeedbackIds Json           @default("[]")
+  /// AI output, as produced (never edited).
+  aiSummary        String?
+  aiInsights       Json           @default("[]")
+  /// Designer-reviewed versions (start as copies of the AI output).
+  summary          String?
+  insights         Json           @default("[]")
+  reviewNote       String?
+  reviewedById     String?        @db.Uuid
+  reviewedAt       DateTime?
+  outputMetadata   Json           @default("{}")
+  error            String?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  round       DesignRound      @relation(fields: [roundId, projectId], references: [id, projectId], onDelete: Cascade)
+  session     TestSession?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  requestedBy User?            @relation("AnalysisRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?            @relation("AnalysisReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  themes      FeedbackTheme[]
+  decisions   DesignDecision[]
+
+  @@unique([roundId, idempotencyKey])
+  @@index([projectId, createdAt])
+  @@index([roundId])
+  @@index([sessionId])
+  @@map("feedback_analyses")
+}
+
+enum FeedbackCategory {
+  USABILITY
+  VISUAL_DESIGN
+  CONTENT
+  ACCESSIBILITY
+  PERFORMANCE
+  FUNCTIONALITY
+  OTHER
+}
+
+enum FeedbackSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ThemeOrigin {
+  AI
+  /// Created by a designer (manual theme, split or merge).
+  DESIGNER
+}
+
+enum ThemeStatus {
+  /// Suggested, not decided.
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  /// The designer decided not to fix it (with a reason).
+  WONT_FIX
+  /// Folded into another theme.
+  MERGED
+}
+
+/// A group of related raw feedback. `ai*` columns keep what the model said;
+/// the unprefixed columns are what the designer stands behind.
+model FeedbackTheme {
+  id                   String            @id @default(uuid()) @db.Uuid
+  analysisId           String            @db.Uuid
+  origin               ThemeOrigin
+  status               ThemeStatus       @default(PROPOSED)
+  aiTitle              String?
+  aiSummary            String?
+  aiCategory           FeedbackCategory?
+  aiSeverity           FeedbackSeverity?
+  title                String
+  summary              String
+  category             FeedbackCategory
+  severity             FeedbackSeverity
+  labels               String[]
+  designerNote         String?
+  wontFixReason        String?
+  selectedForIteration Boolean           @default(false)
+  selectedAt           DateTime?
+  mergedIntoId         String?           @db.Uuid
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  analysis   FeedbackAnalysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  mergedInto FeedbackTheme?      @relation("ThemeMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom FeedbackTheme[]     @relation("ThemeMerge")
+  feedback   ThemeFeedback[]
+  roundLinks RoundFeedbackLink[]
+  decisions  DesignDecision[]
+
+  @@index([analysisId, status])
+  @@index([mergedIntoId])
+  @@map("feedback_themes")
+}
+
+model ThemeFeedback {
+  themeId    String @db.Uuid
+  feedbackId String @db.Uuid
+
+  theme    FeedbackTheme @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  feedback Feedback      @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@id([themeId, feedbackId])
+  @@index([feedbackId])
+  @@map("theme_feedback")
+}
+
+// ---------------------------------------------------------------------------
+// Decisions and iteration history
+// ---------------------------------------------------------------------------
+
+enum DecisionType {
+  VARIANT_APPROVED
+  ANALYSIS_APPROVED
+  ANALYSIS_REJECTED
+  FEEDBACK_SELECTED
+  FEEDBACK_DESELECTED
+  FEEDBACK_WONT_FIX
+  SESSION_ENDED
+  ROUND_APPROVED
+  ITERATION_STARTED
+}
+
+/// Append-only record of designer decisions, written in the same transaction
+/// as the change it describes. Together with `RoundFeedbackLink` it explains
+/// how feedback led to the next round.
+model DesignDecision {
+  id               String       @id @default(uuid()) @db.Uuid
+  projectId        String       @db.Uuid
+  roundId          String       @db.Uuid
+  type             DecisionType
+  variantId        String?      @db.Uuid
+  sessionId        String?      @db.Uuid
+  analysisId       String?      @db.Uuid
+  themeId          String?      @db.Uuid
+  /// For ITERATION_STARTED: the round that was created.
+  resultingRoundId String?      @db.Uuid
+  decidedById      String?      @db.Uuid
+  rationale        String?
+  createdAt        DateTime     @default(now())
+
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  round     DesignRound       @relation(fields: [roundId, projectId], references: [id, projectId], onDelete: Cascade)
+  decidedBy User?             @relation("DecisionMaker", fields: [decidedById], references: [id], onDelete: SetNull)
+  session   TestSession?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  analysis  FeedbackAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  theme     FeedbackTheme?    @relation(fields: [themeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([roundId, createdAt])
+  @@map("design_decisions")
+}
+
+/// "This round was created to address this theme": the link from feedback to
+/// the next iteration (the round's variants are the resulting UI changes).
+model RoundFeedbackLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  roundId   String   @db.Uuid
+  themeId   String   @db.Uuid
+  note      String?
+  createdAt DateTime @default(now())
+
+  round DesignRound   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  theme FeedbackTheme @relation(fields: [themeId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, themeId])
+  @@index([themeId])
+  @@map("round_feedback_links")
+}
+
+// ---------------------------------------------------------------------------
+// Stakeholders: shared rounds and reports
+// ---------------------------------------------------------------------------
+
+model RoundComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  roundId   String   @db.Uuid
+  authorId  String?  @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  round  DesignRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  author User?       @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([roundId, createdAt])
+  @@map("round_comments")
+}
+
+model RoundAcknowledgement {
+  roundId        String   @db.Uuid
+  userId         String   @db.Uuid
+  acknowledgedAt DateTime @default(now())
+
+  round DesignRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roundId, userId])
+  @@index([userId])
+  @@map("round_acknowledgements")
+}
+
+/// Which audience a report is written for.
+enum ReportType {
+  DESIGNER
+  CLIENT
+  DEVELOPER
+  PROJECT_MANAGER
+}
+
+/// A generated snapshot. `content` holds only what its audience may see.
+model Report {
+  id            String     @id @default(uuid()) @db.Uuid
+  projectId     String     @db.Uuid
+  roundId       String?    @db.Uuid
+  type          ReportType
+  title         String
+  content       Json
+  generatedById String?    @db.Uuid
+  createdAt     DateTime   @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  round       DesignRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  generatedBy User?        @relation("ReportAuthor", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, type, createdAt])
+  @@map("reports")
 }

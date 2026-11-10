@@ -8,13 +8,14 @@ import { errorText, logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
-import {
-  GeneratedDesign,
-  toGeneratedDesign,
-} from '../design/document/design-document'
-import { UI_KITS } from '../design/document/ui-kits'
+import { AccessService } from '../access/access.service'
+import { can, Permission } from '../access/permissions'
 import { DesignGenerator, VariantResult } from './design-generator.service'
-import { GenerationInput } from './design-prompts'
+import {
+  GENERATION_INPUT_FORMAT,
+  GenerationInput,
+  PersonaInput,
+} from './design-prompts'
 import {
   DESIGN_GENERATION_QUEUE,
   DesignGenerationJobData,
@@ -22,10 +23,19 @@ import {
 } from './generation.constants'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmNotConfiguredError } from './llm-not-configured.error'
+import { PersonaSynthesizer } from './persona-synthesizer'
 
 export interface DesignGenerationResult {
   variantIds: string[]
   failedVariants: number
+  /** The persona artifact synthesized from the prompt. */
+  personaId: string | null
+}
+
+interface PersonaArtifact {
+  id: string
+  persona: PersonaInput
+  usage: { promptTokens: number; completionTokens: number }
 }
 
 /** While generating, check this often whether the job was cancelled. */
@@ -35,7 +45,8 @@ const PROGRESS_THROTTLE_MS = 1_000
 const VARIANT_LABELS = 'ABCDEFGH'
 
 /**
- * Runs design generation jobs from the `design-generation` queue. The
+ * Runs design generation jobs from the `design-generation` queue: persona
+ * artifact first, then high-fidelity HTML variants. The
  * database row is the source of truth for status; BullMQ provides retries
  * with backoff, stalled-job recovery and cross-process events (SSE).
  *
@@ -55,6 +66,8 @@ export class DesignGenerationProcessor
     private readonly cache: HttpCacheService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
     private readonly queue: GenerationQueue,
+    private readonly access: AccessService,
+    private readonly personas: PersonaSynthesizer,
   ) {
     super()
   }
@@ -149,6 +162,38 @@ export class DesignGenerationProcessor
       throw new UnrecoverableError('Generation job no longer exists.')
     }
     const { projectId } = row.round
+    const input = row.inputSnapshot as unknown as GenerationInput
+    if (input?.format !== GENERATION_INPUT_FORMAT) {
+      // Queued before the switch to HTML generation: its snapshot cannot be used.
+      await this.prisma.generationJob.updateMany({
+        where: { id, status: { in: ['QUEUED', 'RUNNING'] } },
+        data: {
+          status: 'FAILED',
+          error: 'This job was created before HTML generation; generate again.',
+          finishedAt: new Date(),
+        },
+      })
+      await this.cache.invalidate(projectId)
+
+      return { variantIds: [], failedVariants: 0, personaId: null }
+    }
+    if (!(await this.requesterMayGenerate(row.requestedById, projectId))) {
+      // The person who asked lost their right to generate while the job waited.
+      await this.prisma.generationJob.updateMany({
+        where: { id, status: { in: ['QUEUED', 'RUNNING'] } },
+        data: {
+          status: 'CANCELLED',
+          error: 'The requester no longer has access to generate designs.',
+          finishedAt: new Date(),
+        },
+      })
+      await this.cache.invalidate(projectId)
+      this.logger.warn(
+        logEvent('generation.requester_unauthorized', { job: id }),
+      )
+
+      return { variantIds: [], failedVariants: 0, personaId: null }
+    }
     const claimed = await this.prisma.generationJob.updateMany({
       where: { id, status: { in: ['QUEUED', 'RUNNING'] } },
       data: {
@@ -159,7 +204,7 @@ export class DesignGenerationProcessor
     })
     if (claimed.count === 0) {
       // Cancelled (or already finished) before it ran.
-      return { variantIds: [], failedVariants: 0 }
+      return { variantIds: [], failedVariants: 0, personaId: null }
     }
     await this.cache.invalidate(projectId)
     this.logger.log(
@@ -175,11 +220,21 @@ export class DesignGenerationProcessor
       CANCEL_POLL_MS,
     )
     try {
+      await job.updateProgress({
+        stage: 'started',
+        of: row.variantCount,
+      } satisfies GenerationProgress)
+      const artifact = input.synthesizePersona
+        ? await this.personaArtifact(job, projectId, input, abort.signal)
+        : null
+      const personas = artifact
+        ? [artifact.persona, ...input.personas]
+        : input.personas
       const results = await this.generateAll(
         job,
-        row.uiLibrary,
         row.variantCount,
-        row.inputSnapshot,
+        input,
+        personas,
         abort.signal,
       )
       await job.updateProgress({
@@ -187,7 +242,14 @@ export class DesignGenerationProcessor
         of: row.variantCount,
       } satisfies GenerationProgress)
 
-      return await this.save(id, projectId, row.roundId, results)
+      return await this.save(
+        id,
+        projectId,
+        row.roundId,
+        input,
+        results,
+        artifact,
+      )
     } catch (error) {
       await this.fail(job, projectId, error, abort.signal.aborted)
       throw error instanceof LlmNotConfiguredError || abort.signal.aborted
@@ -198,26 +260,84 @@ export class DesignGenerationProcessor
     }
   }
 
+  /** A queued job runs with its requester's rights *now*, not when it was queued. */
+  private async requesterMayGenerate(
+    requesterId: string | null,
+    projectId: string,
+  ): Promise<boolean> {
+    if (!requesterId) {
+      return false
+    }
+    const access = await this.access.forProject(requesterId, projectId)
+
+    return access !== null && can(access.role, Permission.DesignWrite)
+  }
+
+  /**
+   * Persona Artifact synthesis: the designer's prompt becomes a user persona
+   * of the project, saved before any design is generated (so it is kept even
+   * if the designs fail) and used as the primary persona of the prompt. One
+   * per job: a retry reuses the persona saved by an earlier attempt.
+   */
+  private async personaArtifact(
+    job: Job<DesignGenerationJobData>,
+    projectId: string,
+    input: GenerationInput,
+    signal: AbortSignal,
+  ): Promise<PersonaArtifact> {
+    const id = job.data.generationJobId
+    const saved = await this.prisma.userPersona.findUnique({
+      where: { generationJobId: id },
+    })
+    if (saved) {
+      return {
+        id: saved.id,
+        persona: saved,
+        usage: { promptTokens: 0, completionTokens: 0 },
+      }
+    }
+    await job.updateProgress({
+      stage: 'persona',
+      of: 1,
+    } satisfies GenerationProgress)
+    const { persona, usage } = await this.personas.synthesize(input, signal)
+    try {
+      const created = await this.prisma.userPersona.create({
+        data: { ...persona, projectId, origin: 'AI', generationJobId: id },
+        select: { id: true },
+      })
+      await this.cache.invalidate(projectId)
+      this.logger.log(
+        logEvent('persona.saved', { job: id, persona: created.id }),
+      )
+
+      return { id: created.id, persona, usage }
+    } catch (error) {
+      // A concurrent attempt saved it first (unique per job): use that one.
+      const raced = await this.prisma.userPersona.findUnique({
+        where: { generationJobId: id },
+      })
+      if (raced) {
+        return { id: raced.id, persona: raced, usage }
+      }
+      throw error
+    }
+  }
+
   private async generateAll(
     job: Job<DesignGenerationJobData>,
-    library: keyof typeof UI_KITS,
     total: number,
-    snapshot: Prisma.JsonValue,
+    input: GenerationInput,
+    personas: PersonaInput[],
     signal: AbortSignal,
   ): Promise<VariantResult[]> {
-    const kit = UI_KITS[library]
-    const input = snapshot as unknown as GenerationInput
     const results: VariantResult[] = []
-    const previous: GeneratedDesign[] = []
-    await job.updateProgress({
-      stage: 'started',
-      of: total,
-    } satisfies GenerationProgress)
+    const previous: Array<{ title: string; rationale: string }> = []
 
     for (let index = 1; index <= total; index++) {
       let lastSent = 0
       const result = await this.generator.generate(
-        { kit, input, index, total, previous },
+        { input, personas, index, total, previous },
         {
           signal,
           progress: (progress) => {
@@ -241,7 +361,7 @@ export class DesignGenerationProcessor
       )
       results.push(result)
       if (result.passed) {
-        previous.push(toGeneratedDesign(result.document))
+        previous.push({ title: result.title, rationale: result.rationale })
       }
     }
 
@@ -252,14 +372,16 @@ export class DesignGenerationProcessor
     id: string,
     projectId: string,
     roundId: string,
+    input: GenerationInput,
     results: VariantResult[],
+    artifact: PersonaArtifact | null,
   ): Promise<DesignGenerationResult> {
     const usage = results.reduce(
       (sum, r) => ({
         promptTokens: sum.promptTokens + r.usage.promptTokens,
         completionTokens: sum.completionTokens + r.usage.completionTokens,
       }),
-      { promptTokens: 0, completionTokens: 0 },
+      artifact?.usage ?? { promptTokens: 0, completionTokens: 0 },
     )
     const summary = results.map((r, i) => ({
       variant: i + 1,
@@ -267,8 +389,18 @@ export class DesignGenerationProcessor
       attempts: r.attempts,
       ...('issues' in r
         ? { issues: r.issues.slice(0, 20) }
-        : { autoFixed: r.autoFixed, warnings: r.accessibility.warnings }),
+        : {
+            title: r.title,
+            rationale: r.rationale,
+            warnings: r.report.warnings,
+            removed: r.report.removed,
+          }),
     }))
+    const metadata = {
+      usage,
+      personaId: artifact?.id ?? null,
+      variants: summary,
+    } as Prisma.InputJsonObject
     const passed = results.filter(
       (r): r is Extract<VariantResult, { passed: true }> => r.passed,
     )
@@ -276,15 +408,10 @@ export class DesignGenerationProcessor
       // Keep the per-variant issues; fail() then marks the job FAILED.
       await this.prisma.generationJob.update({
         where: { id },
-        data: {
-          outputMetadata: {
-            usage,
-            variants: summary,
-          } as Prisma.InputJsonObject,
-        },
+        data: { outputMetadata: metadata },
       })
       throw new UnrecoverableError(
-        `No design passed the UI kit and WCAG 2.0 checks: ${firstIssues(results)}`,
+        `No design passed the HTML, accessibility and brand checks: ${firstIssues(results)}`,
       )
     }
 
@@ -294,10 +421,7 @@ export class DesignGenerationProcessor
         data: {
           status: 'SUCCEEDED',
           finishedAt: new Date(),
-          outputMetadata: {
-            usage,
-            variants: summary,
-          } as Prisma.InputJsonObject,
+          outputMetadata: metadata,
         },
       })
       if (done.count === 0) {
@@ -305,13 +429,10 @@ export class DesignGenerationProcessor
       }
       const job = await tx.generationJob.findUniqueOrThrow({
         where: { id },
-        select: { inputSnapshot: true },
+        select: { baseVariantId: true },
       })
-      const storyIds = (
-        job.inputSnapshot as unknown as GenerationInput
-      ).stories.map((s) => s.id)
       const existing = await tx.userStory.findMany({
-        where: { id: { in: storyIds }, projectId },
+        where: { id: { in: input.stories.map((s) => s.id) }, projectId },
         select: { id: true },
       })
       const ids: string[] = []
@@ -320,12 +441,13 @@ export class DesignGenerationProcessor
           data: {
             roundId,
             generationJobId: id,
-            name: result.document.name,
+            // Refinements keep their lineage; they are READY, never APPROVED.
+            parentVariantId: job.baseVariantId,
+            name: result.title,
             label: VARIANT_LABELS[i],
-            uiLibrary: result.document.uiLibrary,
-            design: result.document as unknown as Prisma.InputJsonObject,
-            accessibility:
-              result.accessibility as unknown as Prisma.InputJsonObject,
+            uiLibrary: input.intent.designSystem,
+            html: result.html,
+            accessibility: result.report as unknown as Prisma.InputJsonObject,
             status: 'READY',
             stories: { connect: existing },
           },
@@ -342,12 +464,17 @@ export class DesignGenerationProcessor
         job: id,
         variants: variantIds.length,
         failed: results.length - passed.length,
+        persona: artifact?.id,
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
       }),
     )
 
-    return { variantIds, failedVariants: results.length - passed.length }
+    return {
+      variantIds,
+      failedVariants: results.length - passed.length,
+      personaId: artifact?.id ?? null,
+    }
   }
 
   /** Records a failure: final ones (no retry left) mark the job FAILED. */
@@ -395,11 +522,9 @@ export class DesignGenerationProcessor
 }
 
 function firstIssues(results: VariantResult[]): string {
-  const issues = results
+  return results
     .flatMap((r) => ('issues' in r ? r.issues : []))
     .slice(0, 3)
-
-  return issues
     .map((i) => (i.criterion ? `WCAG ${i.criterion}: ` : '') + i.message)
     .join('; ')
 }

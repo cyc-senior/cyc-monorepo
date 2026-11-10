@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser'
 import { AppModule } from './app.module'
 import { AppLogger } from './common/logging/app-logger'
 import { logEvent } from './common/logging/log-event'
+import { securityHeaders } from './common/security-headers.middleware'
 import { EnvironmentVariables } from './config/env.validation'
 import { setupSwagger } from './swagger'
 
@@ -27,6 +28,16 @@ async function bootstrap() {
     ),
   )
 
+  const express = app.getHttpAdapter().getInstance()
+  express.disable('x-powered-by')
+  if (config.get('TRUST_PROXY', { infer: true })) {
+    express.set('trust proxy', 1)
+  }
+  app.use(
+    securityHeaders({
+      hsts: config.get('NODE_ENV', { infer: true }) === 'production',
+    }),
+  )
   app.setGlobalPrefix('api')
   app.enableCors({
     origin: config.get('FRONTEND_URL', { infer: true }),
@@ -36,7 +47,9 @@ async function bootstrap() {
   app.use(cookieParser())
   app.enableShutdownHooks()
 
-  setupSwagger(app)
+  if (config.get('SWAGGER_ENABLED', { infer: true })) {
+    setupSwagger(app)
+  }
 
   const port = config.get('PORT', { infer: true })
   await app.listen(port)
@@ -44,7 +57,7 @@ async function bootstrap() {
     logEvent('app.started', {
       port,
       env: config.get('NODE_ENV', { infer: true }),
-      docs: `/api`,
+      docs: config.get('SWAGGER_ENABLED', { infer: true }) ? '/api' : 'off',
     }),
   )
 }

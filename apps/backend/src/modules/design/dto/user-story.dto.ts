@@ -8,7 +8,7 @@ import {
 } from 'class-validator'
 
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
-import { UserStoryStatus } from '../../../generated/prisma/client'
+import { StoryOrigin, UserStoryStatus } from '../../../generated/prisma/client'
 
 export class CreateUserStoryDto {
   /** @example 'Pay with a saved card' */
@@ -64,6 +64,14 @@ export class UserStoryDto {
 
   @ApiProperty({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
   status: UserStoryStatus
+
+  /** MANUAL, or AI for a draft written by the model (always starts as DRAFT). */
+  @ApiProperty({ enum: StoryOrigin, enumName: 'StoryOrigin' })
+  origin: StoryOrigin
+
+  /** The AI drafting job that wrote it, if any. */
+  @ApiProperty({ format: 'uuid' })
+  generationId: string | null
 
   createdAt: Date
 

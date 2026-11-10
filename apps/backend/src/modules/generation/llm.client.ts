@@ -28,6 +28,8 @@ export class LlmClient {
   private readonly logger = new Logger(LlmClient.name)
   private readonly client?: OpenAI
   readonly model: string
+  /** Model for analysis and drafting (the proposal's text model). */
+  readonly analysisModel: string
   readonly provider: string
   private readonly maxTokens: number
   private readonly disableThinking: boolean
@@ -36,6 +38,8 @@ export class LlmClient {
     const baseURL = config.get('LLM_BASE_URL', { infer: true })
     const apiKey = config.get('LLM_API_KEY', { infer: true })
     this.model = config.get('LLM_MODEL', { infer: true })
+    this.analysisModel =
+      config.get('LLM_ANALYSIS_MODEL', { infer: true }) ?? this.model
     this.maxTokens = config.get('LLM_MAX_TOKENS', { infer: true })
     this.disableThinking = config.get('LLM_DISABLE_THINKING', { infer: true })
     this.provider = baseURL ? new URL(baseURL).host : 'unconfigured'
@@ -58,6 +62,8 @@ export class LlmClient {
     schemaName: string
     schema: Record<string, unknown>
     temperature?: number
+    /** Defaults to the design model (`LLM_MODEL`). */
+    model?: string
     signal?: AbortSignal
     /** Called as output arrives, with the characters received so far. */
     onDelta?: (receivedChars: number) => void
@@ -66,8 +72,9 @@ export class LlmClient {
       throw new LlmNotConfiguredError()
     }
     const started = Date.now()
+    const model = options.model ?? this.model
     const body = {
-      model: this.model,
+      model,
       messages: options.messages,
       temperature: options.temperature ?? 0.7,
       max_tokens: this.maxTokens,
@@ -111,7 +118,7 @@ export class LlmClient {
     }
     this.logger.log(
       logEvent('llm.completion', {
-        model: this.model,
+        model,
         schema: options.schemaName,
         ms: Date.now() - started,
         promptTokens: usage.promptTokens,

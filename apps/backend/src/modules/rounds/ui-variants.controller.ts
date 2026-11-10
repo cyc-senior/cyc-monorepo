@@ -15,10 +15,13 @@ import { UuidParam } from '../../common/decorators/uuid-param.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
 import { Authorize } from '../access/authorize.decorator'
 import { Permission } from '../access/permissions'
-import { AuditEntity } from '../audit/audit.decorators'
+import { AuditAction, AuditEntity } from '../audit/audit.decorators'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import {
+  ApproveUIVariantDto,
   CreateUIVariantDto,
   UIVariantDto,
+  UIVariantHistoryDto,
   UIVariantQueryDto,
   UpdateUIVariantDto,
 } from './dto/ui-variant.dto'
@@ -71,12 +74,43 @@ export class UIVariantsController {
     return this.variants.get(projectId, variantId)
   }
 
+  /** Get the lineage of a UI variant (what it was refined from). */
+  @Get('variants/:variantId/history')
+  @Authorize(Permission.DesignRead)
+  history(
+    @UuidParam('projectId') projectId: string,
+    @UuidParam('variantId') variantId: string,
+  ): Promise<UIVariantHistoryDto> {
+    return this.variants.history(projectId, variantId)
+  }
+
+  /**
+   * Approve a READY variant.
+   *
+   * @remarks A human decision: the AI never approves. Only approved variants
+   * can be put in a test session. Changing the design of an approved variant
+   * withdraws the approval.
+   * @throws {409} Not READY (or already approved), or the round is frozen.
+   */
+  @Post('variants/:variantId/approve')
+  @HttpCode(HttpStatus.OK)
+  @Authorize(Permission.DesignApprove)
+  @AuditAction('approve')
+  approve(
+    @UuidParam('projectId') projectId: string,
+    @UuidParam('variantId') variantId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApproveUIVariantDto,
+  ): Promise<UIVariantDto> {
+    return this.variants.approve(projectId, variantId, userId, dto.rationale)
+  }
+
   /**
    * Update a UI variant, e.g. an edited design.
    *
    * @remarks Bumps the variant version. A new `design` is checked again
    * (UI kit and WCAG 2.0 AA). `storyIds` replaces the linked set.
-   * @throws {409} The round is approved or archived.
+   * @throws {409} The round is approved or archived, or the variant is part of a test session.
    * @throws {422} The design fails the UI kit or WCAG checks (`issues` lists why).
    */
   @Patch('variants/:variantId')
@@ -89,7 +123,11 @@ export class UIVariantsController {
     return this.variants.update(projectId, variantId, dto)
   }
 
-  /** Delete a UI variant. */
+  /**
+   * Delete a UI variant.
+   *
+   * @throws {409} The variant is part of a test session.
+   */
   @Delete('variants/:variantId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Authorize(Permission.DesignWrite)
