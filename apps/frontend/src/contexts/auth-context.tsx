@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiFetch("/auth/logout", {
         method: "POST",
-        body: JSON.stringify({}),
+        data: {},
       });
     } catch {
       // Ignore network/server errors during logout

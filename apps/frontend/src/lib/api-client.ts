@@ -1,3 +1,10 @@
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { AuthTokens } from "@/types/auth";
 
 const API_URL =
@@ -15,6 +22,28 @@ export function setAccessToken(token: string | null) {
 }
 
 /**
+ * Extended Axios request configuration supporting CYC options.
+ */
+export interface CustomRequestConfig extends AxiosRequestConfig {
+  skipAuth?: boolean;
+  cacheMinutes?: number;
+  forceRefresh?: boolean;
+  body?: any; // Fetch-compatible alias for data
+  _retry?: boolean;
+}
+
+/**
+ * Base Axios instance for CYC API.
+ */
+export const api: AxiosInstance = axios.create({
+  baseURL: API_URL,
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+/**
  * Attempts to obtain a new access token using the HTTP-only refresh cookie.
  */
 export async function refreshAccessToken(): Promise<string | null> {
@@ -24,22 +53,16 @@ export async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Empty body if backend reads cookie, or passes empty JSON
-        body: JSON.stringify({}),
-        credentials: "include",
-      });
+      // Use raw axios to prevent interceptor loops
+      const response = await axios.post<AuthTokens>(
+        `${API_URL}/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
 
-      if (!res.ok) {
-        setAccessToken(null);
-        return null;
-      }
-
-      const data: AuthTokens = await res.json();
-      setAccessToken(data.accessToken);
-      return data.accessToken;
+      const token = response.data.accessToken;
+      setAccessToken(token);
+      return token;
     } catch {
       setAccessToken(null);
       return null;
@@ -51,62 +74,47 @@ export async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export interface ApiFetchOptions extends RequestInit {
-  skipAuth?: boolean;
-}
-
-/**
- * Standard fetch wrapper for CYC Backend.
- * Automatically attaches Authorization header and includes credentials for cross-subdomain cookies.
- */
-export async function apiFetch<T = any>(
-  endpoint: string,
-  options: ApiFetchOptions = {}
-): Promise<T> {
-  const { skipAuth = false, headers, ...rest } = options;
-
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${API_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
-
-  const requestHeaders = new Headers(headers);
-
-  if (!skipAuth && inMemoryToken) {
-    requestHeaders.set("Authorization", `Bearer ${inMemoryToken}`);
-  }
-
-  // Ensure credentials (cookies) are passed
-  const fetchOptions: RequestInit = {
-    ...rest,
-    headers: requestHeaders,
-    credentials: "include",
-  };
-
-  let response = await fetch(url, fetchOptions);
-
-  // If unauthorized and we haven't skipped auth, attempt one token refresh
-  if (response.status === 401 && !skipAuth) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      requestHeaders.set("Authorization", `Bearer ${newToken}`);
-      response = await fetch(url, { ...fetchOptions, headers: requestHeaders });
+// Request Interceptor: attach Bearer token
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig & { skipAuth?: boolean }) => {
+    if (!config.skipAuth && inMemoryToken) {
+      config.headers.set("Authorization", `Bearer ${inMemoryToken}`);
     }
-  }
+    return config;
+  },
+  (error: AxiosError) => Promise.reject(error)
+);
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(
-      errorBody.message ||
-        `Request to ${endpoint} failed with status ${response.status}`
-    );
-  }
+// Response Interceptor: handle 401 transparent token refresh
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as
+      | (InternalAxiosRequestConfig & { _retry?: boolean; skipAuth?: boolean })
+      | undefined;
 
-  if (response.status === 204) {
-    return null as T;
-  }
+    if (
+      originalRequest &&
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.skipAuth
+    ) {
+      originalRequest._retry = true;
 
-  return response.json();
-}
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
+        return api(originalRequest);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// ==========================================
+// Caching & Parameter Handling Layer
+// ==========================================
 
 interface CacheEntry<T> {
   data: T;
@@ -116,66 +124,99 @@ interface CacheEntry<T> {
 const memoryCache = new Map<string, CacheEntry<any>>();
 const inFlightRequests = new Map<string, Promise<any>>();
 
-export interface CacheOptions {
-  cacheMinutes?: number;
-  forceRefresh?: boolean;
+/**
+ * Generates a deterministic, sorted cache key.
+ * Parameter order is normalized (`?page=1&limit=10` === `?limit=10&page=1`),
+ * while different parameters produce distinct keys (`page=1` !== `page=2`).
+ */
+function buildCacheKey(
+  endpoint: string,
+  config?: CustomRequestConfig
+): string {
+  const method = (config?.method || "GET").toUpperCase();
+  const [path, queryString] = endpoint.split("?");
+  const searchParams = new URLSearchParams(queryString || "");
+
+  if (config?.params) {
+    if (config.params instanceof URLSearchParams) {
+      config.params.forEach((val, key) => searchParams.set(key, val));
+    } else {
+      Object.entries(config.params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          searchParams.set(key, String(val));
+        }
+      });
+    }
+  }
+
+  // Sort query parameters alphabetically for consistent keys
+  searchParams.sort();
+  const sortedQuery = searchParams.toString();
+  const normalizedUrl = sortedQuery ? `${path}?${sortedQuery}` : path;
+
+  let serializedBody = "";
+  if (config?.data) {
+    serializedBody =
+      typeof config.data === "string"
+        ? config.data
+        : JSON.stringify(config.data);
+  }
+
+  return `${method}:${normalizedUrl}:${serializedBody}`;
 }
 
 /**
- * Wraps a fetch function with an in-memory TTL cache (in minutes) and in-flight deduplication.
+ * Wraps an API request with an in-memory TTL cache (in minutes) and in-flight deduplication.
  *
- * @param fetchFn - Base fetch function (e.g. `apiFetch`)
- * @returns A wrapped fetcher accepting a `cacheMinutes` parameter or option
+ * @param requestFn - Function returning a Promise (e.g. `apiFetch`)
+ * @returns A cached request function accepting `cacheMinutes`
  *
  * @example
  * ```ts
  * const fetchCached = wrapFetchWithCache(apiFetch);
- * // Cache for 5 minutes
  * const user = await fetchCached<User>('/users/me', {}, 5);
- * // Or via options
- * const user = await fetchCached<User>('/users/me', { cacheMinutes: 5 });
+ * const projects = await fetchCached('/projects', { params: { page: 1, limit: 10 } }, 10);
  * ```
  */
 export function wrapFetchWithCache<
-  F extends (endpoint: string, options?: any) => Promise<any>
->(fetchFn: F) {
-  return async function cachedFetch<T = any>(
+  F extends (endpoint: string, config?: any) => Promise<any>
+>(requestFn: F) {
+  return async function cachedRequest<T = any>(
     endpoint: string,
-    options?: Parameters<F>[1] & CacheOptions,
+    config?: Parameters<F>[1] & { cacheMinutes?: number; forceRefresh?: boolean },
     cacheMinutesParam?: number
   ): Promise<T> {
     const cacheMinutes =
       cacheMinutesParam !== undefined
         ? cacheMinutesParam
-        : (options as CacheOptions)?.cacheMinutes ?? 0;
+        : config?.cacheMinutes ?? 0;
 
-    const forceRefresh = (options as CacheOptions)?.forceRefresh ?? false;
+    const forceRefresh = config?.forceRefresh ?? false;
 
-    // If no cache duration requested or force refresh is set, bypass cache
+    // Bypass cache if no duration or forceRefresh requested
     if (cacheMinutes <= 0 || forceRefresh) {
-      return fetchFn(endpoint, options);
+      return requestFn(endpoint, config);
     }
 
-    const method = options?.method?.toUpperCase() || "GET";
-    const cacheKey = `${method}:${endpoint}:${options?.body ? String(options.body) : ""}`;
+    const cacheKey = buildCacheKey(endpoint, config);
 
-    // 1. Check if valid unexpired cache exists
+    // 1. Return unexpired cached response if available
     const cached = memoryCache.get(cacheKey);
     const now = Date.now();
     if (cached && cached.expiresAt > now) {
       return cached.data as T;
     }
 
-    // 2. In-flight request deduplication (prevent duplicate network requests fired simultaneously)
+    // 2. In-flight request deduplication (share existing pending request)
     const existingInFlight = inFlightRequests.get(cacheKey);
     if (existingInFlight) {
       return existingInFlight as Promise<T>;
     }
 
-    // 3. Perform network call and cache the result
+    // 3. Perform network call and cache the response
     const fetchPromise = (async () => {
       try {
-        const data = await fetchFn(endpoint, options);
+        const data = await requestFn(endpoint, config);
         memoryCache.set(cacheKey, {
           data,
           expiresAt: Date.now() + cacheMinutes * 60 * 1000,
@@ -192,12 +233,28 @@ export function wrapFetchWithCache<
 }
 
 /**
+ * Standard fetch helper returning `data` directly (backwards-compatible with previous `apiFetch`).
+ */
+export async function apiFetch<T = any>(
+  endpoint: string,
+  config: CustomRequestConfig = {}
+): Promise<T> {
+  const { body, data, ...rest } = config;
+  const response = await api.request<T>({
+    url: endpoint,
+    data: data ?? body,
+    ...rest,
+  });
+  return response.data;
+}
+
+/**
  * Pre-wrapped `apiFetch` with in-memory TTL caching.
  */
 export const apiFetchWithCache = wrapFetchWithCache(apiFetch);
 
 /**
- * Clears cached entries. If `endpointPrefix` is provided, clears entries matching that endpoint.
+ * Invalidate specific endpoint cache or clear all cache.
  */
 export function clearApiCache(endpointPrefix?: string) {
   if (!endpointPrefix) {
@@ -210,5 +267,3 @@ export function clearApiCache(endpointPrefix?: string) {
     }
   }
 }
-
-
