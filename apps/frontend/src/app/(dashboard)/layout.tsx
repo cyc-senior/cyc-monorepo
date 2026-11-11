@@ -6,6 +6,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { Navbar } from "@/components/layout/Navbar";
 import { Loader2 } from "lucide-react";
 
+/**
+ * Protected dashboard shell with session guard and navigation header.
+ */
 export default function DashboardLayout({
   children,
 }: {

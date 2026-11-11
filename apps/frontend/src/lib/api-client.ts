@@ -13,10 +13,32 @@ const API_URL =
 let inMemoryToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
+/**
+ * Cross-tab coordination channel for synchronized token refreshes.
+ */
+const authChannel: BroadcastChannel | null =
+  typeof window !== "undefined" && "BroadcastChannel" in window
+    ? new BroadcastChannel("cyc_auth_channel")
+    : null;
+
+if (authChannel) {
+  authChannel.onmessage = (event: MessageEvent) => {
+    if (event.data?.type === "TOKEN_REFRESHED" && event.data.token) {
+      inMemoryToken = event.data.token;
+    }
+  };
+}
+
+/**
+ * Retrieves the current in-memory access token.
+ */
 export function getAccessToken(): string | null {
   return inMemoryToken;
 }
 
+/**
+ * Updates the in-memory access token.
+ */
 export function setAccessToken(token: string | null) {
   inMemoryToken = token;
 }
@@ -62,9 +84,16 @@ export async function refreshAccessToken(): Promise<string | null> {
 
       const token = response.data.accessToken;
       setAccessToken(token);
+      authChannel?.postMessage({ type: "TOKEN_REFRESHED", token });
       return token;
-    } catch {
-      setAccessToken(null);
+    } catch (err: unknown) {
+      // Only wipe session if the server explicitly reports unauthenticated (401/403)
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.status === 401 || err.response?.status === 403)
+      ) {
+        setAccessToken(null);
+      }
       return null;
     } finally {
       refreshPromise = null;
@@ -155,11 +184,12 @@ function buildCacheKey(
   const normalizedUrl = sortedQuery ? `${path}?${sortedQuery}` : path;
 
   let serializedBody = "";
-  if (config?.data) {
+  const payload = config?.data ?? config?.body;
+  if (payload) {
     serializedBody =
-      typeof config.data === "string"
-        ? config.data
-        : JSON.stringify(config.data);
+      typeof payload === "string"
+        ? payload
+        : JSON.stringify(payload);
   }
 
   return `${method}:${normalizedUrl}:${serializedBody}`;

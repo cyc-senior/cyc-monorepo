@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { User } from "@/types/auth";
 import {
   apiFetch,
@@ -28,6 +29,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Provider component for managing authentication state and session operations.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -39,8 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile = await apiFetch<User>("/users/me");
       setUser(profile);
       return profile;
-    } catch {
-      setUser(null);
+    } catch (err: unknown) {
+      // Clear user only when the response explicitly indicates unauthenticated
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.status === 401 || err.response?.status === 403)
+      ) {
+        setUser(null);
+        setClientAccessToken(null);
+        setToken(null);
+      }
       return null;
     }
   }, []);
@@ -55,6 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      setToken(refreshed);
+    }
     return await fetchProfile();
   }, [fetchProfile]);
 
@@ -65,20 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.assign(`${apiUrl}/auth/google`);
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await apiFetch("/auth/logout", {
-        method: "POST",
-        data: {},
-      });
-    } catch {
-      // Ignore network/server errors during logout
-    } finally {
-      setClientAccessToken(null);
-      setToken(null);
-      setUser(null);
-      router.push("/signin");
-    }
+  const logout = useCallback(async (): Promise<void> => {
+    await apiFetch("/auth/logout", {
+      method: "POST",
+      data: {},
+    });
+    setClientAccessToken(null);
+    setToken(null);
+    setUser(null);
+    router.push("/signin");
   }, [router]);
 
   // Initial authentication check on application mount
@@ -130,6 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Hook to access authentication state and session methods.
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

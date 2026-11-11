@@ -70,6 +70,6 @@ minutes (`JWT_ACCESS_TTL_SECONDS`); run the command again for a new one.
 ### Google sign-in (optional, to test the real flow)
 
 1. In Google Cloud Console, create a _Web application_ OAuth client.
-2. Add `http://api.cyc.local/api/auth/google/callback` as an authorized redirect URI (or `http://localhost:4000/api/auth/google/callback` for direct dev).
-3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_CALLBACK_URL` in `apps/backend/.env`.
-4. Open `http://api.cyc.local/api/auth/google` in a browser.
+2. Add `http://localhost:4000/api/auth/google/callback` as an authorized redirect URI (or your production callback URL).
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback` in `apps/backend/.env`.
+4. Open `http://localhost:4000/api/auth/google` in a browser, or click "Continue with Google" on `http://localhost:3000/signin`.

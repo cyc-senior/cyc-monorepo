@@ -1,6 +1,9 @@
 import React from "react";
 import { Navbar } from "@/components/navbar";
 
+/**
+ * Shared layout shell for legal, policy, and compliance documentation pages.
+ */
 export default function LegalLayout({
   children,
 }: {

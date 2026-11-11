@@ -27,6 +27,9 @@ function AuthLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Shared layout shell for authentication views (signin, signup, reset password).
+ */
 export default function AuthLayout({
   children,
 }: {

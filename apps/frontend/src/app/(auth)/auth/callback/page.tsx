@@ -9,10 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setSession } = useAuth();
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get("token");
     const error = searchParams.get("error");
 
     if (error) {
@@ -20,22 +19,18 @@ function CallbackHandler() {
       return;
     }
 
-    if (token) {
-      setSession(token)
-        .then((user) => {
-          if (user) {
-            router.replace("/dashboard");
-          } else {
-            router.replace("/signin?error=profile_fetch_failed");
-          }
-        })
-        .catch(() => {
+    refreshUser()
+      .then((user) => {
+        if (user) {
+          router.replace("/dashboard");
+        } else {
           router.replace("/signin?error=auth_failed");
-        });
-    } else {
-      router.replace("/dashboard");
-    }
-  }, [searchParams, router, setSession]);
+        }
+      })
+      .catch(() => {
+        router.replace("/signin?error=auth_failed");
+      });
+  }, [searchParams, router, refreshUser]);
 
   return (
     <Card className="w-full shadow-sm">

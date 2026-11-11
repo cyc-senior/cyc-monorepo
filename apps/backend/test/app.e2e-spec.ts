@@ -135,7 +135,7 @@ describe('App (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/refresh')
         .send({})
-        .expect(400)
+        .expect(401)
     })
   })
 

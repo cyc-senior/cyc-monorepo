@@ -63,9 +63,15 @@ export default function DashboardPage() {
                   {user.name || "CYC User"}
                 </h3>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
-                <span className="inline-flex items-center mt-1 text-xs text-primary font-medium">
-                  ✓ Email Verified
-                </span>
+                {user.emailVerified ? (
+                  <span className="inline-flex items-center mt-1 text-xs text-primary font-medium">
+                    ✓ Email Verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center mt-1 text-xs text-amber-500 font-medium">
+                    ⚠ Email Unverified
+                  </span>
+                )}
               </div>
             </div>
 

@@ -89,14 +89,26 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto?: RefreshTokenDto,
   ): Promise<AuthTokensDto> {
+    const hasBodyToken = Boolean(dto?.refreshToken)
+    const hasCookieToken = Boolean(req.cookies?.['refreshToken'])
     const rawToken = dto?.refreshToken || req.cookies?.['refreshToken']
     if (!rawToken) {
       throw new UnauthorizedException('No refresh token provided.')
     }
 
     const tokens = await this.authService.refresh(rawToken)
-    res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
 
+    // For cookie flow: update httpOnly cookie and omit refreshToken from the JSON response
+    if (hasCookieToken && !hasBodyToken) {
+      res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
+      return {
+        accessToken: tokens.accessToken,
+        tokenType: tokens.tokenType,
+        expiresIn: tokens.expiresIn,
+      } as AuthTokensDto
+    }
+
+    // For body-token flow: return tokens without setting a browser cookie
     return tokens
   }
 
