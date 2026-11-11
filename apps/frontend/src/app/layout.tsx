@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, IBM_Plex_Sans_Thai, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "@/contexts/auth-context";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

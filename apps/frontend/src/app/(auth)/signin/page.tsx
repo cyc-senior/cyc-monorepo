@@ -4,8 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { Navbar } from "@/components/navbar";
-import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,16 +127,8 @@ function SignInContent() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-      style={{ background: "var(--cyc-bg-brand)" }}
-    >
-      <Navbar variant="auth" />
-
-      <MobileDesktopNotice sessionCode={sessionCode}>
-        <main className="flex-1 flex justify-center px-4 pt-[80px] pb-16">
-        <div className="w-[440px] max-w-full flex flex-col gap-4">
-          {/* Alert Error when Google sign-in fails or cancelled */}
+    <>
+      {/* Alert Error when Google sign-in fails or cancelled */}
           {showGoogleError && (
             <Alert variant="destructive" className="relative">
               <AlertCircle className="h-4 w-4" />
@@ -328,25 +318,13 @@ function SignInContent() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </main>
-    </MobileDesktopNotice>
-    </div>
+    </>
   );
 }
 
 export default function SignInPage() {
   return (
-    <React.Suspense
-      fallback={
-        <div
-          className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-          style={{ background: "var(--cyc-bg-brand)" }}
-        >
-          <Navbar variant="auth" />
-        </div>
-      }
-    >
+    <React.Suspense fallback={null}>
       <SignInContent />
     </React.Suspense>
   );
