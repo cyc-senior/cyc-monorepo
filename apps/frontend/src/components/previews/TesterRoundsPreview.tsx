@@ -33,14 +33,14 @@ export function TesterRoundsPreview({
   className,
 }: TesterRoundsPreviewProps) {
   return (
-    <Card className={cn("overflow-hidden shadow-md", className)}>
+    <Card className={cn("overflow-hidden shadow-md gap-0 py-0", className)}>
       {/* Header */}
-      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border px-5 py-3.5">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border px-5 py-3.5">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-foreground">{title}</span>
           <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
-        <Badge variant="lime">{statusLabel}</Badge>
+        <Badge variant="secondary" className="bg-primary-subtle px-2 text-primary-text rounded-[10px]">{statusLabel}</Badge>
       </CardHeader>
 
       {/* Flow diagram */}
