@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Eye, EyeOff, Info, MailCheck } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
@@ -45,8 +46,16 @@ function GoogleIcon() {
 }
 
 function SignUpContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { loginWithGoogle, user, isLoading } = useAuth();
   const sessionCode = searchParams.get("session_code");
+
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   // Form states
   const [fullName, setFullName] = React.useState("");
@@ -120,9 +129,7 @@ function SignUpContent() {
   };
 
   const handleGoogleLogin = () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.local/api";
-    window.location.href = `${apiUrl}/auth/google`;
+    loginWithGoogle();
   };
 
   return (

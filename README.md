@@ -19,6 +19,10 @@ pnpm env:init                   # creates apps/backend/.env with a random JWT se
 cp apps/frontend/.env.example apps/frontend/.env.local  # sets NEXT_PUBLIC_API_URL
 pnpm db:migrate                 # apply migrations
 pnpm db:seed                    # create the dev admin user (admin@senior.local)
+
+#Portless setup
+pnpm portless proxy start       # Start portless proxy.
+pnpm portless trust             # Trust portless certificate for https.
 pnpm routes:init                # registers cyc.localhost (3000) & api.cyc.localhost (4000)
 pnpm dev                        # runs portless (cyc.local & api.cyc.local)
 ```

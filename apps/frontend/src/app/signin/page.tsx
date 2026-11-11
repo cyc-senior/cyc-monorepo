@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Navbar } from "@/components/navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
@@ -52,10 +53,18 @@ function GoogleIcon() {
 }
 
 function SignInContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { loginWithGoogle, user, isLoading } = useAuth();
   const sessionCode = searchParams.get("session_code");
   const authError = searchParams.get("error");
   const session = sessionCode ? getSessionDetails(sessionCode) : null;
+
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   // Google sign in error state
   const [showGoogleError, setShowGoogleError] = React.useState(
@@ -116,9 +125,7 @@ function SignInContent() {
   };
 
   const handleGoogleLogin = () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.local/api";
-    window.location.href = `${apiUrl}/auth/google`;
+    loginWithGoogle();
   };
 
   return (
