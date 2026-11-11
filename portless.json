@@ -1,6 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/vercel-labs/portless/main/packages/portless/schema.json",
-  "tld": ["local", "localhost"],
   "apps": {
     "apps/frontend": {
       "name": "cyc"
@@ -10,4 +8,3 @@
     }
   }
 }
-
