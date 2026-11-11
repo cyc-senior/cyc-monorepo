@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InputOTP } from "@/components/ui/input-otp";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -315,13 +315,24 @@ function SignUpContent() {
                           Enter 6-digit verification code
                         </Label>
                         <InputOTP
+                          maxLength={6}
                           value={otp}
                           onChange={(val) => {
                             setOtp(val);
                             if (otpError) setOtpError(null);
                           }}
-                          error={!!otpError}
-                        />
+                          containerClassName="justify-center"
+                          aria-invalid={!!otpError}
+                        >
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
                         {otpError && (
                           <p className="text-xs text-destructive text-center">{otpError}</p>
                         )}
