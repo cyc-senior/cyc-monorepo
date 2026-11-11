@@ -48,4 +48,3 @@ export const CYCLogo = ({ className }: { className?: string } = {}) => {
     </svg>
   );
 };
-

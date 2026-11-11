@@ -112,6 +112,7 @@
 
   /* --- CYC extras: brand --- */
   --brand: var(--color-indigo-900); /* #15095D  bg/brand */
+  --cyc-bg-brand: var(--color-indigo-900); /* #15095D */
   --brand-foreground: var(--color-neutral-0); /* #FFFFFF  text/on-brand (17.1:1 AAA) */
   --brand-subtle: var(--color-indigo-50); /* #F3F4FF */
   --brand-muted: var(--color-indigo-100); /* #E4E8FE */
@@ -212,6 +213,7 @@
 
   /* --- CYC extras: brand --- */
   --brand: var(--color-indigo-950); /* #0B0139  bg/brand */
+  --cyc-bg-brand: var(--color-indigo-950);
   --brand-foreground: var(--color-neutral-0); /* #FFFFFF */
   --brand-subtle: var(--color-indigo-800); /* #251F73 */
   --brand-muted: var(--color-indigo-700); /* #35328D */
@@ -302,6 +304,7 @@
 
   /* --- brand: semantic and indigo color */
   --color-brand: var(--brand);
+  --color-cyc-bg-brand: var(--cyc-bg-brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-subtle: var(--brand-subtle);
   --color-brand-muted: var(--brand-muted);
