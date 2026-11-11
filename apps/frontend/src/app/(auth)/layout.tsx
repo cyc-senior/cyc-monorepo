@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense } from "react";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { useSearchParams } from "next/navigation";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 
