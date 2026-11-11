@@ -33,4 +33,11 @@ module.exports = {
     '@typescript-eslint/no-var-requires': 'off',
     '@typescript-eslint/no-unused-vars': ['warn'],
   },
+  overrides: [
+    {
+      // A resource's create/update/query/response shapes live in one DTO file.
+      files: ['**/*.dto.ts'],
+      rules: { 'max-classes-per-file': 'off' },
+    },
+  ],
 }

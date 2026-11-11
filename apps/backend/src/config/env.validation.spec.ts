@@ -3,6 +3,10 @@ import 'reflect-metadata'
 import { validateEnv } from './env.validation'
 
 describe('validateEnv', () => {
+  const llm = {
+    LLM_BASE_URL: 'https://llm.example.com/v1',
+    LLM_API_KEY: 'sk-test',
+  }
   const base = {
     NODE_ENV: 'development',
     DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
@@ -70,5 +74,63 @@ describe('validateEnv', () => {
         GOOGLE_CLIENT_SECRET: 'local-dev-placeholder',
       }),
     ).toThrow('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET')
+  })
+
+  it('requires Redis in production only', () => {
+    expect(() => validateEnv({ ...base, NODE_ENV: 'production' })).toThrow(
+      'REDIS_URL is required in production',
+    )
+    expect(
+      validateEnv({
+        ...base,
+        ...llm,
+        NODE_ENV: 'production',
+        REDIS_URL: 'rediss://cache.internal:6380',
+      }).REDIS_URL,
+    ).toBe('rediss://cache.internal:6380')
+    expect(validateEnv(base).REDIS_URL).toBeUndefined()
+  })
+
+  it('requires the LLM in production unless the worker runs elsewhere', () => {
+    const prod = { ...base, NODE_ENV: 'production', REDIS_URL: 'redis://r' }
+
+    expect(() => validateEnv(prod)).toThrow('LLM_BASE_URL and LLM_API_KEY')
+    expect(validateEnv({ ...prod, ...llm }).LLM_MODEL).toBe('qwen3.8-27b')
+    expect(
+      validateEnv({ ...prod, GENERATION_WORKER: 'false' }).GENERATION_WORKER,
+    ).toBe(false)
+  })
+
+  it('reads boolean flags from strings', () => {
+    expect(validateEnv(base).LLM_DISABLE_THINKING).toBe(true)
+    expect(
+      validateEnv({ ...base, LLM_DISABLE_THINKING: 'false' })
+        .LLM_DISABLE_THINKING,
+    ).toBe(false)
+    expect(() => validateEnv({ ...base, DESIGN_REPAIR_ATTEMPTS: '9' })).toThrow(
+      'DESIGN_REPAIR_ATTEMPTS',
+    )
+  })
+
+  it('rejects a non-Redis cache URL', () => {
+    expect(() =>
+      validateEnv({ ...base, REDIS_URL: 'http://localhost:6379' }),
+    ).toThrow('REDIS_URL')
+  })
+
+  it('defaults to JSON logs in production and pretty logs elsewhere', () => {
+    const prod = {
+      ...base,
+      ...llm,
+      NODE_ENV: 'production',
+      REDIS_URL: 'redis://r',
+    }
+
+    expect(validateEnv(prod).LOG_FORMAT).toBe('json')
+    expect(validateEnv(base).LOG_FORMAT).toBe('pretty')
+    expect(validateEnv({ ...base, LOG_FORMAT: 'json' }).LOG_FORMAT).toBe('json')
+    expect(() => validateEnv({ ...base, LOG_LEVEL: 'loud' })).toThrow(
+      'LOG_LEVEL',
+    )
   })
 })

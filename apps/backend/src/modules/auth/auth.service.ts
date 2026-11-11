@@ -1,9 +1,10 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 
+import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -15,6 +16,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -22,8 +25,12 @@ export class AuthService {
   ) {}
 
   /** Starts a new refresh-token family (i.e. a new login). */
-  issueTokens(user: AuthenticatedUser): Promise<AuthTokensDto> {
-    return this.createTokens(user, randomUUID())
+  async issueTokens(user: AuthenticatedUser): Promise<AuthTokensDto> {
+    const familyId = randomUUID()
+    const tokens = await this.createTokens(user, familyId)
+    this.logger.log(logEvent('auth.login', { user: user.id, family: familyId }))
+
+    return tokens
   }
 
   /**
@@ -36,14 +43,22 @@ export class AuthService {
       include: { user: true },
     })
     if (!stored) {
+      this.logger.warn(logEvent('auth.refresh_rejected', { reason: 'unknown' }))
       throw new UnauthorizedException('Invalid refresh token.')
     }
 
     if (stored.revokedAt) {
       await this.revokeFamily(stored.familyId)
-      throw new UnauthorizedException('Invalid refresh token.')
+      this.reuseDetected(stored)
     }
     if (stored.expiresAt <= new Date()) {
+      this.logger.warn(
+        logEvent('auth.refresh_rejected', {
+          reason: 'expired',
+          user: stored.userId,
+          family: stored.familyId,
+        }),
+      )
       throw new UnauthorizedException('Refresh token expired.')
     }
 
@@ -70,10 +85,28 @@ export class AuthService {
     })
     if (!tokens) {
       await this.revokeFamily(stored.familyId)
-      throw new UnauthorizedException('Invalid refresh token.')
+      this.reuseDetected(stored)
     }
+    this.logger.log(
+      logEvent('auth.refreshed', {
+        user: stored.userId,
+        family: stored.familyId,
+      }),
+    )
 
     return tokens
+  }
+
+  /** A rotated token came back: likely stolen, so the family was revoked. */
+  private reuseDetected(stored: { userId: string; familyId: string }): never {
+    this.logger.warn(
+      logEvent('auth.refresh_reuse_detected', {
+        user: stored.userId,
+        family: stored.familyId,
+        action: 'family_revoked',
+      }),
+    )
+    throw new UnauthorizedException('Invalid refresh token.')
   }
 
   /** Ends the session the refresh token belongs to. Idempotent. */
@@ -84,6 +117,13 @@ export class AuthService {
     if (stored) {
       await this.revokeFamily(stored.familyId)
     }
+    this.logger.log(
+      logEvent('auth.logout', {
+        user: userId,
+        family: stored?.familyId,
+        known: Boolean(stored),
+      }),
+    )
   }
 
   /**

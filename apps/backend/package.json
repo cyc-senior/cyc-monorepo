@@ -26,6 +26,9 @@
     "env:init": "ts-node scripts/init-env.ts"
   },
   "dependencies": {
+    "@keyv/redis": "^6.1.0",
+    "@nestjs/bullmq": "^11.0.5",
+    "@nestjs/cache-manager": "^3.1.3",
     "@nestjs/common": "^11.2.7",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.2.7",
@@ -35,14 +38,21 @@
     "@nestjs/swagger": "^11.4.7",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "bullmq": "^5.81.5",
+    "cache-manager": "^7.2.9",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
+    "htmlparser2": "^8.0.2",
+    "keyv": "^6.1.0",
+    "openai": "^7.55.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sanitize-html": "^2.17.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
@@ -55,6 +65,7 @@
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.23.1",
+    "@types/sanitize-html": "^2.16.0",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^8.72.0",
     "@typescript-eslint/parser": "^8.72.0",
@@ -92,6 +103,9 @@
     "coverageReporters": [
       "text-summary",
       "lcov"
+    ],
+    "setupFiles": [
+      "<rootDir>/../test/silence-logs.ts"
     ]
   }
 }
