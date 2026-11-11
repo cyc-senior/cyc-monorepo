@@ -39,8 +39,16 @@ async function bootstrap() {
     }),
   )
   app.setGlobalPrefix('api')
+  const frontendUrl = config.get('FRONTEND_URL', { infer: true })
   app.enableCors({
-    origin: config.get('FRONTEND_URL', { infer: true }),
+    origin: [
+      frontendUrl,
+      'http://cyc.local',
+      'https://cyc.local',
+      'http://cyc.localhost',
+      'https://cyc.localhost',
+      'http://localhost:3000',
+    ].filter(Boolean),
     credentials: true,
     exposedHeaders: ['X-Request-Id', 'X-Cache'],
   })

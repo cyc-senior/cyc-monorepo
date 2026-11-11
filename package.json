@@ -8,7 +8,8 @@
     "node": "^20.19 || ^22.12 || >=24.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "portless",
+    "dev:direct": "turbo run dev",
     "dev:frontend": "pnpm --filter frontend run dev",
     "dev:backend": "pnpm --filter backend run dev",
     "env:init": "pnpm --filter backend run env:init",
@@ -24,6 +25,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
   },
   "devDependencies": {
+    "portless": "^0.17.0",
     "prettier": "^3.9.10",
     "turbo": "^2.11.10"
   }

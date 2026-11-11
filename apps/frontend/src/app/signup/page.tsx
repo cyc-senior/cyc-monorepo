@@ -121,7 +121,7 @@ function SignUpContent() {
 
   const handleGoogleLogin = () => {
     const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.local/api";
     window.location.href = `${apiUrl}/auth/google`;
   };
 
