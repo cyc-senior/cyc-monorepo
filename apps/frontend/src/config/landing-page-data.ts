@@ -72,6 +72,10 @@ export const abTestingPreviewData = {
   progressLabel: "6 of 8 testers",
 };
 
+export const stepsContent = {
+  title: "How it works",
+};
+
 export const stepsData: StepItem[] = [
   {
     title: "Set design intent",

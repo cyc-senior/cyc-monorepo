@@ -6,7 +6,6 @@ export interface DesignPreviewCardProps {
   layout?: "stacked" | "media-header";
   className?: string;
 }
-
 export function DesignPreviewCard({
   variant,
   label,
@@ -15,40 +14,40 @@ export function DesignPreviewCard({
 }: DesignPreviewCardProps) {
   return (
     <div className={cn("flex flex-col", className)}>
-      <div className="flex items-center gap-1.5 mb-2">
+      <div className="mb-2 flex items-center gap-1.5">
         <span
           aria-hidden="true"
           className={cn(
-            "w-2 h-2 rounded-full shrink-0",
+            "size-2 shrink-0 rounded-full",
             variant === "a" ? "bg-design-a" : "bg-design-b"
           )}
         />
-        <span className="text-[11px] font-medium text-foreground">{label}</span>
+        <span className="text-xs font-medium text-foreground">{label}</span>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-2.5 flex-1 flex flex-col justify-between min-h-[144px]">
+      <div className="flex min-h-36 flex-1 flex-col justify-between rounded-lg border border-border bg-card p-2.5">
         {layout === "stacked" ? (
           <>
             <div>
-              <div className="h-14 rounded-md bg-muted w-full mb-2.5" />
-              <div className="h-2 rounded bg-muted w-full mb-1.5" />
-              <div className="h-2 rounded bg-muted w-3/4" />
+              <div className="mb-2.5 h-14 w-full rounded-md bg-muted" />
+              <div className="mb-1.5 h-2 w-full rounded bg-muted" />
+              <div className="h-2 w-3/4 rounded bg-muted" />
             </div>
-            <div className="h-6 rounded-md bg-muted w-full mt-3" />
+            <div className="mt-3 h-6 w-full rounded-md bg-muted" />
           </>
         ) : (
           <>
             <div>
-              <div className="flex items-center gap-2 mb-2.5">
-                <div className="w-5 h-5 rounded-full bg-muted shrink-0" />
-                <div className="h-2 rounded bg-muted flex-1" />
+              <div className="mb-2.5 flex items-center gap-2">
+                <div className="size-5 shrink-0 rounded-full bg-muted" />
+                <div className="h-2 flex-1 rounded bg-muted" />
               </div>
-              <div className="h-2 rounded bg-muted w-full mb-1.5" />
-              <div className="h-2 rounded bg-muted w-2/3 mb-2.5" />
-              <div className="h-11 rounded-md bg-muted w-full" />
+              <div className="mb-1.5 h-2 w-full rounded bg-muted" />
+              <div className="mb-2.5 h-2 w-2/3 rounded bg-muted" />
+              <div className="h-11 w-full rounded-md bg-muted" />
             </div>
-            <div className="flex justify-end mt-3">
-              <div className="h-6 rounded-md bg-muted w-2/5" />
+            <div className="mt-3 flex justify-end">
+              <div className="h-6 w-2/5 rounded-md bg-muted" />
             </div>
           </>
         )}

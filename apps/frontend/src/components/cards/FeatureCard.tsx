@@ -7,7 +7,6 @@ export interface FeatureCardProps {
   description: string;
   className?: string;
 }
-
 export function FeatureCard({
   icon: Icon,
   title,
@@ -16,11 +15,11 @@ export function FeatureCard({
 }: FeatureCardProps) {
   return (
     <div className={cn("flex items-start gap-3", className)}>
-      <div className="shrink-0 mt-0.5 text-brand-text">
-        <Icon className="w-4 h-4" aria-hidden="true" />
+      <div className="mt-0.5 shrink-0 text-brand-text">
+        <Icon className="size-4" aria-hidden="true" />
       </div>
       <div>
-        <h3 className="font-sans text-sm font-semibold text-brand-text mb-1">
+        <h3 className="mb-1 font-sans text-sm font-semibold text-brand-text">
           {title}
         </h3>
         <p className="text-xs leading-relaxed text-brand-700 dark:text-brand-200">

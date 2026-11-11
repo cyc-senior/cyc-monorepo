@@ -8,6 +8,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground",
+        secondary: "bg-secondary text-secondary-foreground",
         lime: "bg-primary-subtle text-primary-text",
         neutral: "bg-muted text-muted-foreground",
         outline: "border border-border bg-card text-foreground",
@@ -24,6 +25,9 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
+/**
+ * Compact status pill using existing semantic color tokens.
+ */
 function Badge({ className, variant, ...props }: BadgeProps) {
   return (
     <span className={cn(badgeVariants({ variant }), className)} {...props} />
@@ -31,4 +35,3 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export { Badge, badgeVariants };
-

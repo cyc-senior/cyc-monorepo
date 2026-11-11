@@ -9,48 +9,37 @@ export interface CTASectionProps {
   buttonLabel?: string;
   buttonHref?: string;
   onButtonClick?: () => void;
-  backgroundColor?: string;
   className?: string;
 }
-
 export function CTASection({
   title = ctaContent.title,
   description = ctaContent.description,
   buttonLabel = ctaContent.buttonLabel,
   buttonHref = ctaContent.buttonHref,
   onButtonClick,
-  backgroundColor,
   className,
 }: CTASectionProps) {
   return (
-    <section
-      className={cn("bg-brand py-16 md:py-20", className)}
-      style={backgroundColor ? { backgroundColor } : undefined}
-    >
-      <div className="container-page">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+    <section className={cn("bg-brand py-16 md:py-20", className)}>
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="section-heading text-brand-foreground mb-2">
+            <h2 className="mb-2 text-2xl font-bold tracking-tight text-brand-foreground sm:text-3xl">
               {title}
             </h2>
-            <p className="text-[15px] text-brand-200">{description}</p>
+            <p className="text-sm text-brand-200 sm:text-base">{description}</p>
           </div>
 
           {onButtonClick ? (
             <Button
               type="button"
               onClick={onButtonClick}
-              size="sm"
-              className="h-9 px-5 shrink-0 self-start md:self-auto"
+              className="shrink-0 self-start md:self-auto"
             >
               {buttonLabel}
             </Button>
           ) : (
-            <Button
-              size="sm"
-              className="h-9 px-5 shrink-0 self-start md:self-auto"
-              asChild
-            >
+            <Button className="shrink-0 self-start md:self-auto" asChild>
               <Link href={buttonHref ?? "#"}>{buttonLabel}</Link>
             </Button>
           )}

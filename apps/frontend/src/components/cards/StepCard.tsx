@@ -1,6 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export interface StepCardProps {
   stepNumber: number;
@@ -9,7 +15,6 @@ export interface StepCardProps {
   description: string;
   className?: string;
 }
-
 export function StepCard({
   stepNumber,
   icon: Icon,
@@ -18,19 +23,19 @@ export function StepCard({
   className,
 }: StepCardProps) {
   return (
-    <Card className={cn("p-5 flex flex-col gap-3.5 h-full", className)}>
-      <div className="flex items-center justify-between">
-        <span className="w-6 h-6 rounded-full bg-primary-subtle text-primary-text text-[11px] font-semibold flex items-center justify-center shrink-0">
+    <Card className={cn("h-full", className)}>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-3.5">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-xs font-semibold text-primary-text">
           {stepNumber}
         </span>
-        <Icon className="w-4 h-4 text-primary-text shrink-0" aria-hidden="true" />
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <Icon className="size-4 shrink-0 text-primary-text" aria-hidden="true" />
+      </CardHeader>
+      <CardContent>
+        <CardTitle className="mb-1.5 text-sm">{title}</CardTitle>
+        <CardDescription className="text-xs leading-relaxed">
           {description}
-        </p>
-      </div>
+        </CardDescription>
+      </CardContent>
     </Card>
   );
 }

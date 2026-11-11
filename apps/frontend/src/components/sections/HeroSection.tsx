@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { heroContent } from "@/config/landing-page-data";
 
@@ -32,10 +32,8 @@ export interface HeroSectionProps {
   sessionCard?: HeroSessionCardConfig | null;
   onJoinSession?: (sessionCode: string) => void | Promise<void>;
   preview?: React.ReactNode;
-  backgroundColor?: string;
   className?: string;
 }
-
 export function HeroSection({
   eyebrow,
   title = heroContent.title,
@@ -45,7 +43,6 @@ export function HeroSection({
   sessionCard = heroContent.sessionCard,
   onJoinSession,
   preview,
-  backgroundColor,
   className,
 }: HeroSectionProps) {
   const inputId = React.useId();
@@ -64,7 +61,7 @@ export function HeroSection({
 
     setError("");
     if (!onJoinSession) {
-      setError("Session joining requires a connected session service.");
+      setError("Joining by session code is not available yet.");
       return;
     }
 
@@ -79,38 +76,30 @@ export function HeroSection({
   };
 
   return (
-    <section
-      className={cn("bg-brand text-brand-foreground", className)}
-      style={backgroundColor ? { backgroundColor } : undefined}
-    >
-      <div className="container-page py-16 md:py-20">
-        <div className="grid grid-cols-1 min-[900px]:grid-cols-[1.05fr_0.95fr] gap-10 min-[900px]:gap-10 lg:gap-12 items-center">
+    <section className={cn("bg-brand text-brand-foreground", className)}>
+      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-20 lg:px-8">
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-12">
           {/* Left: Headline, description, CTA, and session join card */}
           <div className="min-w-0">
             {eyebrow && (
-              <p className="text-overline text-primary mb-3">{eyebrow}</p>
+              <p className="mb-3 text-overline text-primary">{eyebrow}</p>
             )}
 
-            <h1 className="font-heading text-3xl sm:text-4xl lg:text-[44px] font-bold leading-[1.14] tracking-tight text-brand-foreground mb-4">
+            <h1 className="mb-4 text-3xl font-bold leading-tight tracking-tight text-brand-foreground sm:text-4xl xl:text-5xl">
               {title}
             </h1>
 
-            <p className="text-[15px] leading-relaxed text-brand-200 mb-6 max-w-2xl min-[900px]:max-w-xl">
+            <p className="mb-6 max-w-2xl text-sm leading-relaxed text-brand-200 sm:text-base lg:max-w-xl">
               {description}
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
               {primaryAction.onClick ? (
-                <Button
-                  type="button"
-                  onClick={primaryAction.onClick}
-                  size="sm"
-                  className="h-9 px-4"
-                >
+                <Button type="button" onClick={primaryAction.onClick}>
                   {primaryAction.label}
                 </Button>
               ) : (
-                <Button size="sm" className="h-9 px-4" asChild>
+                <Button asChild>
                   <Link href={primaryAction.href ?? "#"}>
                     {primaryAction.label}
                   </Link>
@@ -122,14 +111,12 @@ export function HeroSection({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
                     onClick={secondaryAction.onClick}
-                    className="h-9 px-4"
                   >
                     {secondaryAction.label}
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm" className="h-9 px-4" asChild>
+                  <Button variant="outline" asChild>
                     <Link href={secondaryAction.href ?? "#"}>
                       {secondaryAction.label}
                     </Link>
@@ -138,69 +125,71 @@ export function HeroSection({
             </div>
 
             {sessionCard && (
-              <Card className="p-5 mt-8 border-0 shadow-md w-full min-[900px]:max-w-xl">
-                <form onSubmit={handleJoinSubmit} noValidate>
-                  <p className="text-sm font-semibold text-foreground mb-3.5">
+              <Card className="mt-8 w-full border-0 shadow-md lg:max-w-xl">
+                <CardHeader className="pb-3.5">
+                  <h2 className="font-sans text-sm font-semibold leading-none tracking-tight text-foreground">
                     {sessionCard.title}
-                  </p>
-
-                  <label
-                    htmlFor={inputId}
-                    className="text-xs font-medium text-foreground block mb-1.5"
-                  >
-                    {sessionCard.inputLabel}
-                  </label>
-
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      id={inputId}
-                      type="text"
-                      value={sessionCode}
-                      onChange={(e) => {
-                        setSessionCode(e.target.value);
-                        if (error) setError("");
-                      }}
-                      placeholder={sessionCard.inputPlaceholder}
-                      aria-invalid={error ? "true" : undefined}
-                      aria-describedby={error ? errorId : undefined}
-                      className="h-9 text-xs"
-                    />
-                    <Button
-                      type="submit"
-                      variant="primarySoft"
-                      size="sm"
-                      disabled={isSubmitting}
-                      className="h-9 px-4 shrink-0"
+                  </h2>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleJoinSubmit} noValidate>
+                    <label
+                      htmlFor={inputId}
+                      className="mb-1.5 block text-xs font-medium text-foreground"
                     >
-                      {isSubmitting ? "Joining..." : sessionCard.joinLabel}
-                    </Button>
-                  </div>
+                      {sessionCard.inputLabel}
+                    </label>
 
-                  {error && (
-                    <p
-                      id={errorId}
-                      role="alert"
-                      className="mt-2 flex items-center gap-1.5 text-xs text-danger"
-                    >
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                      <span>{error}</span>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        id={inputId}
+                        name="sessionCode"
+                        type="text"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        value={sessionCode}
+                        onChange={(e) => {
+                          setSessionCode(e.target.value);
+                          if (error) setError("");
+                        }}
+                        placeholder={sessionCard.inputPlaceholder}
+                        aria-invalid={error ? true : undefined}
+                        aria-describedby={error ? errorId : undefined}
+                        className="text-xs"
+                      />
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        disabled={isSubmitting}
+                        className="shrink-0 border-primary-300 bg-primary-subtle font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:border-primary-800 dark:hover:bg-primary-900"
+                      >
+                        {isSubmitting ? "Joining..." : sessionCard.joinLabel}
+                      </Button>
+                    </div>
+
+                    {error && (
+                      <p
+                        id={errorId}
+                        role="alert"
+                        className="mt-2 flex items-center gap-1.5 text-xs text-danger"
+                      >
+                        <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                        <span>{error}</span>
+                      </p>
+                    )}
+
+                    <p className="mt-2.5 text-xs text-muted-foreground">
+                      {sessionCard.helpText}
                     </p>
-                  )}
-
-                  <p className="text-xs text-muted-foreground mt-2.5">
-                    {sessionCard.helpText}
-                  </p>
-                </form>
+                  </form>
+                </CardContent>
               </Card>
             )}
           </div>
 
           {/* Right: Visual preview */}
-          {preview && (
-            <div className="min-w-0 w-full min-[900px]:flex min-[900px]:justify-end">
-              <div className="w-full min-[900px]:max-w-[540px]">{preview}</div>
-            </div>
-          )}
+          {preview && <div className="min-w-0 w-full">{preview}</div>}
         </div>
       </div>
     </section>

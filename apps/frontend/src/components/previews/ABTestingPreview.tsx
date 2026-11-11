@@ -1,5 +1,11 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { DesignPreviewCard } from "./DesignPreviewCard";
 import { abTestingPreviewData } from "@/config/landing-page-data";
 
@@ -23,25 +29,18 @@ export function ABTestingPreview({
   className,
 }: ABTestingPreviewProps) {
   return (
-    <div
-      className={cn(
-        "rounded-xl bg-card text-card-foreground border border-border/80 overflow-hidden shadow-xl",
-        className
-      )}
-    >
+    <Card className={cn("overflow-hidden border-border/80 shadow-xl", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-foreground">{title}</span>
-          <span className="text-[11px] text-muted-foreground">{subtitle}</span>
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
-        <Badge variant="lime" className="px-2 py-0.5 text-[11px]">
-          {statusLabel}
-        </Badge>
-      </div>
+        <Badge variant="lime">{statusLabel}</Badge>
+      </CardHeader>
 
       {/* Design A and B wireframe panels */}
-      <div className="grid grid-cols-2 gap-3 p-4">
+      <CardContent className="grid grid-cols-2 gap-3 p-4">
         {abTestingPreviewData.variants.map((variant) => (
           <DesignPreviewCard
             key={variant.id}
@@ -50,28 +49,28 @@ export function ABTestingPreview({
             layout={variant.layout}
           />
         ))}
-      </div>
+      </CardContent>
 
       {/* Feedback footer */}
-      <div className="px-4 py-3 border-t border-border flex flex-wrap items-center gap-2">
+      <CardFooter className="flex-wrap gap-2 border-t border-border px-4 py-3">
         <div className="flex items-center gap-1" aria-hidden="true">
           {[0, 1, 2].map((index) => (
             <span
               key={index}
-              className="w-5 h-5 rounded-full bg-muted border border-border/70"
+              className="size-6 rounded-full border border-border/70 bg-muted"
             />
           ))}
-          <span className="w-5 h-5 rounded-full bg-muted border border-border/70 text-[9px] font-medium text-muted-foreground flex items-center justify-center">
+          <span className="flex size-6 items-center justify-center rounded-full border border-border/70 bg-muted text-xs font-medium text-muted-foreground">
             {extraTestersCount}
           </span>
         </div>
 
-        <p className="text-[11px] text-foreground truncate">{quote}</p>
+        <p className="truncate text-xs text-foreground">{quote}</p>
 
-        <span className="text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
+        <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">
           {progressLabel}
         </span>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
