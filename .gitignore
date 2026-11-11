@@ -4,6 +4,7 @@ dist/
 .turbo/
 coverage/
 .cache/
+.serena/
 
 .env
 .env.local

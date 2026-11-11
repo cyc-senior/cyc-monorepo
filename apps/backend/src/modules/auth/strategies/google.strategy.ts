@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PassportStrategy } from '@nestjs/passport'
 import { Profile, Strategy } from 'passport-google-oauth20'
 
+import { logEvent } from '../../../common/logging/log-event'
 import { EnvironmentVariables } from '../../../config/env.validation'
 import { AuthProvider } from '../../../generated/prisma/client'
 import { UsersService } from '../../users/users.service'
@@ -10,6 +11,8 @@ import { AuthenticatedUser } from '../interfaces/authenticated-user.interface'
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  private readonly logger = new Logger(GoogleStrategy.name)
+
   constructor(
     config: ConfigService<EnvironmentVariables, true>,
     private readonly usersService: UsersService,
@@ -35,6 +38,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ): Promise<AuthenticatedUser> {
     const email = profile.emails?.[0]?.value
     if (!email || !profile._json.email_verified) {
+      this.logger.warn(
+        logEvent('auth.google_rejected', {
+          reason: 'email_not_verified',
+          googleAccount: profile.id,
+        }),
+      )
       throw new UnauthorizedException('Google account email is not verified.')
     }
 

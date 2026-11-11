@@ -6,6 +6,7 @@ import { PassportModule } from '@nestjs/passport'
 
 import { EnvironmentVariables } from '../../config/env.validation'
 import { UsersModule } from '../users/users.module'
+import { API_AUDIENCE, JWT_ISSUER } from './auth.constants'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { GoogleAuthGuard } from './guards/google-auth.guard'
@@ -23,6 +24,8 @@ import { JwtStrategy } from './strategies/jwt.strategy'
         secret: config.get('JWT_ACCESS_SECRET', { infer: true }),
         signOptions: {
           algorithm: 'HS256',
+          issuer: JWT_ISSUER,
+          audience: API_AUDIENCE,
           expiresIn: config.get('JWT_ACCESS_TTL_SECONDS', { infer: true }),
         },
       }),
