@@ -8,8 +8,8 @@
     "node": "^20.19 || ^22.12 || >=24.0"
   },
   "scripts": {
-    "dev": "portless",
-    "dev:direct": "turbo run dev",
+    "dev": "turbo run dev",
+    "routes:init": "portless alias cyc 3000 --force && portless alias api.cyc 4000 --force",
     "dev:frontend": "pnpm --filter frontend run dev",
     "dev:backend": "pnpm --filter backend run dev",
     "env:init": "pnpm --filter backend run env:init",
