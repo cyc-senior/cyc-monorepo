@@ -19,12 +19,7 @@ pnpm env:init                   # creates apps/backend/.env with a random JWT se
 cp apps/frontend/.env.example apps/frontend/.env.local  # sets NEXT_PUBLIC_API_URL
 pnpm db:migrate                 # apply migrations
 pnpm db:seed                    # create the dev admin user (admin@senior.local)
-
-#Portless setup
-pnpm portless proxy start       # Start portless proxy.
-pnpm portless trust             # Trust portless certificate for https.
-pnpm routes:init                # registers cyc.localhost (3000) & api.cyc.localhost (4000)
-pnpm dev                        # runs portless (cyc.local & api.cyc.local)
+pnpm dev                        # starts frontend on :3000 and backend on :4000
 ```
 
 Before running the AI features, set `LLM_API_KEY` in `apps/backend/.env` and
@@ -34,8 +29,7 @@ connect to the KMUTT VPN (see the notice above).
 
 | Command                                  | Description                                              |
 | ---------------------------------------- | -------------------------------------------------------- |
-| `pnpm dev`                               | Run monorepo with Portless (`cyc.local` & `api.cyc.local`)|
-| `pnpm dev:direct`                        | Run without Portless proxy (frontend :3000, backend :4000)|
+| `pnpm dev`                               | Run full monorepo (frontend :3000, backend :4000)        |
 | `pnpm dev:frontend` / `pnpm dev:backend` | Run a single app                                         |
 | `pnpm build`                             | Build all apps                                           |
 | `pnpm lint`                              | Lint all apps                                            |
@@ -44,22 +38,11 @@ connect to the KMUTT VPN (see the notice above).
 | `pnpm db:generate`                       | Regenerate the Prisma client                             |
 | `pnpm db:studio`                         | Browse data in Prisma Studio                             |
 
-### Local URLs (Portless)
+### Local URLs
 
-Apps run behind the [Vercel Labs Portless](https://github.com/vercel-labs/portless) proxy:
-
-* **Frontend:** `http://cyc.local` (or `http://cyc.localhost`)
-* **Backend API & Swagger:** `http://api.cyc.local/api` (or `http://api.cyc.localhost/api`)
-* **OpenAPI JSON:** `http://api.cyc.local/api-json`
-
-> **Tip:** If `.local` does not resolve on your machine, run `pnpm portless hosts sync` (admin), or access via `*.localhost` (e.g. `http://cyc.localhost`), which modern browsers resolve automatically.
-
-To start Portless explicitly or in plain HTTP mode:
-```bash
-pnpm portless proxy start --no-tls   # Plain HTTP on port 80
-# or
-pnpm portless proxy start            # HTTPS on port 443 with local certs
-```
+* **Frontend:** `http://localhost:3000`
+* **Backend API & Swagger:** `http://localhost:4000/api`
+* **OpenAPI JSON:** `http://localhost:4000/api-json`
 
 ### Signing in locally
 
@@ -75,10 +58,10 @@ Use the access token as a bearer token:
 
 ```bash
 TOKEN=$(pnpm --silent dev:token --raw)
-curl -H "Authorization: Bearer $TOKEN" http://api.cyc.local/api/users/me
+curl -H "Authorization: Bearer $TOKEN" http://localhost:4000/api/users/me
 ```
 
-In Swagger (`http://api.cyc.local/api`), click **Authorize** and paste the token. Access tokens last 15
+In Swagger (`http://localhost:4000/api`), click **Authorize** and paste the token. Access tokens last 15
 minutes (`JWT_ACCESS_TTL_SECONDS`); run the command again for a new one.
 
 `pnpm db:seed` and `pnpm dev:token` refuse to run unless `NODE_ENV=development`
