@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Info, MailCheck } from "lucide-react";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,7 +249,7 @@ function SignUpContent() {
                         <span className="w-full border-t border-border" />
                       </div>
                       <span className="relative bg-card px-2 text-xs uppercase text-muted-foreground font-medium">
-                        OR
+                        or
                       </span>
                     </div>
 

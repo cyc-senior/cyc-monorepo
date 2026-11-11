@@ -125,8 +125,8 @@ export function HeroSection({
             </div>
 
             {sessionCard && (
-              <Card className="mt-8 w-full border-0 shadow-md lg:max-w-xl">
-                <CardHeader className="pb-3.5">
+              <Card className="mt-6 w-full gap-0 border-0 ppy-5 shadow-md lg:max-w-xl">
+                <CardHeader className="px-5 pb-3.5">
                   <h2 className="font-sans text-sm font-semibold leading-none tracking-tight text-foreground">
                     {sessionCard.title}
                   </h2>
@@ -189,7 +189,7 @@ export function HeroSection({
           </div>
 
           {/* Right: Visual preview */}
-          {preview && <div className="min-w-0 w-full">{preview}</div>}
+          {preview && <div className="w-full h-full p-12">{preview}</div>}
         </div>
       </div>
     </section>

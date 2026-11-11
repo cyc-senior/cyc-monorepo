@@ -24,23 +24,23 @@ export interface NavbarProps {
   user?: NavbarUser | null;
   onSignOut?: () => void;
 }
-function getInitials(name: string): string {
-  return (
-    name
+
+export function Navbar({ variant = "default", user = null, onSignOut }: NavbarProps) {
+  const isAuthVariant = variant === "auth";
+
+  const getInitials = (name: string) => {
+    return name
       .split(" ")
       .filter(Boolean)
       .map((part) => part[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2) || "U"
-  );
-}
-export function Navbar({ variant = "default", user = null, onSignOut }: NavbarProps) {
-  const isAuthVariant = variant === "auth";
+      .slice(0, 2) || "U";
+  };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background text-foreground">
-      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-white text-foreground">
+      <div className="flex h-16 w-full items-center justify-between px-[40px]">
         {/* Left: Logo */}
         <Link
           href="/"
@@ -60,7 +60,7 @@ export function Navbar({ variant = "default", user = null, onSignOut }: NavbarPr
                     type="button"
                     className="flex cursor-pointer items-center gap-2 rounded-full py-1 pl-1 pr-2 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Avatar className="size-8">
+                    <Avatar className="h-8 w-8">
                       {user.avatarUrl && (
                         <AvatarImage src={user.avatarUrl} alt={user.name} />
                       )}
@@ -69,7 +69,7 @@ export function Navbar({ variant = "default", user = null, onSignOut }: NavbarPr
                     <span className="text-sm font-medium text-foreground">
                       {user.name}
                     </span>
-                    <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200" />
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -77,22 +77,22 @@ export function Navbar({ variant = "default", user = null, onSignOut }: NavbarPr
                     <p className="text-sm font-medium leading-none text-foreground">
                       {user.name}
                     </p>
-                    <p className="truncate text-xs leading-none text-muted-foreground">
+                    <p className="text-xs leading-none text-muted-foreground truncate">
                       {user.email}
                     </p>
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={onSignOut}
-                    className="cursor-pointer text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                   >
-                    <LogOut className="mr-2 size-4" />
-                    <span>Sign out</span>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Signout</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" asChild>
+              <Button variant="ghost" className="bg-secondary rounded-[10px]" asChild>
                 <Link href="/signin">Sign in</Link>
               </Button>
             )}
@@ -102,3 +102,4 @@ export function Navbar({ variant = "default", user = null, onSignOut }: NavbarPr
     </header>
   );
 }
+

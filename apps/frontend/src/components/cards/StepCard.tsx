@@ -23,8 +23,8 @@ export function StepCard({
   className,
 }: StepCardProps) {
   return (
-    <Card className={cn("h-full", className)}>
-      <CardHeader className="flex-row items-center justify-between space-y-0 pb-3.5">
+    <Card className={cn("h-full gap-0 py-5", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3.5">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-xs font-semibold text-primary-text">
           {stepNumber}
         </span>

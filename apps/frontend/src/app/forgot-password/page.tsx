@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

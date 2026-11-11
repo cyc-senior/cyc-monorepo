@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Navbar } from "@/components/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,94 +130,66 @@ function SignInContent() {
 
       <MobileDesktopNotice sessionCode={sessionCode}>
         <main className="flex-1 flex justify-center px-4 pt-[80px] pb-16">
-        <div className="w-[440px] max-w-full flex flex-col gap-4">
-          {/* Alert Error when Google sign-in fails or cancelled */}
-          {showGoogleError && (
-            <Alert variant="destructive" className="relative">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Couldn&apos;t sign you in with Google</AlertTitle>
-              <AlertDescription>
-                The sign-in was cancelled or didn&apos;t finish. Try again, or use your email.
-              </AlertDescription>
-            </Alert>
-          )}
+          <div className="w-[440px] max-w-full flex flex-col gap-4">
+            {/* Alert Error when Google sign-in fails or cancelled */}
+            {showGoogleError && (
+              <Alert variant="destructive" className="relative">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Couldn&apos;t sign you in with Google</AlertTitle>
+                <AlertDescription>
+                  The sign-in was cancelled or didn&apos;t finish. Try again, or use your email.
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {/* Alert Info when session code provided */}
-          {session && (
-            <Alert variant="info" className="relative">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Joining session {session.code}</AlertTitle>
-              <AlertDescription>{session.title}</AlertDescription>
-            </Alert>
-          )}
+            {/* Alert Info when session code provided */}
+            {session && (
+              <Alert variant="info" className="relative">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Joining session {session.code}</AlertTitle>
+                <AlertDescription>{session.title}</AlertDescription>
+              </Alert>
+            )}
 
-          <Card className="w-full shadow-sm">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-semibold">
-                {session ? "Add your details" : "Sign In"}
-              </CardTitle>
-              {session ? (
-                <CardDescription>
-                  No account needed. Just tell us who you are.
-                </CardDescription>
-              ) : null}
-            </CardHeader>
+            <Card className="w-full shadow-sm">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl font-semibold">
+                  {session ? "Add your details" : "Sign In"}
+                </CardTitle>
+                {session ? (
+                  <CardDescription>
+                    No account needed. Just tell us who you are.
+                  </CardDescription>
+                ) : null}
+              </CardHeader>
 
-            <CardContent>
-              {session ? (
-                /* Session Join Mode */
-                <form onSubmit={handleJoinSession} className="space-y-4" noValidate>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="Jane Doe"
-                      value={name}
-                      error={!!errors.name}
-                      onChange={(e) => {
-                        setName(e.target.value);
-                        if (errors.name) {
-                          setErrors((prev) => ({ ...prev, name: undefined }));
-                        }
-                      }}
-                    />
-                    {errors.name && (
-                      <p className="text-xs text-destructive">{errors.name}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="session-email">Email</Label>
-                    <Input
-                      id="session-email"
-                      type="email"
-                      placeholder="you@company.com"
-                      value={email}
-                      error={!!errors.email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) {
-                          setErrors((prev) => ({ ...prev, email: undefined }));
-                        }
-                      }}
-                    />
-                    {errors.email && (
-                      <p className="text-xs text-destructive">{errors.email}</p>
-                    )}
-                  </div>
-
-                  <Button type="submit" className="w-full mt-2">
-                    Join session
-                  </Button>
-                </form>
-              ) : (
-                /* Regular Sign In Mode */
-                <div className="space-y-4">
-                  <form onSubmit={handleStandardSubmit} className="space-y-4" noValidate>
+              <CardContent>
+                {session ? (
+                  /* Session Join Mode */
+                  <form onSubmit={handleJoinSession} className="space-y-4" noValidate>
                     <div className="space-y-1.5">
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="name">Name</Label>
                       <Input
-                        id="email"
+                        id="name"
+                        placeholder="Jane Doe"
+                        value={name}
+                        error={!!errors.name}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          if (errors.name) {
+                            setErrors((prev) => ({ ...prev, name: undefined }));
+                          }
+                        }}
+                      />
+                      {errors.name && (
+                        <p className="text-xs text-destructive">{errors.name}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="session-email">Email</Label>
+                      <Input
+                        id="session-email"
                         type="email"
                         placeholder="you@company.com"
                         value={email}
@@ -234,96 +206,124 @@ function SignInContent() {
                       )}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password">Password</Label>
-                        <Link
-                          href="/forgot-password"
-                          className="text-xs text-link font-medium hover:text-foreground transition-colors"
-                        >
-                          Forgot password?
-                        </Link>
-                      </div>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        error={!!errors.password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (errors.password) {
-                            setErrors((prev) => ({ ...prev, password: undefined }));
-                          }
-                        }}
-                      />
-                      {errors.password && (
-                        <p className="text-xs text-destructive">
-                          {errors.password}
-                        </p>
-                      )}
-                    </div>
-
-                    <Button type="submit" className="w-full">
-                      Sign In
+                    <Button type="submit" className="w-full mt-2">
+                      Join session
                     </Button>
                   </form>
+                ) : (
+                  /* Regular Sign In Mode */
+                  <div className="space-y-4">
+                    <form onSubmit={handleStandardSubmit} className="space-y-4" noValidate>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="you@company.com"
+                          value={email}
+                          error={!!errors.email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (errors.email) {
+                              setErrors((prev) => ({ ...prev, email: undefined }));
+                            }
+                          }}
+                        />
+                        {errors.email && (
+                          <p className="text-xs text-destructive">{errors.email}</p>
+                        )}
+                      </div>
 
-                  {/* OR Divider */}
-                  <div className="relative flex items-center justify-center my-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="password">Password</Label>
+                          <Link
+                            href="/forgot-password"
+                            className="text-xs text-link font-medium hover:text-foreground transition-colors"
+                          >
+                            Forgot password?
+                          </Link>
+                        </div>
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={password}
+                          error={!!errors.password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (errors.password) {
+                              setErrors((prev) => ({ ...prev, password: undefined }));
+                            }
+                          }}
+                        />
+                        {errors.password && (
+                          <p className="text-xs text-destructive">
+                            {errors.password}
+                          </p>
+                        )}
+                      </div>
+
+                      <Button type="submit" className="w-full">
+                        Sign In
+                      </Button>
+                    </form>
+
+                    {/* OR Divider */}
+                    <div className="relative flex items-center justify-center my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <span className="relative bg-card px-2 text-xs uppercase text-muted-foreground font-medium">
+                        or
+                      </span>
                     </div>
-                    <span className="relative bg-card px-2 text-xs uppercase text-muted-foreground font-medium">
-                      OR
-                    </span>
-                  </div>
 
-                  {/* Google Login Button */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2 cursor-pointer"
-                    onClick={handleGoogleLogin}
-                  >
-                    <GoogleIcon />
-                    <span>Continue with Google</span>
-                  </Button>
+                    {/* Google Login Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 cursor-pointer"
+                      onClick={handleGoogleLogin}
+                    >
+                      <GoogleIcon />
+                      <span>Continue with Google</span>
+                    </Button>
 
-                  {/* Footer signup & terms */}
-                  <div className="space-y-3 text-center pt-2">
-                    <p className="text-sm text-muted-foreground">
-                      Don&apos;t have an account?{" "}
-                      <Link
-                        href={
-                          sessionCode
-                            ? `/signup?session_code=${encodeURIComponent(sessionCode)}`
-                            : "/signup"
-                        }
-                        className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
-                      >
-                        Sign up
-                      </Link>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      By continuing, you agree to the{" "}
-                      <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
-                        Terms of use
-                      </Link>{" "}
-                      and{" "}
-                      <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
-                        Privacy notice
-                      </Link>
-                      .
-                    </p>
+                    {/* Footer signup & terms */}
+                    <div className="space-y-3 text-center pt-2">
+                      <p className="text-sm text-muted-foreground">
+                        Don&apos;t have an account?{" "}
+                        <Link
+                          href={
+                            sessionCode
+                              ? `/signup?session_code=${encodeURIComponent(sessionCode)}`
+                              : "/signup"
+                          }
+                          className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
+                        >
+                          Sign up
+                        </Link>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        By continuing, you agree to the{" "}
+                        <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+                          Terms of use
+                        </Link>{" "}
+                        and{" "}
+                        <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+                          Privacy notice
+                        </Link>
+                        .
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </MobileDesktopNotice>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </MobileDesktopNotice>
     </div>
   );
 }

@@ -25,7 +25,7 @@ export function RoleCard({
   className,
 }: RoleCardProps) {
   return (
-    <Card className={cn("flex h-full flex-col", className)}>
+    <Card className={cn("flex h-full flex-col gap-0", className)}>
       <CardHeader className="pb-1.5">
         <div className="mb-2.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-text">
           <Icon className="size-4" aria-hidden="true" />
