@@ -70,6 +70,11 @@ export class EnvironmentVariables {
   @IsUrl({ require_tld: false, require_protocol: true })
   FRONTEND_URL: string = 'http://localhost:3000'
 
+  /** Domain for shared httpOnly auth cookies (e.g. `.cyc.localhost` or `.cyc.com`). */
+  @IsOptional()
+  @IsString()
+  COOKIE_DOMAIN?: string
+
   /**
    * Response cache and the design-generation queue (BullMQ). Required in
    * production; elsewhere the cache falls back to an in-process store and the
