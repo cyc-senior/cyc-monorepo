@@ -195,7 +195,8 @@ export function wrapFetchWithCache<
 
     // Bypass cache if no duration or forceRefresh requested
     if (cacheMinutes <= 0 || forceRefresh) {
-      return requestFn(endpoint, config);
+      const directData = await requestFn(endpoint, config);
+      return directData as T;
     }
 
     const cacheKey = buildCacheKey(endpoint, config);
@@ -210,13 +211,13 @@ export function wrapFetchWithCache<
     // 2. In-flight request deduplication (share existing pending request)
     const existingInFlight = inFlightRequests.get(cacheKey);
     if (existingInFlight) {
-      return existingInFlight as Promise<T>;
+      return (await existingInFlight) as T;
     }
 
     // 3. Perform network call and cache the response
-    const fetchPromise = (async () => {
+    const fetchPromise = (async (): Promise<T> => {
       try {
-        const data = await requestFn(endpoint, config);
+        const data = (await requestFn(endpoint, config)) as T;
         memoryCache.set(cacheKey, {
           data,
           expiresAt: Date.now() + cacheMinutes * 60 * 1000,
