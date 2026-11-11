@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = useCallback(() => {
     const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.localhost/api";
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
     window.location.href = `${apiUrl}/auth/google`;
   }, []);
 

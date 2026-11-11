@@ -71,7 +71,7 @@ export class AuthController {
     res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
 
     const frontendUrl =
-      this.config.get('FRONTEND_URL', { infer: true }) || 'https://cyc.localhost'
+      this.config.get('FRONTEND_URL', { infer: true }) || 'http://localhost:3000'
     return res.redirect(`${frontendUrl}/dashboard`)
   }
 

@@ -1,7 +1,7 @@
 import { AuthTokens } from "@/types/auth";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.localhost/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 let inMemoryToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
@@ -75,7 +75,7 @@ export async function apiFetch<T = any>(
     requestHeaders.set("Authorization", `Bearer ${inMemoryToken}`);
   }
 
-  // Ensure cross-subdomain cookies (api.cyc.localhost <-> cyc.localhost) are passed
+  // Ensure credentials (cookies) are passed
   const fetchOptions: RequestInit = {
     ...rest,
     headers: requestHeaders,

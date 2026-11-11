@@ -70,7 +70,7 @@ export class EnvironmentVariables {
   @IsUrl({ require_tld: false, require_protocol: true })
   FRONTEND_URL: string = 'http://localhost:3000'
 
-  /** Domain for shared httpOnly auth cookies (e.g. `.cyc.localhost` or `.cyc.com`). */
+  /** Domain for shared httpOnly auth cookies in production (e.g. `.cyc.com`). */
   @IsOptional()
   @IsString()
   COOKIE_DOMAIN?: string
