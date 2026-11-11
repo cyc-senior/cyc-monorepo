@@ -7,10 +7,10 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { User } from "@/types/auth";
 import {
   apiFetch,
-  getAccessToken,
   refreshAccessToken,
   setAccessToken as setClientAccessToken,
 } from "@/lib/api-client";
@@ -29,6 +29,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -60,7 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = useCallback(() => {
     const apiUrl =
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-    window.location.href = `${apiUrl}/auth/google`;
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`${apiUrl}/auth/google`);
   }, []);
 
   const logout = useCallback(async () => {
@@ -75,9 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setClientAccessToken(null);
       setToken(null);
       setUser(null);
-      window.location.href = "/signin";
+      router.push("/signin");
     }
-  }, []);
+  }, [router]);
 
   // Initial authentication check on application mount
   useEffect(() => {

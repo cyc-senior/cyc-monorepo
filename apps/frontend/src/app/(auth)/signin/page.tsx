@@ -65,9 +65,8 @@ function SignInContent() {
   }, [isLoading, user, router]);
 
   // Google sign in error state
-  const [showGoogleError, setShowGoogleError] = React.useState(
-    authError === "google" || authError === "google_failed"
-  );
+  const showGoogleError =
+    authError === "google" || authError === "google_failed";
 
   // Form states
   const [email, setEmail] = React.useState("");

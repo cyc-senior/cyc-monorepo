@@ -28,7 +28,7 @@ export interface CustomRequestConfig extends AxiosRequestConfig {
   skipAuth?: boolean;
   cacheMinutes?: number;
   forceRefresh?: boolean;
-  body?: any; // Fetch-compatible alias for data
+  body?: unknown; // Fetch-compatible alias for data
   _retry?: boolean;
 }
 
@@ -121,8 +121,8 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-const memoryCache = new Map<string, CacheEntry<any>>();
-const inFlightRequests = new Map<string, Promise<any>>();
+const memoryCache = new Map<string, CacheEntry<unknown>>();
+const inFlightRequests = new Map<string, Promise<unknown>>();
 
 /**
  * Generates a deterministic, sorted cache key.
@@ -179,9 +179,9 @@ function buildCacheKey(
  * ```
  */
 export function wrapFetchWithCache<
-  F extends (endpoint: string, config?: any) => Promise<any>
+  F extends (endpoint: string, config?: CustomRequestConfig) => Promise<unknown>
 >(requestFn: F) {
-  return async function cachedRequest<T = any>(
+  return async function cachedRequest<T = unknown>(
     endpoint: string,
     config?: Parameters<F>[1] & { cacheMinutes?: number; forceRefresh?: boolean },
     cacheMinutesParam?: number
@@ -235,7 +235,7 @@ export function wrapFetchWithCache<
 /**
  * Standard fetch helper returning `data` directly (backwards-compatible with previous `apiFetch`).
  */
-export async function apiFetch<T = any>(
+export async function apiFetch<T = unknown>(
   endpoint: string,
   config: CustomRequestConfig = {}
 ): Promise<T> {

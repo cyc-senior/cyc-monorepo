@@ -34,8 +34,7 @@ export class AuthController {
 
   /** Builds cookie options for the refresh token. */
   private getCookieOptions(): CookieOptions {
-    const isProd =
-      this.config.get('NODE_ENV', { infer: true }) === 'production'
+    const isProd = this.config.get('NODE_ENV', { infer: true }) === 'production'
     const domain =
       this.config.get('COOKIE_DOMAIN', { infer: true }) || undefined
     const days =
@@ -71,7 +70,8 @@ export class AuthController {
     res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
 
     const frontendUrl =
-      this.config.get('FRONTEND_URL', { infer: true }) || 'http://localhost:3000'
+      this.config.get('FRONTEND_URL', { infer: true }) ||
+      'http://localhost:3000'
     return res.redirect(`${frontendUrl}/dashboard`)
   }
 
