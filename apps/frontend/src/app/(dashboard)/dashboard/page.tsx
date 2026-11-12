@@ -5,20 +5,42 @@ import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertCircle, LogOut, User as UserIcon } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Building03Icon, Ticket01Icon } from "@hugeicons/core-free-icons";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const sessionHeadingId = React.useId();
+  const sessionCodeId = React.useId();
+  const sessionErrorId = React.useId();
+  const sessionInputRef = React.useRef<HTMLInputElement>(null);
+  const [sessionCode, setSessionCode] = React.useState("");
+  const [sessionError, setSessionError] = React.useState("");
+  const [joinStatus, setJoinStatus] = React.useState("");
 
   if (!user) return null;
+
+  const handleJoinSession = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = sessionCode.trim();
+    if (!trimmed) {
+      setJoinStatus("");
+      setSessionError("Please enter a session code.");
+      sessionInputRef.current?.focus();
+      return;
+    }
+
+    setSessionError("");
+    setJoinStatus("Joining by session code is not available yet.");
+  };
 
   const initials = (user.name || user.email)
     .split(" ")
@@ -38,8 +60,8 @@ export default function DashboardPage() {
           You can do both later. Your role is set separately in each project.
         </p>
       </div>
-      <div className="flex flex-row gap-6">
-        <Card className="w-full">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="rounded-2xl">
           <CardHeader>
             <div
               aria-hidden="true"
@@ -47,14 +69,23 @@ export default function DashboardPage() {
             >
               <HugeiconsIcon icon={Building03Icon} />
             </div>
-            <CardTitle>Create a workspace</CardTitle>
-            <CardDescription>
-              For designers and teams who run tests and invite clients, developers or project managers.
+            <CardTitle className="text-lg">Create a workspace</CardTitle>
+            <CardDescription className="leading-relaxed">
+              For designers and teams who run tests and invite clients,
+              developers or project managers.
             </CardDescription>
-            <Button className="shrink-0 border-primary-300 bg-primary font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:border-primary-800 dark:hover:bg-primary-900">Create Workspace</Button>
           </CardHeader>
+          <CardFooter className="mt-auto">
+            <Button
+              type="button"
+              size="lg"
+              className="w-full rounded-xl font-semibold hover:bg-primary-hover"
+            >
+              Create workspace
+            </Button>
+          </CardFooter>
         </Card>
-        <Card className="w-full">
+        <Card className="rounded-2xl">
           <CardHeader>
             <div
               aria-hidden="true"
@@ -62,65 +93,71 @@ export default function DashboardPage() {
             >
               <HugeiconsIcon icon={Ticket01Icon} />
             </div>
-            <CardTitle>Join testing session with a code</CardTitle>
-            <CardDescription>
-              A designer sent you a session code or link to test a design. No workspace needed.
+            <CardTitle id={sessionHeadingId} className="text-lg">
+              Join testing session with a code
+            </CardTitle>
+            <CardDescription className="leading-relaxed">
+              A designer sent you a session code or link to test a design. No
+              workspace needed.
             </CardDescription>
-            <Button className="shrink-0 border-primary-300 bg-primary-subtle font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:border-primary-800 dark:hover:bg-primary-900">Join Session</Button>
           </CardHeader>
+          <CardFooter className="mt-auto">
+            <form
+              onSubmit={handleJoinSession}
+              aria-labelledby={sessionHeadingId}
+              noValidate
+              className="w-full space-y-2"
+            >
+              <Label htmlFor={sessionCodeId}>Session code</Label>
+              <div className="flex flex-col gap-2">
+                <Input
+                  ref={sessionInputRef}
+                  id={sessionCodeId}
+                  name="sessionCode"
+                  type="text"
+                  required
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  placeholder="e.g. CYC-4821"
+                  value={sessionCode}
+                  error={!!sessionError}
+                  aria-describedby={sessionError ? sessionErrorId : undefined}
+                  onChange={(e) => {
+                    setSessionCode(e.target.value);
+                    if (sessionError) setSessionError("");
+                    if (joinStatus) setJoinStatus("");
+                  }}
+                />
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full rounded-xl border border-primary bg-primary-subtle font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:hover:bg-primary-900"
+                >
+                  Join Session
+                </Button>
+              </div>
+              {sessionError && (
+                <p
+                  id={sessionErrorId}
+                  role="alert"
+                  className="flex items-center gap-1.5 text-xs text-danger"
+                >
+                  <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span>{sessionError}</span>
+                </p>
+              )}
+              {joinStatus && (
+                <p role="status" className="text-xs text-muted-foreground">
+                  {joinStatus}
+                </p>
+              )}
+            </form>
+          </CardFooter>
         </Card>
       </div>
-
-      {/* 
-      <Card className="shadow-sm">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl flex items-center gap-2">
-            <UserIcon className="h-5 w-5 text-primary" />
-            Profile Details
-          </CardTitle>
-          <CardDescription>
-            Your authenticated account information.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-muted/40 border border-border">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-14 w-14 border border-border">
-                {user.image && (
-                  <AvatarImage src={user.image} alt={user.name || user.email} />
-                )}
-                <AvatarFallback className="text-base font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-semibold text-foreground text-lg">
-                  {user.name || "CYC User"}
-                </h3>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
-                {user.emailVerified ? (
-                  <span className="inline-flex items-center mt-1 text-xs text-primary font-medium">
-                    ✓ Email Verified
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center mt-1 text-xs text-amber-500 font-medium">
-                    ⚠ Email Unverified
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={logout}
-              className="flex items-center gap-2 text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </CardContent>
-      </Card> */}
     </div>
   );
 }
