@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, User as UserIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Building03Icon, Ticket01Icon } from "@hugeicons/core-free-icons";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -29,14 +31,47 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Dashboard
+        <h1 className="text-3xl font-bold tracking-tight text-foreground text-center">
+          Welcome, {user.name}. How do you want to start?
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome back to CYC testing platform.
+        <p className="text-muted-foreground mt-1 text-center">
+          You can do both later. Your role is set separately in each project.
         </p>
       </div>
+      <div className="flex flex-row gap-6">
+        <Card className="w-full">
+          <CardHeader>
+            <div
+              aria-hidden="true"
+              className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary-subtle text-primary-text"
+            >
+              <HugeiconsIcon icon={Building03Icon} />
+            </div>
+            <CardTitle>Create a workspace</CardTitle>
+            <CardDescription>
+              For designers and teams who run tests and invite clients, developers or project managers.
+            </CardDescription>
+            <Button className="shrink-0 border-primary-300 bg-primary font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:border-primary-800 dark:hover:bg-primary-900">Create Workspace</Button>
+          </CardHeader>
+        </Card>
+        <Card className="w-full">
+          <CardHeader>
+            <div
+              aria-hidden="true"
+              className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary-subtle text-primary-text"
+            >
+              <HugeiconsIcon icon={Ticket01Icon} />
+            </div>
+            <CardTitle>Join testing session with a code</CardTitle>
+            <CardDescription>
+              A designer sent you a session code or link to test a design. No workspace needed.
+            </CardDescription>
+            <Button className="shrink-0 border-primary-300 bg-primary-subtle font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:border-primary-800 dark:hover:bg-primary-900">Join Session</Button>
+          </CardHeader>
+        </Card>
+      </div>
 
+      {/* 
       <Card className="shadow-sm">
         <CardHeader className="pb-4">
           <CardTitle className="text-xl flex items-center gap-2">
@@ -85,7 +120,7 @@ export default function DashboardPage() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }
