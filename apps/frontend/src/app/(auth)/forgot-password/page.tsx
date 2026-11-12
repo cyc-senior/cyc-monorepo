@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Navbar } from "@/components/navbar";
-import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,16 +57,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-      style={{ background: "var(--cyc-bg-brand)" }}
-    >
-      <Navbar variant="auth" />
-
-      <MobileDesktopNotice>
-        <main className="flex-1 flex justify-center px-4 pt-[80px] pb-16">
-          <div className="w-[440px] max-w-full">
-            <Card className="w-full shadow-sm">
+    <Card className="w-full shadow-sm">
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-semibold">
                   {submitted ? "Check your email" : "Reset your password"}
@@ -132,9 +121,5 @@ export default function ForgotPasswordPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </main>
-      </MobileDesktopNotice>
-    </div>
   );
 }

@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Navbar } from "@/components/navbar";
-import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,15 +51,22 @@ function GoogleIcon() {
 }
 
 function SignInContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { loginWithGoogle, user, isLoading } = useAuth();
   const sessionCode = searchParams.get("session_code");
   const authError = searchParams.get("error");
   const session = sessionCode ? getSessionDetails(sessionCode) : null;
 
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, user, router]);
+
   // Google sign in error state
-  const [showGoogleError, setShowGoogleError] = React.useState(
-    authError === "google" || authError === "google_failed"
-  );
+  const showGoogleError =
+    authError === "google" || authError === "google_failed";
 
   // Form states
   const [email, setEmail] = React.useState("");
@@ -116,22 +122,12 @@ function SignInContent() {
   };
 
   const handleGoogleLogin = () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.local/api";
-    window.location.href = `${apiUrl}/auth/google`;
+    loginWithGoogle();
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-      style={{ background: "var(--cyc-bg-brand)" }}
-    >
-      <Navbar variant="auth" />
-
-      <MobileDesktopNotice sessionCode={sessionCode}>
-        <main className="flex-1 flex justify-center px-4 pt-[80px] pb-16">
-        <div className="w-[440px] max-w-full flex flex-col gap-4">
-          {/* Alert Error when Google sign-in fails or cancelled */}
+    <>
+      {/* Alert Error when Google sign-in fails or cancelled */}
           {showGoogleError && (
             <Alert variant="destructive" className="relative">
               <AlertCircle className="h-4 w-4" />
@@ -321,25 +317,13 @@ function SignInContent() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </main>
-    </MobileDesktopNotice>
-    </div>
+    </>
   );
 }
 
 export default function SignInPage() {
   return (
-    <React.Suspense
-      fallback={
-        <div
-          className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-          style={{ background: "var(--cyc-bg-brand)" }}
-        >
-          <Navbar variant="auth" />
-        </div>
-      }
-    >
+    <React.Suspense fallback={null}>
       <SignInContent />
     </React.Suspense>
   );

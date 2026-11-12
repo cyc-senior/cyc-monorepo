@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Eye, EyeOff, Info, MailCheck } from "lucide-react";
-import { Navbar } from "@/components/navbar";
-import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,8 +44,16 @@ function GoogleIcon() {
 }
 
 function SignUpContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const { loginWithGoogle, user, isLoading } = useAuth();
   const sessionCode = searchParams.get("session_code");
+
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   // Form states
   const [fullName, setFullName] = React.useState("");
@@ -120,22 +127,12 @@ function SignUpContent() {
   };
 
   const handleGoogleLogin = () => {
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "https://api.cyc.local/api";
-    window.location.href = `${apiUrl}/auth/google`;
+    loginWithGoogle();
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-      style={{ background: "var(--cyc-bg-brand)" }}
-    >
-      <Navbar variant="auth" />
-
-      <MobileDesktopNotice sessionCode={sessionCode}>
-        <main className="flex-1 flex justify-center px-4 pt-[80px] pb-16">
-          <div className="w-[440px] max-w-full flex flex-col gap-4">
-            {/* Alert if session code is provided in url */}
+    <>
+      {/* Alert if session code is provided in url */}
             {sessionCode && step === "form" && (
               <Alert variant="info" className="relative">
                 <Info className="h-4 w-4" />
@@ -366,25 +363,13 @@ function SignUpContent() {
                 </>
               )}
             </Card>
-          </div>
-        </main>
-      </MobileDesktopNotice>
-    </div>
+    </>
   );
 }
 
 export default function SignUpPage() {
   return (
-    <React.Suspense
-      fallback={
-        <div
-          className="min-h-screen flex flex-col bg-[var(--cyc-bg-brand)]"
-          style={{ background: "var(--cyc-bg-brand)" }}
-        >
-          <Navbar variant="auth" />
-        </div>
-      }
-    >
+    <React.Suspense fallback={null}>
       <SignUpContent />
     </React.Suspense>
   );
