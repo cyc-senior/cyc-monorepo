@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { FeatureCard } from "@/components/cards/FeatureCard";
+import { FeatureCard } from "./cards/FeatureCard";
 import type { FeatureItem } from "@/config/landing-page-data";
 
 export interface FeatureSectionProps {

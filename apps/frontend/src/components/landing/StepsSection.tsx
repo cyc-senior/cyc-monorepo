@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { StepCard } from "@/components/cards/StepCard";
+import { StepCard } from "./cards/StepCard";
 import { stepsData, type StepItem } from "@/config/landing-page-data";
 
 export interface StepsSectionProps {

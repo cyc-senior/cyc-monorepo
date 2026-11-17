@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { RoleCard } from "@/components/cards/RoleCard";
+import { RoleCard } from "./cards/RoleCard";
 import {
   roleCardsContent,
   rolesData,
