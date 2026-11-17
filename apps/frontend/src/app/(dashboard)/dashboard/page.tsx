@@ -1,163 +1,198 @@
 "use client";
 
-import React from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { AlertCircle, LogOut, User as UserIcon } from "lucide-react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Building03Icon, Ticket01Icon } from "@hugeicons/core-free-icons";
+  useWorkspace,
+  DashboardPreviewMode,
+} from "@/contexts/workspace-context";
+import { apiFetch } from "@/lib/api-client";
+import { mockProjects } from "@/config/mock-projects";
+import { mockSessions } from "@/config/mock-sessions";
+import { ProjectWithRole } from "@/types/project";
+import { UserSession } from "@/types/session";
+import { Loader2 } from "lucide-react";
+import {
+  DashboardBreadcrumb,
+  DashboardHeader,
+  DashboardEmptyState,
+  DashboardPreviewDock,
+  ProjectsSection,
+  SessionsSection,
+  defaultFormatRole,
+} from "@/components/dashboard";
 
-export default function DashboardPage() {
-  const { user, logout } = useAuth();
-  const sessionHeadingId = React.useId();
-  const sessionCodeId = React.useId();
-  const sessionErrorId = React.useId();
-  const sessionInputRef = React.useRef<HTMLInputElement>(null);
-  const [sessionCode, setSessionCode] = React.useState("");
-  const [sessionError, setSessionError] = React.useState("");
-  const [joinStatus, setJoinStatus] = React.useState("");
+function DashboardView() {
+  const { user, isLoading: authLoading } = useAuth();
+  const {
+    workspaces,
+    currentWorkspace,
+    setCurrentWorkspace,
+    previewMode,
+    setPreviewMode,
+    isTester,
+  } = useWorkspace();
 
-  if (!user) return null;
+  const searchParams = useSearchParams();
 
-  const handleJoinSession = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmed = sessionCode.trim();
-    if (!trimmed) {
-      setJoinStatus("");
-      setSessionError("Please enter a session code.");
-      sessionInputRef.current?.focus();
-      return;
+  // Support ?view=tester | both | projects-only | empty in URL
+  useEffect(() => {
+    const viewParam = searchParams.get("view");
+    if (
+      viewParam === "tester" ||
+      viewParam === "both" ||
+      viewParam === "projects-only" ||
+      viewParam === "empty"
+    ) {
+      setPreviewMode(viewParam as DashboardPreviewMode);
+    }
+  }, [searchParams, setPreviewMode]);
+
+  // Projects & Sessions states
+  const [projects, setProjects] = useState<ProjectWithRole[]>(mockProjects);
+  const [sessions, setSessions] = useState<UserSession[]>(mockSessions);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // Fetch projects from API if logged in
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchData() {
+      try {
+        setIsLoadingData(true);
+        const projRes = await apiFetch<
+          ProjectWithRole[] | { data: ProjectWithRole[] }
+        >("/projects");
+        const projList = Array.isArray(projRes)
+          ? projRes
+          : (projRes as { data: ProjectWithRole[] })?.data || [];
+        if (isMounted) {
+          if (projList.length > 0) {
+            setProjects(projList);
+          }
+        }
+      } catch (err) {
+        console.info("Using mock dashboard data preview:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingData(false);
+        }
+      }
     }
 
-    setSessionError("");
-    setJoinStatus("Joining by session code is not available yet.");
-  };
+    if (user) {
+      fetchData();
+    }
 
-  const initials = (user.name || user.email)
-    .split(" ")
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  // Sort projects: Items requiring attention ("T3 needs you") first
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const aUrgent = a.requiresAttention || a.statusBadge?.type === "warning";
+      const bUrgent = b.requiresAttention || b.statusBadge?.type === "warning";
+      if (aUrgent && !bUrgent) return -1;
+      if (!aUrgent && bUrgent) return 1;
+      return 0;
+    });
+  }, [projects]);
+
+  // Sort sessions: Active -> Scheduled -> Completed
+  const sortedSessions = useMemo(() => {
+    const priorityMap: Record<string, number> = {
+      ACTIVE: 1,
+      SCHEDULED: 2,
+      COMPLETED: 3,
+    };
+    return [...sessions].sort((a, b) => {
+      return (priorityMap[a.status] || 99) - (priorityMap[b.status] || 99);
+    });
+  }, [sessions]);
+
+  const hasProjects = previewMode !== "empty" && sortedProjects.length > 0;
+  const showSessions =
+    (previewMode === "both" || previewMode === "tester") &&
+    sortedSessions.length > 0;
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground text-center">
-          Welcome, {user.name}. How do you want to start?
-        </h1>
-        <p className="text-muted-foreground mt-1 text-center">
-          You can do both later. Your role is set separately in each project.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <div
-              aria-hidden="true"
-              className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary-subtle text-primary-text"
-            >
-              <HugeiconsIcon icon={Building03Icon} />
-            </div>
-            <CardTitle className="text-lg">Create a workspace</CardTitle>
-            <CardDescription className="leading-relaxed">
-              For designers and teams who run tests and invite clients,
-              developers or project managers.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="mt-auto">
-            <Button
-              type="button"
-              size="lg"
-              className="w-full rounded-xl font-semibold hover:bg-primary-hover"
-            >
-              Create workspace
-            </Button>
-          </CardFooter>
-        </Card>
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <div
-              aria-hidden="true"
-              className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary-subtle text-primary-text"
-            >
-              <HugeiconsIcon icon={Ticket01Icon} />
-            </div>
-            <CardTitle id={sessionHeadingId} className="text-lg">
-              Join testing session with a code
-            </CardTitle>
-            <CardDescription className="leading-relaxed">
-              A designer sent you a session code or link to test a design. No
-              workspace needed.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="mt-auto">
-            <form
-              onSubmit={handleJoinSession}
-              aria-labelledby={sessionHeadingId}
-              noValidate
-              className="w-full space-y-2"
-            >
-              <Label htmlFor={sessionCodeId}>Session code</Label>
-              <div className="flex flex-col gap-2">
-                <Input
-                  ref={sessionInputRef}
-                  id={sessionCodeId}
-                  name="sessionCode"
-                  type="text"
-                  required
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  enterKeyHint="go"
-                  placeholder="e.g. CYC-4821"
-                  value={sessionCode}
-                  error={!!sessionError}
-                  aria-describedby={sessionError ? sessionErrorId : undefined}
-                  onChange={(e) => {
-                    setSessionCode(e.target.value);
-                    if (sessionError) setSessionError("");
-                    if (joinStatus) setJoinStatus("");
-                  }}
-                />
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full rounded-xl border border-primary bg-primary-subtle font-semibold text-primary-text hover:bg-primary-200 hover:text-primary-text dark:hover:bg-primary-900"
-                >
-                  Join Session
-                </Button>
-              </div>
-              {sessionError && (
-                <p
-                  id={sessionErrorId}
-                  role="alert"
-                  className="flex items-center gap-1.5 text-xs text-danger"
-                >
-                  <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
-                  <span>{sessionError}</span>
-                </p>
-              )}
-              {joinStatus && (
-                <p role="status" className="text-xs text-muted-foreground">
-                  {joinStatus}
-                </p>
-              )}
-            </form>
-          </CardFooter>
-        </Card>
-      </div>
+    <div className="flex flex-col w-full min-h-[calc(100vh-64px)] bg-background">
+      {/* 1. Sub-header Breadcrumb Bar:
+          Hidden when user is a Tester / has no workspace (Figma Node 221:4357) */}
+      {!isTester && (
+        <DashboardBreadcrumb
+          workspaces={workspaces}
+          currentWorkspace={currentWorkspace}
+          onSelectWorkspace={setCurrentWorkspace}
+          previewMode={previewMode}
+          onPreviewModeChange={setPreviewMode}
+        />
+      )}
+
+      {/* 2. Main Content Container */}
+      <main className="w-full max-w-7xl mx-auto px-6 lg:px-20 py-8 lg:py-10 flex flex-col gap-8">
+        {/* Dynamic Greeting Header:
+            - Tester view (221:4357): "Join with code" & "Create workspace"
+            - Projects view (137:1589 / 221:3801): "Join with code" & "New project"
+            - Empty view (154:1198): no action buttons in header */}
+        <DashboardHeader
+          userName={user?.name || user?.email}
+          hasProjects={hasProjects}
+          isTester={isTester}
+        />
+
+        {/* Content Body:
+            Mode 1 (Tester - Node 221:4357): Full-width 3-column My Sessions grid
+            Mode 2 (Empty - Node 154:1198): Dark indigo empty state banner
+            Mode 3 (Projects & Sessions - Node 221:3801): 2-column Projects + Sessions sidebar
+            Mode 4 (Projects Only - Node 137:1589): Full-width Projects list */}
+        {isTester ? (
+          <SessionsSection sessions={sortedSessions} layout="grid" />
+        ) : !hasProjects ? (
+          <DashboardEmptyState />
+        ) : (
+          <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
+            <ProjectsSection
+              projects={sortedProjects}
+              isLoading={isLoadingData}
+              formatRole={defaultFormatRole}
+            />
+
+            {showSessions && <SessionsSection sessions={sortedSessions} layout="sidebar" />}
+          </div>
+        )}
+      </main>
+
+      {/* Persistent floating preview dock for Figma wireframe switching */}
+      <DashboardPreviewDock
+        currentMode={previewMode}
+        onSelectMode={setPreviewMode}
+      />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <DashboardView />
+    </Suspense>
   );
 }
