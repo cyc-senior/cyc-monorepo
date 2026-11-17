@@ -24,6 +24,13 @@ import { RefreshTokenDto } from './dto/refresh-token.dto'
 import { GoogleAuthGuard } from './guards/google-auth.guard'
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface'
 
+// TODO: Implement manual email/password authentication endpoints:
+// - POST /auth/register: Accepts { name, email, password }. Creates unverified user and generates 6-digit verification code. (UC A01, A12)
+// - POST /auth/login: Accepts { email, password }. Authenticates credentials, checks emailVerified, issues tokens. (UC A01, A14)
+// - POST /auth/verify-email: Accepts { email, code }. Verifies OTP code, marks emailVerified = true, issues tokens. (UC A01, A13)
+// - POST /auth/resend-code: Accepts { email }. Rate-limited OTP resend.
+// Note: Requires adding passwordHash and verificationCode fields to Prisma User model or credentials table.
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {

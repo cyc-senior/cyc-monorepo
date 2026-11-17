@@ -53,7 +53,7 @@ function GoogleIcon() {
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithGoogle, user, isLoading } = useAuth();
+  const { loginWithGoogle, loginWithCredentials, user, isLoading } = useAuth();
   const sessionCode = searchParams.get("session_code");
   const authError = searchParams.get("error");
   const session = sessionCode ? getSessionDetails(sessionCode) : null;
@@ -72,6 +72,8 @@ function SignInContent() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [name, setName] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   // Validation states
   const [errors, setErrors] = React.useState<{
@@ -103,11 +105,22 @@ function SignInContent() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleStandardSubmit = (e: React.FormEvent) => {
+  const handleStandardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    // Mock UI only
-    console.log("Mock signin submitted:", { email, password });
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await loginWithCredentials(email.trim(), password);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Invalid email or password. Please try again.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleJoinSession = (e: React.FormEvent) => {
@@ -209,6 +222,13 @@ function SignInContent() {
               ) : (
                 /* Regular Sign In Mode */
                 <div className="space-y-4">
+                  {submitError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Sign-in failed</AlertTitle>
+                      <AlertDescription>{submitError}</AlertDescription>
+                    </Alert>
+                  )}
                   <form onSubmit={handleStandardSubmit} className="space-y-4" noValidate>
                     <div className="space-y-1.5">
                       <Label htmlFor="email">Email</Label>

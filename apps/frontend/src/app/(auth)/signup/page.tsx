@@ -46,7 +46,14 @@ function GoogleIcon() {
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithGoogle, user, isLoading } = useAuth();
+  const {
+    loginWithGoogle,
+    registerWithCredentials,
+    verifyEmailOtp,
+    resendVerificationCode,
+    user,
+    isLoading,
+  } = useAuth();
   const sessionCode = searchParams.get("session_code");
 
   React.useEffect(() => {
@@ -60,6 +67,8 @@ function SignUpContent() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [serverError, setServerError] = React.useState<string | null>(null);
 
   // Step state: "form" | "verify"
   const [step, setStep] = React.useState<"form" | "verify">("form");
@@ -100,30 +109,57 @@ function SignUpContent() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    // Advance to OTP verify step
-    console.log("Mock sign up created:", { fullName, email, sessionCode });
-    setStep("verify");
+    setIsSubmitting(true);
+    setServerError(null);
+    try {
+      await registerWithCredentials(fullName.trim(), email.trim(), password);
+      setStep("verify");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to create account. Please try again.";
+      setServerError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 6) {
       setOtpError("Please enter the complete 6-digit code");
       return;
     }
     setOtpError(null);
-    // Dummy api verification
-    console.log("Verifying OTP:", otp, "for email:", email, "sessionCode:", sessionCode);
+    setIsSubmitting(true);
+    try {
+      await verifyEmailOtp(email.trim(), otp.trim());
+      if (sessionCode) {
+        router.push(`/dashboard?session_code=${encodeURIComponent(sessionCode)}`);
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Invalid or expired verification code.";
+      setOtpError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     setOtp("");
     setOtpError(null);
-    console.log("Resending OTP code to:", email);
+    try {
+      await resendVerificationCode(email.trim());
+    } catch {
+      // Ignored or rate-limited
+    }
   };
 
   const handleGoogleLogin = () => {

@@ -22,6 +22,14 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   loginWithGoogle: () => void;
+  loginWithCredentials: (email: string, password: string) => Promise<User | null>;
+  registerWithCredentials: (
+    name: string,
+    email: string,
+    password: string
+  ) => Promise<{ id: string; email: string }>;
+  verifyEmailOtp: (email: string, code: string) => Promise<User | null>;
+  resendVerificationCode: (email: string) => Promise<void>;
   setSession: (token: string) => Promise<User | null>;
   refreshUser: () => Promise<User | null>;
   logout: () => Promise<void>;
@@ -81,6 +89,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.assign(`${apiUrl}/auth/google`);
   }, []);
 
+  const loginWithCredentials = useCallback(
+    async (email: string, password: string): Promise<User | null> => {
+      const res = await apiFetch<{ accessToken: string }>("/auth/login", {
+        method: "POST",
+        data: { email, password },
+      });
+      return await setSession(res.accessToken);
+    },
+    [setSession]
+  );
+
+  const registerWithCredentials = useCallback(
+    async (
+      name: string,
+      email: string,
+      password: string
+    ): Promise<{ id: string; email: string }> => {
+      return await apiFetch<{ id: string; email: string }>("/auth/register", {
+        method: "POST",
+        data: { name, email, password },
+      });
+    },
+    []
+  );
+
+  const verifyEmailOtp = useCallback(
+    async (email: string, code: string): Promise<User | null> => {
+      const res = await apiFetch<{ accessToken: string }>("/auth/verify-email", {
+        method: "POST",
+        data: { email, code },
+      });
+      return await setSession(res.accessToken);
+    },
+    [setSession]
+  );
+
+  const resendVerificationCode = useCallback(
+    async (email: string): Promise<void> => {
+      await apiFetch<{ sent: boolean }>("/auth/resend-code", {
+        method: "POST",
+        data: { email },
+      });
+    },
+    []
+  );
+
   const logout = useCallback(async (): Promise<void> => {
     await apiFetch("/auth/logout", {
       method: "POST",
@@ -131,6 +185,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         loginWithGoogle,
+        loginWithCredentials,
+        registerWithCredentials,
+        verifyEmailOtp,
+        resendVerificationCode,
         setSession,
         refreshUser,
         logout,
