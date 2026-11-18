@@ -48,7 +48,7 @@ export interface CreateProjectPayload {
   name: string;
   clientOrProduct: string;
   description?: string | null;
-  platforms: Platform[];
+  platforms?: Platform[];
 }
 
 export interface ProjectsResponse {
