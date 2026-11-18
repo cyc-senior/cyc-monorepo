@@ -71,7 +71,7 @@ export function DashboardHeader({
             asChild
             className="rounded-[10px] h-8 px-2.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
           >
-            <Link href="/projects?new=true">New project</Link>
+            <Link href="/projects/new">New project</Link>
           </Button>
         </div>
       ) : null}

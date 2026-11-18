@@ -2,40 +2,23 @@
 
 import React from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight, Loader2 } from "lucide-react";
 import { ProjectWithRole, ProjectRole } from "@/types/project";
+import { formatProjectRole } from "@/lib/utils";
+import { ProjectStatusBadge } from "@/components/projects/CYCProjectCard";
+
+export { formatProjectRole as defaultFormatRole };
 
 export interface ProjectRowProps {
   project: ProjectWithRole;
   formatRole?: (role?: ProjectRole | string) => string;
 }
 
-export function defaultFormatRole(role?: ProjectRole | string): string {
-  if (!role) return "Member";
-  switch (role.toUpperCase()) {
-    case "DESIGNER":
-      return "Designer";
-    case "CLIENT":
-      return "Client";
-    case "DEVELOPER":
-      return "Developer";
-    case "PROJECT_MANAGER":
-      return "Project Manager";
-    case "PRODUCT_OWNER":
-      return "Product Owner";
-    default:
-      return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  }
-}
-
-export function ProjectRow({ project, formatRole = defaultFormatRole }: ProjectRowProps) {
+export function ProjectRow({
+  project,
+  formatRole = formatProjectRole,
+}: ProjectRowProps) {
   const roleText = formatRole(project.role);
-
-  // Status Badge resolution
-  const statusBadge = project.statusBadge || {
-    label: project.activeRound || "Active",
-    type: project.status === "ACTIVE" ? ("ready" as const) : ("in-progress" as const),
-  };
 
   return (
     <Link
@@ -76,19 +59,10 @@ export function ProjectRow({ project, formatRole = defaultFormatRole }: ProjectR
         </div>
 
         {/* Status Badge */}
-        {statusBadge.type === "warning" ? (
-          <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 text-xs font-medium">
-            {statusBadge.label}
-          </div>
-        ) : statusBadge.type === "ready" ? (
-          <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-primary-subtle text-primary-text text-xs font-medium">
-            {statusBadge.label}
-          </div>
-        ) : (
-          <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-secondary text-secondary-foreground text-xs font-medium">
-            {statusBadge.label}
-          </div>
-        )}
+        <ProjectStatusBadge
+          project={project}
+          fallbackLabel={project.activeRound || "Active"}
+        />
       </div>
 
       {/* 4. Arrow icon */}
@@ -96,5 +70,55 @@ export function ProjectRow({ project, formatRole = defaultFormatRole }: ProjectR
         <ChevronRight className="size-4" />
       </div>
     </Link>
+  );
+}
+
+export interface ProjectsSectionProps {
+  projects: ProjectWithRole[];
+  isLoading?: boolean;
+  formatRole?: (role?: ProjectRole | string) => string;
+  viewAllHref?: string;
+}
+
+export function ProjectsSection({
+  projects,
+  isLoading = false,
+  formatRole = formatProjectRole,
+  viewAllHref = "/projects",
+}: ProjectsSectionProps) {
+  return (
+    <div className="flex-1 flex flex-col gap-4 w-full min-w-0">
+      {/* Section Head */}
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-xl font-medium text-foreground">
+          My projects
+        </h2>
+
+        <Link
+          href={viewAllHref}
+          className="group flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors"
+        >
+          <span>View all in Projects</span>
+          <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+        </Link>
+      </div>
+
+      {/* Project Rows List */}
+      {isLoading ? (
+        <div className="flex h-40 items-center justify-center rounded-2xl border border-border bg-card">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="p-8 text-center rounded-2xl border border-border bg-card text-muted-foreground text-sm">
+          No projects found in this workspace.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {projects.map((project) => (
+            <ProjectRow key={project.id} project={project} formatRole={formatRole} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

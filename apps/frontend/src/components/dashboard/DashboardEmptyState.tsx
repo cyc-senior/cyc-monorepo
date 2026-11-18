@@ -10,7 +10,7 @@ export interface DashboardEmptyStateProps {
 }
 
 export function DashboardEmptyState({
-  createProjectHref = "/projects?new=true",
+  createProjectHref = "/projects/new",
 }: DashboardEmptyStateProps) {
   return (
     <div className="bg-cyc-bg-brand flex flex-col gap-6 items-center justify-center px-6 sm:px-10 py-16 sm:py-20 rounded-[14px] w-full text-center shadow-sm">
