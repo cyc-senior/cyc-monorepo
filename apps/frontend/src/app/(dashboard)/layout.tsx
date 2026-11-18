@@ -1,45 +1,38 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
-import { Navbar, NavbarUser } from "@/components/layout/Navbar";
+import { WorkspaceProvider } from "@/contexts/workspace-context";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { Loader2 } from "lucide-react";
 
-function DashboardShell({
-  user,
-  onSignOut,
-  children,
-}: {
-  user: NavbarUser;
-  onSignOut: () => void;
-  children: React.ReactNode;
-}) {
-  const { isTester } = useWorkspace();
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navbar
-        variant="default"
-        user={user}
-        onSignOut={onSignOut}
-        hideWorkspaceLinks={isTester}
-      />
-      <main className="flex-1 flex flex-col w-full">{children}</main>
+    <div className="min-h-screen flex bg-background">
+      <AppSidebar collapsed={sidebarCollapsed} />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <SidebarHeader
+          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+        />
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+      </div>
     </div>
   );
 }
 
 /**
- * Protected dashboard shell with session guard, workspace context, and navigation header.
+ * Protected dashboard shell with session guard, workspace context, and Hi-fi v2 Sidebar layout.
  */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -56,17 +49,9 @@ export default function DashboardLayout({
     );
   }
 
-  const navbarUser: NavbarUser = {
-    name: user.name || user.email,
-    email: user.email,
-    avatarUrl: user.image || undefined,
-  };
-
   return (
     <WorkspaceProvider>
-      <DashboardShell user={navbarUser} onSignOut={logout}>
-        {children}
-      </DashboardShell>
+      <DashboardShell>{children}</DashboardShell>
     </WorkspaceProvider>
   );
 }
