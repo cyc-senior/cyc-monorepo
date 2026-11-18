@@ -14,3 +14,7 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 apps/backend/src/generated/
+
+apps/backend/.claude/
+apps/backend/.agents/
+apps/backend/.windsurf/
