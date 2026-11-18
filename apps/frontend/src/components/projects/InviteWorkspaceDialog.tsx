@@ -1,40 +1,61 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Mail, CheckCircle2 } from "lucide-react";
+import axios from "axios";
+import { X, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { inviteWorkspaceMember } from "@/services/workspace.service";
 
 export interface InviteWorkspaceDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  workspaceId?: string;
   workspaceName?: string;
 }
 
 export function InviteWorkspaceDialog({
   isOpen,
   onClose,
-  workspaceName = "Studio workspace",
+  workspaceId,
+  workspaceName = "Workspace",
 }: InviteWorkspaceDialogProps) {
   const [email, setEmail] = useState("");
   const [isSent, setIsSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   if (!isOpen) return null;
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !workspaceId) return;
 
+    setErrorMessage("");
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      await inviteWorkspaceMember(workspaceId, trimmedEmail, "MEMBER");
       setIsSent(true);
-    }, 500);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const apiMsg = (err.response?.data as { message?: string })?.message;
+        setErrorMessage(
+          apiMsg ||
+            "Could not invite this user. Make sure they have registered or aren't already a member."
+        );
+      } else {
+        setErrorMessage("Failed to send invitation. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleClose = () => {
     setEmail("");
     setIsSent(false);
+    setErrorMessage("");
     onClose();
   };
 
@@ -78,11 +99,10 @@ export function InviteWorkspaceDialog({
               <CheckCircle2 className="size-6" />
             </div>
             <p className="text-base font-semibold text-foreground">
-              Invitation sent!
+              Member added to workspace!
             </p>
             <p className="text-sm text-muted-foreground max-w-xs">
-              We sent an invitation link to <span className="font-medium text-foreground">{email}</span>.
-              The recipient must sign in with this email to join.
+              <span className="font-medium text-foreground">{email}</span> now has access to {workspaceName}.
             </p>
             <Button
               type="button"
@@ -94,6 +114,13 @@ export function InviteWorkspaceDialog({
           </div>
         ) : (
           <form onSubmit={handleSend} className="flex flex-col gap-4">
+            {errorMessage && (
+              <div className="flex items-center gap-2 rounded-[10px] border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="invite-email"
@@ -114,7 +141,7 @@ export function InviteWorkspaceDialog({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                The invited user must sign in using this exact email address to accept the invitation.
+                The invited user must sign in using this exact email address to access the workspace.
               </p>
             </div>
 
@@ -130,7 +157,7 @@ export function InviteWorkspaceDialog({
 
               <Button
                 type="submit"
-                disabled={isLoading || !email.trim()}
+                disabled={isLoading || !email.trim() || !workspaceId}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-[10px] text-sm font-medium transition-colors cursor-pointer"
               >
                 {isLoading ? "Sending..." : "Send invite"}

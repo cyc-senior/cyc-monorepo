@@ -3,63 +3,97 @@
 import React from "react";
 import Link from "next/link";
 import { ProjectWithRole } from "@/types/project";
+import { getInitials } from "@/lib/utils";
 import { Monitor, Smartphone } from "lucide-react";
+
+export interface ProjectStatusBadgeProps {
+  project: ProjectWithRole;
+  fallbackLabel?: string;
+}
+
+/**
+ * Shared Status Badge for projects (used in Dashboard ProjectRow and Projects Hub CYCProjectCard).
+ */
+export function ProjectStatusBadge({
+  project,
+  fallbackLabel,
+}: ProjectStatusBadgeProps) {
+  const label =
+    project.statusBadge?.label ||
+    fallbackLabel ||
+    (project.hasDesignIntent ? "In progress" : "Draft · Design intent");
+
+  const type =
+    project.statusBadge?.type ||
+    (label.includes("needs you")
+      ? "warning"
+      : label.includes("Completed") || project.status === "ACTIVE"
+      ? "ready"
+      : "in-progress");
+
+  if (type === "warning" || label.includes("needs you")) {
+    return (
+      <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 text-xs font-medium shrink-0">
+        {label}
+      </div>
+    );
+  }
+
+  if (type === "ready" || label.includes("Completed")) {
+    return (
+      <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-primary-subtle text-primary-text text-xs font-medium shrink-0">
+        {label}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-secondary text-secondary-foreground text-xs font-medium shrink-0">
+      {label}
+    </div>
+  );
+}
 
 export interface CYCProjectCardProps {
   project: ProjectWithRole;
-  members?: string[];
 }
 
-export function CYCProjectCard({
-  project,
-  members = ["PW", "NT", "PK"],
-}: CYCProjectCardProps) {
+export function CYCProjectCard({ project }: CYCProjectCardProps) {
   // Format platform text
   const platformText =
     project.platforms && project.platforms.length > 0
       ? project.platforms
-          .map((p) => (p === "DESKTOP" ? "Desktop" : p === "MOBILE" ? "Mobile" : "Tablet"))
+          .map((p) =>
+            p === "DESKTOP" ? "Desktop" : p === "MOBILE" ? "Mobile" : "Tablet"
+          )
           .join(" · ")
       : "Desktop · Mobile";
 
-  // Format status badge
-  const renderStatusBadge = () => {
-    const label = project.statusBadge?.label || "In progress";
-
-    if (label.includes("needs you") || project.statusBadge?.type === "warning") {
-      return (
-        <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-[#ffedd5] text-[#c2410c] dark:bg-orange-950 dark:text-orange-300 text-xs font-medium shrink-0">
-          {label}
-        </div>
-      );
-    }
-
-    if (label.includes("Completed")) {
-      return (
-        <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-primary-subtle text-primary-text text-xs font-medium shrink-0">
-          {label}
-        </div>
-      );
-    }
-
-    // Default neutral / secondary badge (Prompt & context, In testing, Draft · Design intent, etc.)
-    return (
-      <div className="h-[22px] px-2 flex items-center justify-center rounded-[10px] bg-secondary text-secondary-foreground text-xs font-medium shrink-0">
-        {label}
-      </div>
-    );
-  };
+  // Extract member initials from project.members if provided by Backend
+  const memberInitials =
+    project.members && project.members.length > 0
+      ? project.members.map((m) => getInitials(m.name))
+      : [];
 
   return (
     <div className="group bg-card border border-border shadow-xs hover:border-foreground/30 hover:shadow-sm transition-all flex flex-col rounded-[14px] overflow-hidden w-full">
       {/* Thumbnail Placeholder:
           Figma annotation: ภาพ A/B ล่าสุด, platform, ชื่อ, คำอธิบาย และสมาชิก ไม่มีภาพจนกว่า AI จะสร้าง A/B ครั้งแรก */}
       <div className="h-[180px] w-full bg-accent/50 relative flex items-center justify-center overflow-hidden border-b border-border/40">
-        <div className="flex items-center gap-2 text-muted-foreground/50 text-xs font-medium">
-          <Monitor className="size-4" />
-          <span>·</span>
-          <Smartphone className="size-4" />
-        </div>
+        {project.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={project.thumbnailUrl}
+            alt={project.name}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="flex items-center gap-2 text-muted-foreground/50 text-xs font-medium">
+            <Monitor className="size-4" />
+            <span>·</span>
+            <Smartphone className="size-4" />
+          </div>
+        )}
       </div>
 
       {/* Card Body */}
@@ -76,7 +110,7 @@ export function CYCProjectCard({
             {project.name}
           </Link>
           <p className="text-sm text-muted-foreground leading-5 line-clamp-2">
-            {project.description}
+            {project.description || project.clientOrProduct}
           </p>
         </div>
 
@@ -84,7 +118,7 @@ export function CYCProjectCard({
         <div className="flex items-center justify-between pt-2">
           {/* Member avatars */}
           <div className="flex items-center gap-1">
-            {members.map((initials, idx) => (
+            {memberInitials.map((initials, idx) => (
               <div
                 key={idx}
                 className="size-6 rounded-[10px] bg-muted text-muted-foreground text-xs font-medium flex items-center justify-center select-none"
@@ -95,7 +129,7 @@ export function CYCProjectCard({
           </div>
 
           {/* Status Badge */}
-          {renderStatusBadge()}
+          <ProjectStatusBadge project={project} />
         </div>
       </div>
     </div>
