@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
 
 export interface NavbarUser {
   name: string;
@@ -36,18 +37,6 @@ export function Navbar({
 }: NavbarProps) {
   const isAuthVariant = variant === "auth";
   const pathname = usePathname();
-
-  const getInitials = (name: string) => {
-    return (
-      name
-        .split(" ")
-        .filter(Boolean)
-        .map((part) => part[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2) || "U"
-    );
-  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background text-foreground">

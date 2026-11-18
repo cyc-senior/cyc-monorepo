@@ -1,4 +1,4 @@
-export type Platform = "DESKTOP" | "MOBILE";
+export type Platform = "DESKTOP" | "MOBILE" | "TABLET";
 
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
 
@@ -8,6 +8,12 @@ export type ProjectRole =
   | "PRODUCT_OWNER"
   | "DEVELOPER"
   | "CLIENT";
+
+export interface ProjectMemberSummary {
+  id: string;
+  name: string | null;
+  image: string | null;
+}
 
 export interface ProjectWithRole {
   id: string;
@@ -22,6 +28,7 @@ export interface ProjectWithRole {
   role: ProjectRole;
   createdAt: string;
   updatedAt: string;
+  // Additional UI summary fields requested from Backend API:
   activeRound?: string;
   testerProgress?: {
     current: number;
@@ -33,6 +40,15 @@ export interface ProjectWithRole {
     type: "warning" | "in-progress" | "ready";
   };
   requiresAttention?: boolean;
+  members?: ProjectMemberSummary[];
+  thumbnailUrl?: string | null;
+}
+
+export interface CreateProjectPayload {
+  name: string;
+  clientOrProduct: string;
+  description?: string | null;
+  platforms: Platform[];
 }
 
 export interface ProjectsResponse {

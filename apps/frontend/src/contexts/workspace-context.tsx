@@ -9,29 +9,38 @@ import React, {
   useState,
 } from "react";
 import { useAuth } from "./auth-context";
-import { apiFetch } from "@/lib/api-client";
+import { listWorkspaces } from "@/services/workspace.service";
+import type { OrganizationRole, Workspace } from "@/types/workspace";
 
-export interface Workspace {
-  id: string;
-  name: string;
-}
-
-export type DashboardPreviewMode =
-  | "both"
-  | "projects-only"
-  | "empty"
-  | "tester";
+export type { OrganizationRole, Workspace };
 
 interface WorkspaceContextType {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
   setCurrentWorkspace: (ws: Workspace | null) => void;
   isLoading: boolean;
-  previewMode: DashboardPreviewMode;
-  setPreviewMode: (mode: DashboardPreviewMode) => void;
   isTester: boolean;
-  refreshWorkspaces: () => Promise<void>;
+  refreshWorkspaces: () => Promise<Workspace[]>;
+  setWorkspaceAvatar: (workspaceId: string, avatarUrl: string) => void;
 }
+
+const STORAGE_AVATAR_PREFIX = "cyc_ws_avatar_";
+
+const getStoredWorkspaceAvatar = (id: string): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(`${STORAGE_AVATAR_PREFIX}${id}`);
+  } catch {
+    return null;
+  }
+};
+
+const persistWorkspaceAvatar = (id: string, avatarUrl: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`${STORAGE_AVATAR_PREFIX}${id}`, avatarUrl);
+  } catch {}
+};
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
   undefined
@@ -39,49 +48,70 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([
-    { id: "ws-1", name: "Studio workspace" },
-  ]);
-  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>({
-    id: "ws-1",
-    name: "Studio workspace",
-  });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [previewMode, setPreviewMode] = useState<DashboardPreviewMode>("both");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const refreshWorkspaces = useCallback(async () => {
-    if (!user) return;
+  const refreshWorkspaces = useCallback(async (): Promise<Workspace[]> => {
+    if (!user) {
+      setWorkspaces([]);
+      setCurrentWorkspace(null);
+      setIsLoading(false);
+      return [];
+    }
+
     try {
       setIsLoading(true);
-      const res = await apiFetch<Workspace[] | { data: Workspace[] }>(
-        "/organizations"
-      );
-      const list = Array.isArray(res)
-        ? res
-        : (res as { data: Workspace[] })?.data || [];
-      if (list.length > 0) {
-        setWorkspaces(list);
-        setCurrentWorkspace(list[0]);
-      } else {
-        setWorkspaces([]);
-        setCurrentWorkspace(null);
-      }
+      const rawList = await listWorkspaces();
+      const list = rawList.map((ws) => ({
+        ...ws,
+        avatarUrl: ws.avatarUrl || getStoredWorkspaceAvatar(ws.id) || null,
+      }));
+
+      setWorkspaces(list);
+      setCurrentWorkspace((prev) => {
+        if (list.length === 0) return null;
+        if (prev) {
+          const matched = list.find((ws) => ws.id === prev.id);
+          if (matched) return matched;
+        }
+        return list[0];
+      });
+      return list;
     } catch (err) {
-      console.info("Using mock workspace data:", err);
+      console.error("Failed to fetch workspaces from GET /organizations:", err);
+      setWorkspaces([]);
+      setCurrentWorkspace(null);
+      return [];
     } finally {
       setIsLoading(false);
     }
   }, [user]);
 
+  const setWorkspaceAvatar = useCallback(
+    (workspaceId: string, avatarUrl: string) => {
+      persistWorkspaceAvatar(workspaceId, avatarUrl);
+      setWorkspaces((prev) =>
+        prev.map((ws) => (ws.id === workspaceId ? { ...ws, avatarUrl } : ws))
+      );
+      setCurrentWorkspace((prev) =>
+        prev?.id === workspaceId ? { ...prev, avatarUrl } : prev
+      );
+    },
+    []
+  );
+
   useEffect(() => {
     refreshWorkspaces();
   }, [refreshWorkspaces]);
 
-  // isTester is true if previewMode is "tester" OR user has no workspaces
+  // According to Figma Screen 9 Tester (Node 221:4357):
+  // User is in Tester mode when they have no workspaces.
   const isTester = useMemo(() => {
-    if (previewMode === "tester") return true;
-    return workspaces.length === 0;
-  }, [previewMode, workspaces]);
+    return !isLoading && workspaces.length === 0;
+  }, [isLoading, workspaces]);
 
   const value = useMemo(
     () => ({
@@ -89,18 +119,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       currentWorkspace,
       setCurrentWorkspace,
       isLoading,
-      previewMode,
-      setPreviewMode,
       isTester,
       refreshWorkspaces,
+      setWorkspaceAvatar,
     }),
     [
       workspaces,
       currentWorkspace,
       isLoading,
-      previewMode,
       isTester,
       refreshWorkspaces,
+      setWorkspaceAvatar,
     ]
   );
 
@@ -113,7 +142,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
 export function useWorkspace() {
   const context = useContext(WorkspaceContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useWorkspace must be used within a WorkspaceProvider");
   }
   return context;
