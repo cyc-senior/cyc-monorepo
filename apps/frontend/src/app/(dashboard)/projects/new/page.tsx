@@ -83,15 +83,15 @@ export default function CreateProjectPage() {
         throw new Error("No active workspace selected.");
       }
 
-      await createProject(currentWorkspace.id, {
+      const created = await createProject(currentWorkspace.id, {
         name: trimmedName,
         clientOrProduct: trimmedClient,
         description: description.trim() || undefined,
         platforms: ["DESKTOP", "MOBILE"],
       });
 
-      // Proceed to projects list or next step
-      router.push("/projects");
+      // Proceed to Step 2: Design intent
+      router.push(`/projects/${created.id}/setup/intent`);
     } catch (err: unknown) {
       console.error("Failed to create project:", err);
       setSubmitError(

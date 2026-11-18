@@ -41,6 +41,11 @@ export interface DesignIntentPayload {
   designPrinciples?: string[];
 }
 
+export interface DesignIntentDetail extends DesignIntentPayload {
+  id?: string;
+  projectId?: string;
+}
+
 export interface PersonaPayload {
   name: string;
   role: string;
@@ -58,83 +63,119 @@ export interface PersonaItem extends PersonaPayload {
 
 export interface ProjectMemberUser {
   id: string;
-  email: string;
   name: string | null;
-  image: string | null;
+  email: string;
+  image?: string | null;
 }
 
 export interface ProjectMemberItem {
   id: string;
-  projectId: string;
-  userId: string;
   role: ProjectRole;
   joinedAt: string;
   user: ProjectMemberUser;
 }
 
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+export interface UserStoryItem {
+  id: string;
+  projectId: string;
+  storyKey?: string;
+  role: string;
+  want: string;
+  benefit: string;
+  problemStatement?: string;
+  successMetric?: string;
+  personaIds?: string[];
+  screenScope?: string[];
+  devices?: string[];
+  createdAt: string;
 }
 
-/**
- * Creates project under workspace (maps to /organizations/:workspaceId/projects)
- */
+export interface CreateUserStoryPayload {
+  role: string;
+  want: string;
+  benefit: string;
+  problemStatement?: string;
+  successMetric?: string;
+  personaIds?: string[];
+  screenScope?: string[];
+  devices?: string[];
+}
+
+export interface DesignRoundItem {
+  id: string;
+  projectId: string;
+  roundNumber?: number;
+  hypothesis?: string;
+  createdAt: string;
+}
+
+export interface CreateDesignRoundPayload {
+  storyId?: string;
+  hypothesis?: string;
+}
+
+export interface GenerationJobItem {
+  id: string;
+  roundId: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface StartGenerationJobPayload {
+  prompt: string;
+}
+
+/** Project API calls */
 export async function createProject(
-  workspaceId: string,
+  orgId: string,
   payload: CreateProjectPayload
 ): Promise<ProjectDetails> {
-  return await apiFetch<ProjectDetails>(
-    `/organizations/${workspaceId}/projects`,
-    {
-      method: "POST",
-      data: payload,
-    }
-  );
+  return apiFetch<ProjectDetails>(`/organizations/${orgId}/projects`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getProject(projectId: string): Promise<ProjectDetails> {
-  return await apiFetch<ProjectDetails>(`/projects/${projectId}`);
+  return apiFetch<ProjectDetails>(`/projects/${projectId}`);
 }
 
+export async function getProjectById(projectId: string): Promise<ProjectDetails> {
+  return getProject(projectId);
+}
+
+/** Design intent API calls */
 export async function getDesignIntent(
   projectId: string
-): Promise<DesignIntentPayload> {
-  return await apiFetch<DesignIntentPayload>(
-    `/projects/${projectId}/design-intent`
-  );
+): Promise<DesignIntentDetail> {
+  return apiFetch<DesignIntentDetail>(`/projects/${projectId}/design-intent`);
 }
 
 export async function putDesignIntent(
   projectId: string,
   payload: DesignIntentPayload
-): Promise<DesignIntentPayload> {
-  return await apiFetch<DesignIntentPayload>(
-    `/projects/${projectId}/design-intent`,
-    {
-      method: "PUT",
-      data: payload,
-    }
-  );
+): Promise<DesignIntentDetail> {
+  return apiFetch<DesignIntentDetail>(`/projects/${projectId}/design-intent`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
+/** Persona API calls */
 export async function listPersonas(projectId: string): Promise<PersonaItem[]> {
-  const res = await apiFetch<PaginatedResult<PersonaItem>>(
+  const res = await apiFetch<PersonaItem[] | { data: PersonaItem[] }>(
     `/projects/${projectId}/personas`
   );
-  return res.data || [];
+  return Array.isArray(res) ? res : res.data || [];
 }
 
 export async function createPersona(
   projectId: string,
   payload: PersonaPayload
 ): Promise<PersonaItem> {
-  return await apiFetch<PersonaItem>(`/projects/${projectId}/personas`, {
+  return apiFetch<PersonaItem>(`/projects/${projectId}/personas`, {
     method: "POST",
-    data: payload,
+    body: JSON.stringify(payload),
   });
 }
 
@@ -142,18 +183,19 @@ export async function deletePersona(
   projectId: string,
   personaId: string
 ): Promise<void> {
-  await apiFetch(`/projects/${projectId}/personas/${personaId}`, {
+  return apiFetch<void>(`/projects/${projectId}/personas/${personaId}`, {
     method: "DELETE",
   });
 }
 
+/** Members API calls */
 export async function listProjectMembers(
   projectId: string
 ): Promise<ProjectMemberItem[]> {
-  const res = await apiFetch<PaginatedResult<ProjectMemberItem>>(
+  const res = await apiFetch<ProjectMemberItem[] | { data: ProjectMemberItem[] }>(
     `/projects/${projectId}/members`
   );
-  return res.data || [];
+  return Array.isArray(res) ? res : res.data || [];
 }
 
 export async function addProjectMember(
@@ -161,9 +203,9 @@ export async function addProjectMember(
   email: string,
   role: ProjectRole
 ): Promise<ProjectMemberItem> {
-  return await apiFetch<ProjectMemberItem>(`/projects/${projectId}/members`, {
+  return apiFetch<ProjectMemberItem>(`/projects/${projectId}/members`, {
     method: "POST",
-    data: { email, role },
+    body: JSON.stringify({ email, role }),
   });
 }
 
@@ -172,11 +214,11 @@ export async function updateProjectMemberRole(
   memberId: string,
   role: ProjectRole
 ): Promise<ProjectMemberItem> {
-  return await apiFetch<ProjectMemberItem>(
+  return apiFetch<ProjectMemberItem>(
     `/projects/${projectId}/members/${memberId}`,
     {
       method: "PATCH",
-      data: { role },
+      body: JSON.stringify({ role }),
     }
   );
 }
@@ -185,7 +227,59 @@ export async function removeProjectMember(
   projectId: string,
   memberId: string
 ): Promise<void> {
-  await apiFetch(`/projects/${projectId}/members/${memberId}`, {
+  return apiFetch<void>(`/projects/${projectId}/members/${memberId}`, {
     method: "DELETE",
   });
+}
+
+/** User Stories API calls */
+export async function listUserStories(
+  projectId: string
+): Promise<UserStoryItem[]> {
+  const res = await apiFetch<UserStoryItem[] | { data: UserStoryItem[] }>(
+    `/projects/${projectId}/user-stories`
+  );
+  return Array.isArray(res) ? res : res.data || [];
+}
+
+export async function getUserStoryById(
+  projectId: string,
+  storyId: string
+): Promise<UserStoryItem> {
+  return apiFetch<UserStoryItem>(`/projects/${projectId}/user-stories/${storyId}`);
+}
+
+export async function createUserStory(
+  projectId: string,
+  payload: CreateUserStoryPayload
+): Promise<UserStoryItem> {
+  return apiFetch<UserStoryItem>(`/projects/${projectId}/user-stories`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Design Rounds & Generation API calls */
+export async function createDesignRound(
+  projectId: string,
+  payload: CreateDesignRoundPayload
+): Promise<DesignRoundItem> {
+  return apiFetch<DesignRoundItem>(`/projects/${projectId}/rounds`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function startGenerationJob(
+  projectId: string,
+  roundId: string,
+  payload: StartGenerationJobPayload
+): Promise<GenerationJobItem> {
+  return apiFetch<GenerationJobItem>(
+    `/projects/${projectId}/rounds/${roundId}/generation-jobs`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
