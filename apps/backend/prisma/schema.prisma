@@ -24,9 +24,11 @@ model User {
   accounts      Account[]
   refreshTokens RefreshToken[]
 
-  organizationMemberships OrganizationMember[]
-  organizationsCreated    Organization[]         @relation("OrganizationCreator")
-  projectMemberships      ProjectMember[]
+  organizationMemberships   OrganizationMember[]
+  organizationsCreated      Organization[]           @relation("OrganizationCreator")
+  organizationInvitations   OrganizationInvitation[] @relation("OrganizationInvitationInviter")
+  testParticipants          SessionParticipant[]     @relation("SessionParticipantUser")
+  projectMemberships        ProjectMember[]
   projectsCreated         Project[]              @relation("ProjectCreator")
   approvedRounds          DesignRound[]          @relation("RoundApprover")
   approvedVariants        UIVariant[]            @relation("VariantApprover")
@@ -86,10 +88,7 @@ model RefreshToken {
 /// organization and who may open projects in it; it never grants access to a
 /// project by itself (that is `ProjectMember`).
 enum OrganizationRole {
-  /// Manages the organization and its members, and creates projects. Whoever
-  /// creates an organization is one.
   ADMIN
-  /// Belongs to the organization and can be added to its projects.
   MEMBER
 }
 
@@ -97,15 +96,53 @@ model Organization {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdById String?  @db.Uuid
+  /// Secret in the public picture URL: an <img> cannot send a bearer token.
+  avatarKey   String?  @unique @default(uuid())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdBy User?                @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  members   OrganizationMember[]
-  projects  Project[]
+  createdBy   User?                    @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members     OrganizationMember[]
+  invitations OrganizationInvitation[]
+  projects    Project[]
+  /// Kept in a separate table so listing organizations never reads image bytes.
+  avatar      OrganizationAvatar?
 
   @@index([createdById])
   @@map("organizations")
+}
+
+/// Workspace picture, stored in Postgres as a bytea. One per organization.
+model OrganizationAvatar {
+  organizationId String   @id @db.Uuid
+  contentType    String
+  byteSize       Int
+  data           Bytes
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_avatars")
+}
+
+/// An invitation to an email that does not have an account yet. No email is
+/// sent; the invitee accepts it after signing in.
+model OrganizationInvitation {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  /// Lower-cased, like User.email.
+  email          String
+  role           OrganizationRole
+  invitedById    String?          @db.Uuid
+  createdAt      DateTime         @default(now())
+  expiresAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?         @relation("OrganizationInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, email])
+  @@index([email])
+  @@map("organization_invitations")
 }
 
 model OrganizationMember {
@@ -451,6 +488,8 @@ model UIVariant {
   design          Json?
   /// Result of the last accessibility / safety check of `html`.
   accessibility   Json            @default("{}")
+  /// Optional preview image for dashboards; null until one is generated.
+  thumbnailUrl    String?
   /// Incremented on every update.
   version         Int             @default(1)
   status          UIVariantStatus @default(DRAFT)
@@ -627,6 +666,9 @@ model SessionParticipant {
   sessionId         String            @db.Uuid
   /// Identifies the participant; lower-cased. The only personal data kept.
   email             String
+  /// Set when the invitation was claimed while signed in (nullable: a tester
+  /// may join without an account). Enforces "one account per invitation".
+  userId            String?           @db.Uuid
   displayName       String?
   status            ParticipantStatus @default(INVITED)
   /// Variant (group) this participant tests; empty = every variant of the session.
@@ -642,6 +684,7 @@ model SessionParticipant {
   createdAt         DateTime          @default(now())
 
   session      TestSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user         User?              @relation("SessionParticipantUser", fields: [userId], references: [id], onDelete: SetNull)
   groupVariant SessionVariant?    @relation(fields: [sessionId, assignedVariantId], references: [sessionId, variantId], onDelete: NoAction)
   consents     ConsentRecord[]
   taskRuns     TaskRun[]
@@ -650,6 +693,7 @@ model SessionParticipant {
 
   @@unique([sessionId, email])
   @@unique([id, sessionId])
+  @@index([userId])
   @@map("session_participants")
 }
 

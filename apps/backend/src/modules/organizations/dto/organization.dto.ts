@@ -1,5 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger'
-import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator'
 
 import { EmailField } from '../../../common/decorators/email-field.decorator'
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
@@ -11,6 +17,16 @@ export class CreateOrganizationDto {
   @IsNotEmpty()
   @MaxLength(160)
   name: string
+
+  /**
+   * Optional workspace picture as a PNG/JPEG data URL. The bytes are stored
+   * in Postgres; the response's `avatarUrl` is the URL to fetch them.
+   */
+  @ApiPropertyOptional({ example: 'data:image/png;base64,iVBORw0KGgo...' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1_500_000)
+  avatarUrl?: string
 }
 
 export class UpdateOrganizationDto {
@@ -26,12 +42,24 @@ export class OrganizationDto {
 
   name: string
 
+  /**
+   * URL of the workspace picture, or null. Usable directly in an `<img>`:
+   * the picture endpoint is public but guarded by an unguessable key.
+   */
+  @ApiPropertyOptional({ nullable: true })
+  avatarUrl: string | null
+
   @ApiProperty({ format: 'uuid' })
   createdById: string | null
 
   createdAt: Date
 
   updatedAt: Date
+}
+
+/** Response of `POST /organizations/:organizationId/picture`. */
+export class OrganizationPictureDto {
+  avatarUrl: string
 }
 
 export class OrganizationWithRoleDto extends OrganizationDto {
@@ -66,6 +94,28 @@ export class OrganizationMemberUserDto {
   name: string | null
 
   image: string | null
+}
+
+/** An invitation waiting for an email that has no account yet. */
+export class PendingInvitationDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty({ format: 'uuid' })
+  organizationId: string
+
+  @ApiProperty({ format: 'email' })
+  email: string
+
+  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
+  role: OrganizationRole
+
+  @ApiProperty({ format: 'uuid' })
+  invitedById: string | null
+
+  createdAt: Date
+
+  expiresAt: Date | null
 }
 
 export class OrganizationMemberDto {
