@@ -70,6 +70,10 @@ export class EnvironmentVariables {
   @IsUrl({ require_tld: false, require_protocol: true })
   FRONTEND_URL: string = 'http://localhost:3000'
 
+  /** Publicly reachable API base URL, used in URLs returned to clients (avatars). */
+  @IsUrl({ require_tld: false, require_protocol: true })
+  API_PUBLIC_URL: string = 'http://localhost:4000/api'
+
   /** Domain for shared httpOnly auth cookies in production (e.g. `.cyc.com`). */
   @IsOptional()
   @IsString()

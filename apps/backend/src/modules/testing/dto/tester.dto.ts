@@ -52,6 +52,34 @@ export class TesterTokenDto {
   expiresIn: number
 }
 
+/** An invitation code typed into the "find my session" screen. */
+export class LookupSessionDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  code: string
+}
+
+/** Preview shown before someone decides to join a session. */
+export class FoundSessionDto {
+  /** Upper-cased code, as shown in the UI. */
+  code: string
+
+  workspaceName: string
+
+  projectName: string
+
+  taskName: string
+
+  /** @example 'Desktop' */
+  platform: string
+
+  expiresAt: string
+
+  /** True when another signed-in account has already claimed the invitation. */
+  isTakenByOther: boolean
+}
+
 export class RecordConsentDto {
   /** Must equal the session's current `consent.version`. */
   @IsString()

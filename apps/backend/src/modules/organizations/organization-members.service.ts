@@ -15,7 +15,11 @@ import { PrismaService } from '../../prisma/prisma.service'
 import {
   AddOrganizationMemberDto,
   OrganizationMemberDto,
+  PendingInvitationDto,
 } from './dto/organization.dto'
+
+/** How long an invitation to an unregistered email stays claimable. */
+export const INVITATION_TTL_DAYS = 30
 
 const INCLUDE_USER = {
   user: { select: { id: true, email: true, name: true, image: true } },
@@ -49,24 +53,36 @@ export class OrganizationMembersService {
     )
   }
 
-  /** Adds an already-registered user (looked up by email). */
+  /**
+   * Adds a registered user by email, or leaves a pending invitation when the
+   * email has no account yet. No email is sent; the invitee claims it after
+   * signing in (`POST /organizations/invitations/:invitationId/accept`).
+   */
   async add(
     organizationId: string,
     dto: AddOrganizationMemberDto,
-  ): Promise<OrganizationMemberDto> {
+    invitedById?: string,
+  ): Promise<OrganizationMemberDto | PendingInvitationDto> {
+    const email = dto.email.trim().toLowerCase()
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
       select: { id: true },
     })
-    if (!user) {
-      throw new NotFoundException(
-        'No user can be added with that email. They need to sign in once first.',
-      )
+    if (user) {
+      return this.prisma.organizationMember.create({
+        data: { organizationId, userId: user.id, role: dto.role },
+        include: INCLUDE_USER,
+      })
     }
 
-    return this.prisma.organizationMember.create({
-      data: { organizationId, userId: user.id, role: dto.role },
-      include: INCLUDE_USER,
+    return this.prisma.organizationInvitation.create({
+      data: {
+        organizationId,
+        email,
+        role: dto.role,
+        invitedById,
+        expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 86_400_000),
+      },
     })
   }
 

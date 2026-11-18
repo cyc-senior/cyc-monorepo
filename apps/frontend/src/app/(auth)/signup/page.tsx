@@ -133,236 +133,236 @@ function SignUpContent() {
   return (
     <>
       {/* Alert if session code is provided in url */}
-            {sessionCode && step === "form" && (
-              <Alert variant="info" className="relative">
-                <Info className="h-4 w-4" />
-                <AlertTitle>Joining session {sessionCode}</AlertTitle>
-                <AlertDescription>
-                  After you verify your email, we&apos;ll take you straight to the session.
-                </AlertDescription>
-              </Alert>
-            )}
+      {sessionCode && step === "form" && (
+        <Alert variant="info" className="relative">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Joining session {sessionCode}</AlertTitle>
+          <AlertDescription>
+            After you verify your email, we&apos;ll take you straight to the session.
+          </AlertDescription>
+        </Alert>
+      )}
 
-            <Card className="w-full shadow-sm">
-              {step === "form" ? (
-                /* Step 1: Create Account Form */
-                <>
-                  <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-semibold">
-                      Create your account
-                    </CardTitle>
-                  </CardHeader>
+      <Card className="w-full shadow-sm">
+        {step === "form" ? (
+          /* Step 1: Create Account Form */
+          <>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-semibold">
+                Create your account
+              </CardTitle>
+            </CardHeader>
 
-                  <CardContent className="space-y-4">
-                    <form onSubmit={handleCreateAccount} className="space-y-4" noValidate>
-                      {/* Full Name */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="fullName">Full name</Label>
-                        <Input
-                          id="fullName"
-                          placeholder="Your name"
-                          value={fullName}
-                          error={!!errors.fullName}
-                          onChange={(e) => {
-                            setFullName(e.target.value);
-                            if (errors.fullName) {
-                              setErrors((prev) => ({ ...prev, fullName: undefined }));
-                            }
-                          }}
-                        />
-                        {errors.fullName && (
-                          <p className="text-xs text-destructive">{errors.fullName}</p>
-                        )}
-                      </div>
+            <CardContent className="space-y-4">
+              <form onSubmit={handleCreateAccount} className="space-y-4" noValidate>
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName">Full name</Label>
+                  <Input
+                    id="fullName"
+                    placeholder="Your name"
+                    value={fullName}
+                    error={!!errors.fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (errors.fullName) {
+                        setErrors((prev) => ({ ...prev, fullName: undefined }));
+                      }
+                    }}
+                  />
+                  {errors.fullName && (
+                    <p className="text-xs text-destructive">{errors.fullName}</p>
+                  )}
+                </div>
 
-                      {/* Email */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="signup-email">Email</Label>
-                        <Input
-                          id="signup-email"
-                          type="email"
-                          placeholder="you@company.com"
-                          value={email}
-                          error={!!errors.email}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            if (errors.email) {
-                              setErrors((prev) => ({ ...prev, email: undefined }));
-                            }
-                          }}
-                        />
-                        {errors.email && (
-                          <p className="text-xs text-destructive">{errors.email}</p>
-                        )}
-                      </div>
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="you@company.com"
+                    value={email}
+                    error={!!errors.email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errors.email) {
+                        setErrors((prev) => ({ ...prev, email: undefined }));
+                      }
+                    }}
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email}</p>
+                  )}
+                </div>
 
-                      {/* Password with Eye Icon */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="signup-password">Password</Label>
-                        <div className="relative">
-                          <Input
-                            id="signup-password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="At least 8 characters"
-                            value={password}
-                            error={!!errors.password}
-                            className="pr-10"
-                            onChange={(e) => {
-                              setPassword(e.target.value);
-                              if (errors.password) {
-                                setErrors((prev) => ({ ...prev, password: undefined }));
-                              }
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                        {errors.password && (
-                          <p className="text-xs text-destructive">
-                            {errors.password}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Create account button */}
-                      <Button type="submit" className="w-full cursor-pointer">
-                        Create account
-                      </Button>
-                    </form>
-
-                    {/* OR Divider */}
-                    <div className="relative flex items-center justify-center my-4">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-border" />
-                      </div>
-                      <span className="relative bg-card px-2 text-xs uppercase text-muted-foreground font-medium">
-                        OR
-                      </span>
-                    </div>
-
-                    {/* Google Button */}
-                    <Button
+                {/* Password with Eye Icon */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="At least 8 characters"
+                      value={password}
+                      error={!!errors.password}
+                      className="pr-10"
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errors.password) {
+                          setErrors((prev) => ({ ...prev, password: undefined }));
+                        }
+                      }}
+                    />
+                    <button
                       type="button"
-                      variant="outline"
-                      className="w-full gap-2 cursor-pointer"
-                      onClick={handleGoogleLogin}
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      <GoogleIcon />
-                      <span>Continue with Google</span>
-                    </Button>
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive">
+                      {errors.password}
+                    </p>
+                  )}
+                </div>
 
-                    {/* Already have an account? Sign in */}
-                    <div className="space-y-3 text-center pt-2">
-                      <p className="text-sm text-muted-foreground">
-                        Already have an account?{" "}
-                        <Link
-                          href={
-                            sessionCode
-                              ? `/signin?session_code=${encodeURIComponent(sessionCode)}`
-                              : "/signin"
-                          }
-                          className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
-                        >
-                          Sign in
-                        </Link>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        By continuing, you agree to the{" "}
-                        <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
-                          Terms of use
-                        </Link>{" "}
-                        and{" "}
-                        <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
-                          Privacy notice
-                        </Link>
-                        .
-                      </p>
-                    </div>
-                  </CardContent>
-                </>
-              ) : (
-                /* Step 2: Check your email (OTP Verification) */
-                <>
-                  <CardHeader className="space-y-1 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
-                      <MailCheck className="h-6 w-6" />
-                    </div>
-                    <CardTitle className="text-2xl font-semibold">
-                      Check your email
-                    </CardTitle>
-                    <CardDescription>
-                      We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.
-                    </CardDescription>
-                  </CardHeader>
+                {/* Create account button */}
+                <Button type="submit" className="w-full cursor-pointer">
+                  Create account
+                </Button>
+              </form>
 
-                  <CardContent className="space-y-6">
-                    <form onSubmit={handleVerifyOtp} className="space-y-6" noValidate>
-                      <div className="space-y-2">
-                        <Label className="text-center block text-xs text-muted-foreground">
-                          Enter 6-digit verification code
-                        </Label>
-                        <InputOTP
-                          maxLength={6}
-                          value={otp}
-                          onChange={(val) => {
-                            setOtp(val);
-                            if (otpError) setOtpError(null);
-                          }}
-                          containerClassName="justify-center"
-                          aria-invalid={!!otpError}
-                        >
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                          </InputOTPGroup>
-                        </InputOTP>
-                        {otpError && (
-                          <p className="text-xs text-destructive text-center">{otpError}</p>
-                        )}
-                      </div>
+              {/* OR Divider */}
+              <div className="relative flex items-center justify-center my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">
+                  or
+                </span>
+              </div>
 
-                      <div className="space-y-2.5">
-                        <Button type="submit" className="w-full cursor-pointer">
-                          Verify and continue
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full cursor-pointer"
-                          onClick={handleResendOtp}
-                        >
-                          Resend a code
-                        </Button>
-                      </div>
-                    </form>
+              {/* Google Button */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2 cursor-pointer"
+                onClick={handleGoogleLogin}
+              >
+                <GoogleIcon />
+                <span>Continue with Google</span>
+              </Button>
 
-                    <div className="text-center pt-2 border-t border-border">
-                      <button
-                        type="button"
-                        onClick={() => setStep("form")}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      >
-                        Wrong email address? Change details
-                      </button>
-                    </div>
-                  </CardContent>
-                </>
-              )}
-            </Card>
+              {/* Already have an account? Sign in */}
+              <div className="space-y-3 text-center pt-2">
+                <p className="text-sm text-muted-foreground">
+                  Already have an account?{" "}
+                  <Link
+                    href={
+                      sessionCode
+                        ? `/signin?session_code=${encodeURIComponent(sessionCode)}`
+                        : "/signin"
+                    }
+                    className="text-foreground font-medium underline underline-offset-4 hover:text-primary transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  By continuing, you agree to the{" "}
+                  <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+                    Terms of use
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+                    Privacy notice
+                  </Link>
+                  .
+                </p>
+              </div>
+            </CardContent>
+          </>
+        ) : (
+          /* Step 2: Check your email (OTP Verification) */
+          <>
+            <CardHeader className="space-y-1 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                <MailCheck className="h-6 w-6" />
+              </div>
+              <CardTitle className="text-2xl font-semibold">
+                Check your email
+              </CardTitle>
+              <CardDescription>
+                We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              <form onSubmit={handleVerifyOtp} className="space-y-6" noValidate>
+                <div className="space-y-2">
+                  <Label className="text-center block text-xs text-muted-foreground">
+                    Enter 6-digit verification code
+                  </Label>
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={(val) => {
+                      setOtp(val);
+                      if (otpError) setOtpError(null);
+                    }}
+                    containerClassName="justify-center"
+                    aria-invalid={!!otpError}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                  {otpError && (
+                    <p className="text-xs text-destructive text-center">{otpError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  <Button type="submit" className="w-full cursor-pointer">
+                    Verify and continue
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full cursor-pointer"
+                    onClick={handleResendOtp}
+                  >
+                    Resend a code
+                  </Button>
+                </div>
+              </form>
+
+              <div className="text-center pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Wrong email address? Change details
+                </button>
+              </div>
+            </CardContent>
+          </>
+        )}
+      </Card>
     </>
   );
 }

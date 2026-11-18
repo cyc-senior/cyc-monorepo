@@ -41,19 +41,24 @@ export class CreateProjectDto {
   @MaxLength(5000)
   description?: string | null
 
-  /** Platforms to design and test for (at least one). */
-  @ApiProperty({
+  /**
+   * Platforms to design and test for. Optional at creation (the first wizard
+   * step only collects the brief); defaults to `DESKTOP` in the database and
+   * can be refined with `PATCH /projects/{projectId}` later.
+   */
+  @ApiPropertyOptional({
     enum: Platform,
     enumName: 'Platform',
     isArray: true,
     example: ['DESKTOP', 'MOBILE'],
   })
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(3)
   @ArrayUnique()
   @IsEnum(Platform, { each: true })
-  platforms: Platform[]
+  platforms?: Platform[]
 }
 
 /** Project details and archiving. The design intent has its own endpoint. */
@@ -114,8 +119,49 @@ export class ProjectDto {
   updatedAt: Date
 }
 
+class TesterProgressDto {
+  current: number
+
+  total: number
+}
+
+class ProjectStatusBadgeDto {
+  label: string
+
+  @ApiProperty({ enum: ['warning', 'in-progress', 'ready'] })
+  type: 'warning' | 'in-progress' | 'ready'
+}
+
+class ProjectMemberSummaryDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  name: string | null
+
+  image: string | null
+}
+
 export class ProjectWithRoleDto extends ProjectDto {
   /** The caller's role in this project. */
   @ApiProperty({ enum: ProjectRole, enumName: 'ProjectRole' })
   role: ProjectRole
+
+  /** @example 'Round 2 of 5' */
+  activeRound?: string
+
+  /** Participants who joined vs. were invited in the latest test session. */
+  testerProgress?: TesterProgressDto
+
+  /** Variants in the latest design round. */
+  variantCount?: number
+
+  statusBadge?: ProjectStatusBadgeDto
+
+  /** True when a story or analysis is waiting for the designer. */
+  requiresAttention?: boolean
+
+  members?: ProjectMemberSummaryDto[]
+
+  /** Preview image of the latest generated variant; null until one exists. */
+  thumbnailUrl?: string | null
 }

@@ -19,6 +19,7 @@ import {
   ParticipantInvitationDto,
   ParticipantQueryDto,
 } from './dto/test-session.dto'
+import { hashInviteToken, normalizeInviteToken } from './invite-token'
 import { MAX_PARTICIPANTS_PER_SESSION } from './testing.constants'
 
 type ParticipantRow = Prisma.SessionParticipantGetPayload<object>
@@ -133,14 +134,14 @@ export class ParticipantsService {
         if (assigned) {
           load.set(assigned, (load.get(assigned) ?? 0) + 1)
         }
-        const token = generateToken()
+        const token = normalizeInviteToken(generateToken())
         const row = await tx.sessionParticipant.create({
           data: {
             sessionId,
             email: input.email,
             displayName: input.displayName,
             assignedVariantId: assigned,
-            inviteTokenHash: sha256(token),
+            inviteTokenHash: hashInviteToken(token),
           },
         })
         invitations.push(this.toInvitation(row, token))
@@ -161,7 +162,7 @@ export class ParticipantsService {
     id: string,
   ): Promise<ParticipantInvitationDto> {
     await this.session(projectId, sessionId)
-    const token = generateToken()
+    const token = normalizeInviteToken(generateToken())
     const updated = await this.prisma.sessionParticipant.updateMany({
       where: {
         id,
@@ -169,7 +170,10 @@ export class ParticipantsService {
         status: { in: ['INVITED', 'JOINED'] },
         session: { status: { in: ['DRAFT', 'ACTIVE'] } },
       },
-      data: { inviteTokenHash: sha256(token), inviteIssuedAt: new Date() },
+      data: {
+        inviteTokenHash: hashInviteToken(token),
+        inviteIssuedAt: new Date(),
+      },
     })
     if (updated.count === 0) {
       await this.prisma.sessionParticipant.findFirstOrThrow({

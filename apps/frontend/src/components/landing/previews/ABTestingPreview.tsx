@@ -29,9 +29,9 @@ export function ABTestingPreview({
   className,
 }: ABTestingPreviewProps) {
   return (
-    <Card className={cn("overflow-hidden border-border/80 shadow-xl gap-0 py-0", className)}>
+    <Card className={cn("h-full overflow-hidden border-border/80 shadow-xl gap-0 py-0", className)}>
       {/* Header */}
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border px-4 py-3">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border px-4 py-3 [.border-b]:pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-foreground">{title}</span>
           <span className="text-xs text-muted-foreground">{subtitle}</span>
@@ -40,7 +40,7 @@ export function ABTestingPreview({
       </CardHeader>
 
       {/* Design A and B wireframe panels */}
-      <CardContent className="grid grid-cols-2 gap-3 p-4">
+      <CardContent className="flex-1 grid grid-cols-2 gap-3 p-4">
         {abTestingPreviewData.variants.map((variant) => (
           <DesignPreviewCard
             key={variant.id}
@@ -52,7 +52,7 @@ export function ABTestingPreview({
       </CardContent>
 
       {/* Feedback footer */}
-      <CardFooter className="flex-wrap gap-2 border-t border-border px-4 py-3">
+      <CardFooter className="flex-wrap gap-2 border-t border-border px-4 py-3 [.border-t]:pt-3">
         <div className="flex items-center gap-1" aria-hidden="true">
           {[0, 1, 2].map((index) => (
             <span

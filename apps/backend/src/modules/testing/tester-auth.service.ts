@@ -7,12 +7,13 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 
-import { sha256 } from '../../common/crypto'
 import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { PrismaService } from '../../prisma/prisma.service'
 import { JWT_ISSUER, TESTER_AUDIENCE } from '../auth/auth.constants'
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface'
 import { TesterTokenDto } from './dto/tester.dto'
+import { hashInviteToken } from './invite-token'
 import { TesterTokenPayload } from './tester.types'
 
 /**
@@ -41,9 +42,12 @@ export class TesterAuthService {
    * @throws ForbiddenException when the invitation is genuine but the session
    *   is not open or the participant lost access.
    */
-  async join(inviteToken: string): Promise<TesterTokenDto> {
+  async join(
+    inviteToken: string,
+    user: AuthenticatedUser | null,
+  ): Promise<TesterTokenDto> {
     const participant = await this.prisma.sessionParticipant.findUnique({
-      where: { inviteTokenHash: sha256(inviteToken) },
+      where: { inviteTokenHash: hashInviteToken(inviteToken) },
       include: { session: true },
     })
     if (!participant) {
@@ -73,12 +77,34 @@ export class TesterAuthService {
       throw new ForbiddenException('This test session has expired.')
     }
 
-    if (participant.status === 'INVITED') {
-      await this.prisma.sessionParticipant.updateMany({
-        where: { id: participant.id, status: 'INVITED' },
-        data: { status: 'JOINED', joinedAt: now },
-      })
+    // An invitation can be claimed by one account only. Anonymous joins are
+    // allowed, but a signed-in user can claim an unclaimed invitation later
+    // so it shows up in their "My sessions" list.
+    if (participant.userId && participant.userId !== user?.id) {
+      this.logger.warn(logEvent('testing.join_rejected', { reason: 'claimed' }))
+      throw new ForbiddenException(
+        'This invitation has already been claimed by another account.',
+      )
     }
+    await this.prisma.$transaction(async (tx) => {
+      if (user && !participant.userId) {
+        const claimed = await tx.sessionParticipant.updateMany({
+          where: { id: participant.id, userId: null },
+          data: { userId: user.id },
+        })
+        if (claimed.count === 0) {
+          throw new ForbiddenException(
+            'This invitation has already been claimed by another account.',
+          )
+        }
+      }
+      if (participant.status === 'INVITED') {
+        await tx.sessionParticipant.updateMany({
+          where: { id: participant.id, status: 'INVITED' },
+          data: { status: 'JOINED', joinedAt: now },
+        })
+      }
+    })
 
     const untilExpiry = Math.floor(
       (session.expiresAt.getTime() - now.getTime()) / 1000,

@@ -30,8 +30,8 @@ export function MobileDesktopNotice({ sessionCode, children }: MobileNoticeProps
   return (
     <>
       {/* Mobile Screen: show "Open CYC on a computer" */}
-      <div className="block sm:hidden w-full px-4 pt-[80px] pb-16 flex justify-center">
-        <Card className="w-full max-w-[440px] shadow-sm">
+      <div className="block sm:hidden w-full flex-1 px-4 pt-[80px] pb-16 flex justify-center bg-[var(--cyc-bg-brand)]">
+        <Card className="w-full max-w-[440px] shadow-sm self-start">
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl font-semibold">
               Open CYC on a computer

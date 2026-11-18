@@ -4,7 +4,10 @@ import { JwtModule } from '@nestjs/jwt'
 
 import { RateLimitGuard } from '../../common/rate-limit/rate-limit.guard'
 import { EnvironmentVariables } from '../../config/env.validation'
+import { MySessionsService } from './my-sessions.service'
+import { OptionalUserService } from './optional-user.service'
 import { ParticipantsService } from './participants.service'
+import { SessionLookupService } from './session-lookup.service'
 import { SessionResultsController } from './session-results.controller'
 import { SessionResultsService } from './session-results.service'
 import { SessionSetupController } from './session-setup.controller'
@@ -16,6 +19,7 @@ import { TestingController } from './testing.controller'
 import { TesterGuard } from './tester.guard'
 import { TesterAuthService } from './tester-auth.service'
 import { TesterService } from './tester.service'
+import { UserSessionsController } from './user-sessions.controller'
 
 /**
  * The testing space. Designers run sessions under `/projects/:projectId/
@@ -38,6 +42,7 @@ import { TesterService } from './tester.service'
     SessionResultsController,
     TestingController,
     TesterController,
+    UserSessionsController,
   ],
   providers: [
     TestSessionsService,
@@ -48,6 +53,9 @@ import { TesterService } from './tester.service'
     TesterService,
     TesterGuard,
     RateLimitGuard,
+    OptionalUserService,
+    SessionLookupService,
+    MySessionsService,
   ],
 })
 export class TestingModule {}

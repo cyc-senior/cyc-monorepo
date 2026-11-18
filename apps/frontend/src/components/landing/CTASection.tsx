@@ -22,7 +22,7 @@ export function CTASection({
   return (
     <section className={cn("bg-brand py-16 md:py-20", className)}>
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="mb-2 text-2xl font-bold tracking-tight text-brand-foreground sm:text-3xl">
               {title}
