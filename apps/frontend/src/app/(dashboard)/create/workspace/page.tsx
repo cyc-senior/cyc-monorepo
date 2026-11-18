@@ -234,6 +234,7 @@ export default function CreateWorkspacePage() {
                 {/* Picture preview (40x40 rounded 8px) */}
                 <div className="size-10 rounded-[8px] shrink-0 border border-border bg-muted overflow-hidden flex items-center justify-center font-heading font-semibold text-base text-foreground select-none">
                   {picturePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={picturePreview}
                       alt="Workspace picture preview"

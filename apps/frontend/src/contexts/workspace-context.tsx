@@ -104,8 +104,47 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    refreshWorkspaces();
-  }, [refreshWorkspaces]);
+    let isMounted = true;
+
+    async function load() {
+      if (!user) {
+        return;
+      }
+      try {
+        const rawList = await listWorkspaces();
+        if (!isMounted) return;
+        const list = rawList.map((ws) => ({
+          ...ws,
+          avatarUrl: ws.avatarUrl || getStoredWorkspaceAvatar(ws.id) || null,
+        }));
+        setWorkspaces(list);
+        setCurrentWorkspace((prev) => {
+          if (list.length === 0) return null;
+          if (prev) {
+            const matched = list.find((ws) => ws.id === prev.id);
+            if (matched) return matched;
+          }
+          return list[0];
+        });
+      } catch (err) {
+        console.error("Failed to fetch workspaces from GET /organizations:", err);
+        if (isMounted) {
+          setWorkspaces([]);
+          setCurrentWorkspace(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   // According to Figma Screen 9 Tester (Node 221:4357):
   // User is in Tester mode when they have no workspaces.

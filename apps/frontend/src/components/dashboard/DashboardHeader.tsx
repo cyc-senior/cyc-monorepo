@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -10,23 +10,23 @@ export interface DashboardHeaderProps {
   isTester?: boolean;
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return "Good morning";
+  } else if (hour >= 12 && hour < 17) {
+    return "Good afternoon";
+  } else {
+    return "Good evening";
+  }
+}
+
 export function DashboardHeader({
   userName,
   hasProjects = false,
   isTester = false,
 }: DashboardHeaderProps) {
-  const [greeting, setGreeting] = useState("Good day");
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      setGreeting("Good morning");
-    } else if (hour >= 12 && hour < 17) {
-      setGreeting("Good afternoon");
-    } else {
-      setGreeting("Good evening");
-    }
-  }, []);
+  const greeting = getGreeting();
 
   const firstName = userName ? userName.split(" ")[0] : "Pannawit";
 

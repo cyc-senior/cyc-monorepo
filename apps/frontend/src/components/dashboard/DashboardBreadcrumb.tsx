@@ -38,6 +38,7 @@ export function DashboardBreadcrumb({
         {/* Workspace Mark: Single letter square or picture thumbnail */}
         <div className="flex size-6 items-center justify-center rounded-[6px] overflow-hidden bg-muted text-muted-foreground text-xs font-semibold shrink-0 select-none border border-border/80">
           {currentWorkspace?.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={currentWorkspace.avatarUrl}
               alt={currentWorkspace.name}
@@ -71,6 +72,7 @@ export function DashboardBreadcrumb({
               >
                 <div className="flex size-5 items-center justify-center rounded-[4px] overflow-hidden bg-muted text-[11px] font-semibold shrink-0">
                   {ws.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={ws.avatarUrl}
                       alt={ws.name}

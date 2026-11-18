@@ -42,9 +42,6 @@ function JoinSessionContent() {
   // Lookup session preview when user enters a session code
   useEffect(() => {
     if (!trimmed || trimmed.length < 4) {
-      setSessionData(null);
-      setIsTaken(false);
-      setIsNotFound(false);
       return;
     }
 
@@ -163,8 +160,14 @@ function JoinSessionContent() {
                 value={sessionCode}
                 placeholder="CYC-4821"
                 onChange={(e) => {
-                  setSessionCode(e.target.value);
+                  const val = e.target.value;
+                  setSessionCode(val);
                   if (manualError) setManualError("");
+                  if (val.trim().length < 4) {
+                    setSessionData(null);
+                    setIsTaken(false);
+                    setIsNotFound(false);
+                  }
                 }}
                 className={`rounded-[10px] h-9 text-sm transition-all ${
                   isTaken

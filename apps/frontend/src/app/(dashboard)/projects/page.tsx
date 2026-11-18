@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/contexts/workspace-context";
@@ -42,30 +42,41 @@ function ProjectsView() {
   }, [searchParams, router]);
 
   // Fetch projects for the active workspace from Backend API
-  const fetchProjects = useCallback(async () => {
-    if (!currentWorkspace?.id) {
-      setProjectsList([]);
-      return;
-    }
-
-    try {
-      setIsLoadingProjects(true);
-      const list = await listWorkspaceProjects(currentWorkspace.id);
-      setProjectsList(list);
-    } catch (err) {
-      console.error(
-        `Failed to fetch projects from GET /organizations/${currentWorkspace.id}/projects:`,
-        err
-      );
-      setProjectsList([]);
-    } finally {
-      setIsLoadingProjects(false);
-    }
-  }, [currentWorkspace?.id]);
+  const workspaceId = currentWorkspace?.id;
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    let isMounted = true;
+
+    async function load() {
+      if (!workspaceId) {
+        return;
+      }
+      try {
+        const list = await listWorkspaceProjects(workspaceId);
+        if (isMounted) {
+          setProjectsList(list);
+        }
+      } catch (err) {
+        console.error(
+          `Failed to fetch projects from GET /organizations/${workspaceId}/projects:`,
+          err
+        );
+        if (isMounted) {
+          setProjectsList([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingProjects(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [workspaceId]);
 
 
 
