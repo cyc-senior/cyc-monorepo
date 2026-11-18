@@ -1,7 +1,37 @@
 import * as React from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FeatureCard } from "./cards/FeatureCard";
 import type { FeatureItem } from "@/config/landing-page-data";
+
+export interface FeatureCardProps {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  className?: string;
+}
+
+export function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  className,
+}: FeatureCardProps) {
+  return (
+    <div className={cn("flex items-start gap-3", className)}>
+      <div className="mt-0.5 shrink-0 text-brand-text">
+        <Icon className="size-4" aria-hidden="true" />
+      </div>
+      <div>
+        <h3 className="mb-1 font-sans text-sm font-semibold text-brand-text">
+          {title}
+        </h3>
+        <p className="text-xs leading-relaxed text-brand-700 dark:text-brand-200">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export interface FeatureSectionProps {
   title: string;
@@ -11,6 +41,7 @@ export interface FeatureSectionProps {
   reverseLayout?: boolean;
   className?: string;
 }
+
 export function FeatureSection({
   title,
   description,
