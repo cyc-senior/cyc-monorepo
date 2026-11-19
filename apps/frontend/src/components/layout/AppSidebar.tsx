@@ -15,18 +15,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
+import { InviteWorkspaceDialog } from "@/components/projects/InviteWorkspaceDialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Folder01Icon,
   UserGroupIcon,
   Analytics01Icon,
-  CogIcon,
+  Settings01Icon,
   HelpCircleIcon,
   UnfoldMoreIcon,
   ArrowRight01Icon,
   UserIcon,
   Logout01Icon,
   Add01Icon,
+  UserAdd01Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 
 interface AppSidebarProps {
@@ -40,6 +43,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
   const { workspaces, currentWorkspace, setCurrentWorkspace, isTester } =
     useWorkspace();
   const [accountDialogOpen, setAccountDialogOpen] = React.useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
 
   // Top Nav Items
   const navItems = [
@@ -118,7 +122,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               />
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent className="w-60" align="start">
+            <DropdownMenuContent className="w-64" align="start">
               <DropdownMenuLabel className="text-xs text-muted-foreground">
                 Workspaces
               </DropdownMenuLabel>
@@ -129,8 +133,19 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   className="flex items-center justify-between cursor-pointer"
                 >
                   <span className="truncate">{ws.name}</span>
+                  {ws.id === currentWorkspace?.id && (
+                    <HugeIcon icon={Tick02Icon} size={16} className="text-primary shrink-0" />
+                  )}
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setIsInviteDialogOpen(true)}
+                className="cursor-pointer gap-2"
+              >
+                <HugeIcon icon={UserAdd01Icon} size={16} />
+                <span>Invite to workspace</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => router.push("/workspaces/new")}
@@ -200,15 +215,13 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t space-y-1">
-          {!isTester && (
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
-            >
-              <HugeIcon icon={CogIcon} size={18} className="shrink-0" />
-              <span>Workspace settings</span>
-            </Link>
-          )}
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+          >
+            <HugeIcon icon={Settings01Icon} size={18} className="shrink-0" />
+            <span>Workspace settings</span>
+          </Link>
 
           <a
             href="mailto:support@cyc.app"
@@ -284,6 +297,14 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
       <AccountSettingsDialog
         open={accountDialogOpen}
         onOpenChange={setAccountDialogOpen}
+      />
+
+      {/* Invite to Workspace Modal */}
+      <InviteWorkspaceDialog
+        isOpen={isInviteDialogOpen}
+        onClose={() => setIsInviteDialogOpen(false)}
+        workspaceId={currentWorkspace?.id}
+        workspaceName={currentWorkspace?.name}
       />
     </>
   );
