@@ -7,7 +7,6 @@ import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
-import { Loader2 } from "lucide-react";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,34 +32,25 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Pre-workspace Top Nav */}
-      {!showSidebar && (
-        <div className="w-full flex flex-col min-h-screen">
+      {showSidebar && <AppSidebar collapsed={sidebarCollapsed} />}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {showSidebar ? (
+          <SidebarHeader
+            onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          />
+        ) : (
           <MinimalNav />
-          <main className="flex-1 overflow-y-auto w-full">{children}</main>
-        </div>
-      )}
-
-      {/* Active workspace state: 256px collapsible AppSidebar */}
-      {showSidebar && (
-        <>
-          <AppSidebar collapsed={sidebarCollapsed} />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <SidebarHeader
-              onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
-            />
-            <main className="flex-1 overflow-y-auto w-full">{children}</main>
-          </div>
-        </>
-      )}
+        )}
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+      </div>
     </div>
   );
 }
 
 /**
  * Protected dashboard shell with session guard and workspace context.
- * Always renders children in the DOM tree so Next.js static prerender
- * can validate the child route segments without dropping.
+ * Always renders children uniformly so Next.js static prerender
+ * validates child route segments without dropping.
  */
 export default function DashboardLayout({
   children,
@@ -78,16 +68,7 @@ export default function DashboardLayout({
 
   return (
     <WorkspaceProvider>
-      {isLoading || !user ? (
-        <div className="relative">
-          <div className="flex min-h-screen items-center justify-center bg-background">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <div className="hidden">{children}</div>
-        </div>
-      ) : (
-        <DashboardShell>{children}</DashboardShell>
-      )}
+      <DashboardShell>{children}</DashboardShell>
     </WorkspaceProvider>
   );
 }

@@ -11,9 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { lookupSessionByCode } from "@/services/testing.service";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
-  Building01Icon,
-  Key01Icon,
+  Building03Icon,
   AlertCircleIcon,
+  Ticket01Icon,
 } from "@hugeicons/core-free-icons";
 import { Loader2 } from "lucide-react";
 
@@ -67,8 +67,8 @@ export default function FirstRunScreen6Page() {
         {/* Option 1: Create a workspace (Node 814:9810) */}
         <div className="rounded-[14px] border border-border bg-card text-card-foreground p-6 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
-            <div className="h-10 w-10 rounded-full bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-400 flex items-center justify-center">
-              <HugeIcon icon={Building01Icon} size={20} />
+            <div className="h-10 w-10 rounded-full bg-primary-subtle text-primary-text flex items-center justify-center">
+              <HugeIcon icon={Building03Icon} size={20} />
             </div>
 
             <div className="space-y-2">
@@ -91,8 +91,8 @@ export default function FirstRunScreen6Page() {
         {/* Option 2: Join testing session with a code (Node 814:9823) */}
         <div className="rounded-[14px] border border-border bg-card text-card-foreground p-6 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
-            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 flex items-center justify-center">
-              <HugeIcon icon={Key01Icon} size={20} />
+            <div className="h-10 w-10 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+              <HugeIcon icon={Ticket01Icon} size={20} />
             </div>
 
             <div className="space-y-2">
@@ -108,7 +108,7 @@ export default function FirstRunScreen6Page() {
           <form onSubmit={handleJoinSession} className="space-y-3 pt-4 mt-auto" noValidate>
             {joinError && (
               <Alert variant="destructive" className="py-2">
-                <HugeIcon icon={AlertCircleIcon} size={16} />
+                <HugeIcon icon={AlertCircleIcon} size={16} className="items-center" />  
                 <AlertDescription className="text-xs">{joinError}</AlertDescription>
               </Alert>
             )}

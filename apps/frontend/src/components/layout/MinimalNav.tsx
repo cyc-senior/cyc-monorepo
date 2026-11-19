@@ -19,7 +19,7 @@ import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   ArrowDown01Icon,
-  UserIcon,
+  UserCircleIcon,
   Logout01Icon,
 } from "@hugeicons/core-free-icons";
 
@@ -85,7 +85,7 @@ export function MinimalNav() {
                 onClick={() => setAccountDialogOpen(true)}
                 className="cursor-pointer gap-2"
               >
-                <HugeIcon icon={UserIcon} size={16} />
+                <HugeIcon icon={UserCircleIcon} size={16} />
                 <span>Account settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

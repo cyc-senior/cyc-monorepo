@@ -22,7 +22,7 @@ import {
   Analytics01Icon,
   CogIcon,
   HelpCircleIcon,
-  ArrowUpDownIcon,
+  UnfoldMoreIcon,
   ArrowRight01Icon,
   UserIcon,
   Logout01Icon,
@@ -112,7 +112,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                 </div>
               </div>
               <HugeIcon
-                icon={ArrowUpDownIcon}
+                icon={UnfoldMoreIcon}
                 size={16}
                 className="text-muted-foreground shrink-0"
               />
@@ -241,7 +241,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   </div>
                 </div>
                 <HugeIcon
-                  icon={ArrowUpDownIcon}
+                  icon={UnfoldMoreIcon}
                   size={16}
                   className="text-muted-foreground shrink-0"
                 />
