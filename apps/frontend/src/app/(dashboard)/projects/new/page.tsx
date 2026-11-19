@@ -114,7 +114,7 @@ export default function CreateProjectPage() {
 
       {/* Main Content Area (Figma Node 491:5322 - 11 · Create project (Hi-fi)) */}
       <main className="flex-1 w-full">
-        <div className="w-full max-w-[1360px] mx-auto px-6 sm:px-10 lg:px-20 py-8 sm:py-10 flex flex-col gap-8">
+        <div className="w-full p-10 flex flex-col gap-8">
           {/* 1. Step Progress Bar (3 segments of 96px, 4px height) */}
           <div className="flex gap-1 items-start" aria-label="Step 1 of 3">
             <div className="bg-primary h-1 w-24 rounded-xs shrink-0" />
