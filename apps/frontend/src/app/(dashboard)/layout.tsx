@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
@@ -8,13 +8,10 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
 
-function DashboardShell({ children }: { children: React.ReactNode }) {
+function WorkspaceRedirectGuard() {
   const pathname = usePathname();
   const router = useRouter();
   const { workspaces, isLoading: workspaceLoading } = useWorkspace();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
   const isPreWorkspaceRoute =
     pathname === "/first-run" || pathname === "/workspaces/new";
 
@@ -28,19 +25,62 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [workspaceLoading, workspaces.length, isPreWorkspaceRoute, pathname, router]);
 
+  return null;
+}
+
+function DashboardSidebarWrapper({
+  collapsed,
+}: {
+  collapsed: boolean;
+}) {
+  const pathname = usePathname();
+  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+
+  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
+  const isPreWorkspaceRoute =
+    pathname === "/first-run" || pathname === "/workspaces/new";
   const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
+
+  if (!showSidebar) return null;
+  return <AppSidebar collapsed={collapsed} />;
+}
+
+function DashboardHeaderWrapper({
+  onToggleSidebar,
+}: {
+  onToggleSidebar: () => void;
+}) {
+  const pathname = usePathname();
+  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+
+  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
+  const isPreWorkspaceRoute =
+    pathname === "/first-run" || pathname === "/workspaces/new";
+  const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
+
+  if (showSidebar) {
+    return <SidebarHeader onToggleSidebar={onToggleSidebar} />;
+  }
+  return <MinimalNav />;
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen flex bg-background">
-      {showSidebar && <AppSidebar collapsed={sidebarCollapsed} />}
+      <Suspense fallback={null}>
+        <WorkspaceRedirectGuard />
+        <DashboardSidebarWrapper collapsed={sidebarCollapsed} />
+      </Suspense>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {showSidebar ? (
-          <SidebarHeader
+        <Suspense
+          fallback={<div className="h-14 border-b bg-background shrink-0" />}
+        >
+          <DashboardHeaderWrapper
             onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
           />
-        ) : (
-          <MinimalNav />
-        )}
+        </Suspense>
         <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>
     </div>
