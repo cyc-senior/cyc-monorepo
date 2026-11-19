@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { ProjectWithRole } from "@/types/project";
 import { getInitials } from "@/lib/utils";
-import { Monitor, Smartphone } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { ComputerIcon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 
 export interface ProjectStatusBadgeProps {
   project: ProjectWithRole;
@@ -89,9 +90,9 @@ export function CYCProjectCard({ project }: CYCProjectCardProps) {
           />
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground/50 text-xs font-medium">
-            <Monitor className="size-4" />
+            <HugeIcon icon={ComputerIcon} size={16} />
             <span>·</span>
-            <Smartphone className="size-4" />
+            <HugeIcon icon={SmartPhone01Icon} size={16} />
           </div>
         )}
       </div>
