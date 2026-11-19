@@ -291,7 +291,7 @@ export default function DesignIntentStep2Page() {
         {/* Columns matching Figma Node 815:10130 */}
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           {/* Left Column (Forms) matching Figma Node 815:10131 */}
-          <div className="flex-1 w-full lg:max-w-[672px] space-y-4">
+          <div className="flex-1 w-full space-y-4">
             {/* Personas Card matching Figma Node 815:10132 / 815:10838 */}
             <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-4">
               <h3 className="font-heading font-medium text-xl text-foreground">
