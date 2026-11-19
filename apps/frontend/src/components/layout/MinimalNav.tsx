@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ import {
 } from "@hugeicons/core-free-icons";
 
 export function MinimalNav() {
-  const router = useRouter();
   const { user, logout } = useAuth();
   const [accountDialogOpen, setAccountDialogOpen] = React.useState(false);
 

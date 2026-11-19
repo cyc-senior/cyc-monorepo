@@ -6,11 +6,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Sparkles,
-  CheckCircle2,
   Edit2,
-  Layers,
   AlertCircle,
-  Cpu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

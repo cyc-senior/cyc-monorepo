@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import { SidebarLeft01Icon } from "@hugeicons/core-free-icons";

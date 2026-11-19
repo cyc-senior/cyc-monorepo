@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  Sparkles,
   Smartphone,
   Monitor,
   AlertCircle,
@@ -23,7 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   createUserStory,
@@ -56,13 +54,11 @@ export default function NewUserStoryPage() {
   // Intent preview
   const [intent, setIntent] = React.useState<DesignIntentDetail | null>(null);
 
-  const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     async function loadData() {
-      setIsLoading(true);
       try {
         const [personaList, intentDetail] = await Promise.all([
           listPersonas(projectId).catch(() => []),
@@ -73,8 +69,8 @@ export default function NewUserStoryPage() {
         if (personaList.length > 0) {
           setSelectedPersonaIds([personaList[0].id]);
         }
-      } finally {
-        setIsLoading(false);
+      } catch {
+        // Ignored
       }
     }
     if (projectId) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,14 +29,18 @@ export interface WorkspaceSettingsDialogProps {
   workspace: Workspace | null;
 }
 
-export function WorkspaceSettingsDialog({
-  open,
-  onOpenChange,
+interface WorkspaceSettingsContentProps {
+  workspace: Workspace;
+  onOpenChange: (open: boolean) => void;
+}
+
+function WorkspaceSettingsContent({
   workspace,
-}: WorkspaceSettingsDialogProps) {
+  onOpenChange,
+}: WorkspaceSettingsContentProps) {
   const { refreshWorkspaces, setWorkspaceAvatar } = useWorkspace();
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(workspace.name || "");
   const [nameError, setNameError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,25 +48,13 @@ export function WorkspaceSettingsDialog({
 
   // Picture upload state
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    workspace.avatarUrl || null
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Teammate invite emails list
   const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
-
-  useEffect(() => {
-    if (open && workspace) {
-      setName(workspace.name || "");
-      setAvatarPreview(workspace.avatarUrl || null);
-      setAvatarFile(null);
-      setInviteEmails([""]);
-      setNameError(null);
-      setServerError(null);
-      setIsSuccess(false);
-    }
-  }, [open, workspace]);
-
-  if (!open || !workspace) return null;
 
   const initials = name.trim()
     ? name
@@ -383,5 +375,21 @@ export function WorkspaceSettingsDialog({
         )}
       </div>
     </div>
+  );
+}
+
+export function WorkspaceSettingsDialog({
+  open,
+  onOpenChange,
+  workspace,
+}: WorkspaceSettingsDialogProps) {
+  if (!open || !workspace) return null;
+
+  return (
+    <WorkspaceSettingsContent
+      key={workspace.id}
+      workspace={workspace}
+      onOpenChange={onOpenChange}
+    />
   );
 }

@@ -63,7 +63,6 @@ export default function DesignIntentStep2Page() {
   );
 
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
 
@@ -84,7 +83,6 @@ export default function DesignIntentStep2Page() {
 
   React.useEffect(() => {
     async function loadData() {
-      setIsLoading(true);
       try {
         const [intent, personaList] = await Promise.all([
           getDesignIntent(projectId).catch(() => null),
@@ -111,8 +109,8 @@ export default function DesignIntentStep2Page() {
           }
         }
         setPersonas(personaList);
-      } finally {
-        setIsLoading(false);
+      } catch {
+        // Ignored
       }
     }
     if (projectId) {

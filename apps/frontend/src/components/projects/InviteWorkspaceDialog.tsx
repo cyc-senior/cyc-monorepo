@@ -100,7 +100,7 @@ export function InviteWorkspaceDialog({
           setErrorMessage("Failed to send invitations. Please try again.");
         }
       }
-    } catch (err: unknown) {
+    } catch {
       setErrorMessage("Failed to send invitations. Please try again.");
     } finally {
       setIsLoading(false);

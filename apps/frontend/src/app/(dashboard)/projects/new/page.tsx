@@ -8,8 +8,7 @@ import { AlertCircle, Check, Loader2 } from "lucide-react";
 
 export default function CreateProjectPage() {
   const router = useRouter();
-  const { currentWorkspace, workspaces, setCurrentWorkspace, isLoading } =
-    useWorkspace();
+  const { currentWorkspace, isLoading } = useWorkspace();
 
   const [name, setName] = useState("");
   const [clientOrProduct, setClientOrProduct] = useState("");
