@@ -3,14 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  UploadCloud,
-  AlertCircle,
-  Plus,
-  Trash2,
-  Info,
-  Loader2,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +14,14 @@ import {
   uploadWorkspacePicture,
   inviteWorkspaceMember,
 } from "@/services/workspace.service";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  Add01Icon,
+  Cancel01Icon,
+  InformationCircleIcon,
+  AlertCircleIcon,
+} from "@hugeicons/core-free-icons";
+import { Loader2 } from "lucide-react";
 
 export default function CreateWorkspaceScreen8Page() {
   const router = useRouter();
@@ -151,7 +151,7 @@ export default function CreateWorkspaceScreen8Page() {
 
           {serverError && (
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+              <HugeIcon icon={AlertCircleIcon} size={16} />
               <AlertDescription>{serverError}</AlertDescription>
             </Alert>
           )}
@@ -253,7 +253,7 @@ export default function CreateWorkspaceScreen8Page() {
                       onClick={() => handleRemoveEmail(idx)}
                       className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <HugeIcon icon={Cancel01Icon} size={16} />
                     </Button>
                   )}
                 </div>
@@ -267,13 +267,17 @@ export default function CreateWorkspaceScreen8Page() {
               onClick={handleAddEmail}
               className="gap-1.5 text-xs h-8"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <HugeIcon icon={Add01Icon} size={14} />
               <span>Add another</span>
             </Button>
 
             {/* Note banner */}
             <div className="rounded-xl border bg-muted/40 p-3.5 flex items-start gap-2.5 text-xs text-muted-foreground">
-              <Info className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <HugeIcon
+                icon={InformationCircleIcon}
+                size={18}
+                className="shrink-0 text-muted-foreground mt-0.5"
+              />
               <div className="space-y-0.5 leading-relaxed">
                 <p className="font-medium text-foreground">
                   You&apos;ll choose each person&apos;s role when you add them to a project.

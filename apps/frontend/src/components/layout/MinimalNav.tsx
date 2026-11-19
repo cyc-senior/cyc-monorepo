@@ -14,9 +14,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LogOut, User } from "lucide-react";
 import { CYCLogo } from "@/components/logo";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  ArrowDown01Icon,
+  UserIcon,
+  Logout01Icon,
+} from "@hugeicons/core-free-icons";
 
 export function MinimalNav() {
   const router = useRouter();
@@ -56,7 +61,11 @@ export function MinimalNav() {
                 <span className="text-sm font-medium text-foreground max-w-[150px] truncate hidden sm:inline-block">
                   {user.name || user.email}
                 </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <HugeIcon
+                  icon={ArrowDown01Icon}
+                  size={16}
+                  className="text-muted-foreground"
+                />
               </Button>
             </DropdownMenuTrigger>
 
@@ -76,7 +85,7 @@ export function MinimalNav() {
                 onClick={() => setAccountDialogOpen(true)}
                 className="cursor-pointer gap-2"
               >
-                <User className="h-4 w-4" />
+                <HugeIcon icon={UserIcon} size={16} />
                 <span>Account settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -84,7 +93,7 @@ export function MinimalNav() {
                 onClick={logout}
                 className="cursor-pointer gap-2 text-destructive focus:text-destructive"
               >
-                <LogOut className="h-4 w-4" />
+                <HugeIcon icon={Logout01Icon} size={16} />
                 <span>Sign out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>

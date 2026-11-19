@@ -3,19 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Folder,
-  Users,
-  BarChart3,
-  Settings,
-  HelpCircle,
-  ChevronsUpDown,
-  ChevronRight,
-  LogOut,
-  User,
-  Plus,
-  Check,
-} from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +15,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  Folder01Icon,
+  UserGroupIcon,
+  Analytics01Icon,
+  CogIcon,
+  HelpCircleIcon,
+  ArrowUpDownIcon,
+  ArrowRight01Icon,
+  UserIcon,
+  Logout01Icon,
+  Add01Icon,
+} from "@hugeicons/core-free-icons";
 
 interface AppSidebarProps {
   collapsed?: boolean;
@@ -46,7 +46,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
     {
       title: "Projects",
       href: "/projects",
-      icon: Folder,
+      icon: Folder01Icon,
       active: pathname.startsWith("/projects") || pathname === "/dashboard",
     },
     ...(!isTester
@@ -54,13 +54,13 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
           {
             title: "Test Sessions",
             href: "/sessions",
-            icon: Users,
+            icon: UserGroupIcon,
             active: pathname.startsWith("/sessions"),
           },
           {
             title: "Reports",
             href: "/reports",
-            icon: BarChart3,
+            icon: Analytics01Icon,
             active: pathname.startsWith("/reports"),
           },
         ]
@@ -111,7 +111,11 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   </p>
                 </div>
               </div>
-              <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              <HugeIcon
+                icon={ArrowUpDownIcon}
+                size={16}
+                className="text-muted-foreground shrink-0"
+              />
             </DropdownMenuTrigger>
 
             <DropdownMenuContent className="w-60" align="start">
@@ -125,17 +129,14 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   className="flex items-center justify-between cursor-pointer"
                 >
                   <span className="truncate">{ws.name}</span>
-                  {currentWorkspace?.id === ws.id ? (
-                    <Check className="h-4 w-4 text-primary" />
-                  ) : null}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => router.push("/create/workspace")}
+                onClick={() => router.push("/workspaces/new")}
                 className="cursor-pointer gap-2"
               >
-                <Plus className="h-4 w-4" />
+                <HugeIcon icon={Add01Icon} size={16} />
                 <span>Create workspace</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -150,23 +151,20 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               Workspace
             </p>
             <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      item.active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                        : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.title}</span>
-                  </Link>
-                );
-              })}
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    item.active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  }`}
+                >
+                  <HugeIcon icon={item.icon} size={18} className="shrink-0" />
+                  <span>{item.title}</span>
+                </Link>
+              ))}
             </nav>
           </div>
 
@@ -182,10 +180,18 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   className="flex items-center justify-between px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors group"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <HugeIcon
+                      icon={Folder01Icon}
+                      size={18}
+                      className="shrink-0 text-muted-foreground"
+                    />
                     <span className="truncate">All projects</span>
                   </div>
-                  <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <HugeIcon
+                    icon={ArrowRight01Icon}
+                    size={14}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
                 </Link>
               </nav>
             </div>
@@ -199,7 +205,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               href="/settings"
               className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
             >
-              <Settings className="h-4 w-4 shrink-0" />
+              <HugeIcon icon={CogIcon} size={18} className="shrink-0" />
               <span>Workspace settings</span>
             </Link>
           )}
@@ -208,7 +214,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
             href="mailto:support@cyc.app"
             className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
           >
-            <HelpCircle className="h-4 w-4 shrink-0" />
+            <HugeIcon icon={HelpCircleIcon} size={18} className="shrink-0" />
             <span>Help</span>
           </a>
 
@@ -234,7 +240,11 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                     </p>
                   </div>
                 </div>
-                <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                <HugeIcon
+                  icon={ArrowUpDownIcon}
+                  size={16}
+                  className="text-muted-foreground shrink-0"
+                />
               </DropdownMenuTrigger>
 
               <DropdownMenuContent className="w-56" align="start" side="top">
@@ -253,7 +263,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   onClick={() => setAccountDialogOpen(true)}
                   className="cursor-pointer gap-2"
                 >
-                  <User className="h-4 w-4" />
+                  <HugeIcon icon={UserIcon} size={16} />
                   <span>Account settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -261,7 +271,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   onClick={logout}
                   className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <HugeIcon icon={Logout01Icon} size={16} />
                   <span>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

@@ -1,96 +1,54 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { DashboardShell } from "@/components/layout/DashboardShell";
+import type { Workspace } from "@/types/workspace";
 
-import React, { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/auth-context";
-import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
-import { AppSidebar } from "@/components/layout/AppSidebar";
-import { SidebarHeader } from "@/components/layout/SidebarHeader";
-import { MinimalNav } from "@/components/layout/MinimalNav";
-import { Loader2 } from "lucide-react";
+async function getWorkspacesServer(): Promise<Workspace[]> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("accessToken")?.value;
 
-function DashboardShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  if (!accessToken) {
+    return [];
+  }
 
-  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
-  const isPreWorkspaceRoute =
-    pathname === "/first-run" || pathname === "/workspaces/new";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  try {
+    const res = await fetch(`${apiUrl}/organizations`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
 
-  useEffect(() => {
-    if (!workspaceLoading) {
-      if (workspaces.length === 0 && !isPreWorkspaceRoute) {
-        router.replace("/first-run");
-      } else if (workspaces.length > 0 && pathname === "/first-run") {
-        router.replace("/projects");
-      }
+    if (!res.ok) {
+      return [];
     }
-  }, [workspaceLoading, workspaces.length, isPreWorkspaceRoute, pathname, router]);
 
-  if (workspaceLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    const data = await res.json();
+    return Array.isArray(data) ? data : data?.data || [];
+  } catch {
+    return [];
   }
-
-  // Pre-workspace state (Screen 6 First run & Screen 8 Create workspace):
-  // NO sidebar, NO breadcrumbs, minimal top nav with logo & account menu
-  if (hasNoWorkspace || isPreWorkspaceRoute) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <MinimalNav />
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
-      </div>
-    );
-  }
-
-  // Active workspace state: 256px collapsible AppSidebar
-  return (
-    <div className="min-h-screen flex bg-background">
-      <AppSidebar collapsed={sidebarCollapsed} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <SidebarHeader
-          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
-        />
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
-      </div>
-    </div>
-  );
 }
 
-/**
- * Protected dashboard shell with session guard, workspace context,
- * and conditional Hi-fi v2 layout (Screen 6/8 minimal nav vs AppSidebar).
- */
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("accessToken")?.value;
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/signin");
-    }
-  }, [isLoading, user, router]);
-
-  if (isLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+  // If no auth cookie/session, redirect to signin immediately on server
+  if (!accessToken) {
+    redirect("/signin");
   }
 
+  const initialWorkspaces = await getWorkspacesServer();
+
   return (
-    <WorkspaceProvider>
-      <DashboardShell>{children}</DashboardShell>
-    </WorkspaceProvider>
+    <DashboardShell initialWorkspaces={initialWorkspaces}>
+      {children}
+    </DashboardShell>
   );
 }

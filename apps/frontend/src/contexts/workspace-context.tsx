@@ -46,13 +46,19 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
   undefined
 );
 
-export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+export function WorkspaceProvider({
+  initialWorkspaces = [],
+  children,
+}: {
+  initialWorkspaces?: Workspace[];
+  children: React.ReactNode;
+}) {
   const { user } = useAuth();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
-    null
+    initialWorkspaces.length > 0 ? initialWorkspaces[0] : null
   );
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(initialWorkspaces.length === 0);
 
   const refreshWorkspaces = useCallback(async (): Promise<Workspace[]> => {
     if (!user) {

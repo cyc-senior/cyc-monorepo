@@ -3,13 +3,19 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, KeyRound, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { lookupSessionByCode } from "@/services/testing.service";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  Building01Icon,
+  Key01Icon,
+  AlertCircleIcon,
+} from "@hugeicons/core-free-icons";
+import { Loader2 } from "lucide-react";
 
 export default function FirstRunScreen6Page() {
   const router = useRouter();
@@ -32,7 +38,6 @@ export default function FirstRunScreen6Page() {
     setIsJoining(true);
 
     try {
-      // Validate session code against backend lookup API
       await lookupSessionByCode(code);
       router.push(`/sessions/${encodeURIComponent(code)}`);
     } catch (err: unknown) {
@@ -63,7 +68,7 @@ export default function FirstRunScreen6Page() {
         <div className="rounded-2xl border bg-card text-card-foreground p-8 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
             <div className="h-12 w-12 rounded-full bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-400 flex items-center justify-center">
-              <Building2 className="h-6 w-6" />
+              <HugeIcon icon={Building01Icon} size={24} />
             </div>
 
             <div className="space-y-2">
@@ -87,7 +92,7 @@ export default function FirstRunScreen6Page() {
         <div className="rounded-2xl border bg-card text-card-foreground p-8 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
             <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 flex items-center justify-center">
-              <KeyRound className="h-6 w-6" />
+              <HugeIcon icon={Key01Icon} size={24} />
             </div>
 
             <div className="space-y-2">
@@ -103,7 +108,7 @@ export default function FirstRunScreen6Page() {
           <form onSubmit={handleJoinSession} className="space-y-3 pt-6 mt-auto" noValidate>
             {joinError && (
               <Alert variant="destructive" className="py-2">
-                <AlertCircle className="h-4 w-4" />
+                <HugeIcon icon={AlertCircleIcon} size={16} />
                 <AlertDescription className="text-xs">{joinError}</AlertDescription>
               </Alert>
             )}
