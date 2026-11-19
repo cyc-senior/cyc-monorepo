@@ -29,42 +29,38 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [workspaceLoading, workspaces.length, isPreWorkspaceRoute, pathname, router]);
 
-  if (workspaceLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
 
-  // Pre-workspace state (Screen 6 First run & Screen 8 Create workspace):
-  // NO sidebar, NO breadcrumbs, minimal top nav with logo & account menu
-  if (hasNoWorkspace || isPreWorkspaceRoute) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <MinimalNav />
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
-      </div>
-    );
-  }
-
-  // Active workspace state: 256px collapsible AppSidebar
   return (
     <div className="min-h-screen flex bg-background">
-      <AppSidebar collapsed={sidebarCollapsed} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <SidebarHeader
-          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
-        />
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
-      </div>
+      {/* Pre-workspace Top Nav */}
+      {!showSidebar && (
+        <div className="w-full flex flex-col min-h-screen">
+          <MinimalNav />
+          <main className="flex-1 overflow-y-auto w-full">{children}</main>
+        </div>
+      )}
+
+      {/* Active workspace state: 256px collapsible AppSidebar */}
+      {showSidebar && (
+        <>
+          <AppSidebar collapsed={sidebarCollapsed} />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <SidebarHeader
+              onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+            />
+            <main className="flex-1 overflow-y-auto w-full">{children}</main>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 /**
- * Protected dashboard shell with session guard, workspace context,
- * and conditional Hi-fi v2 layout (Screen 6/8 minimal nav vs AppSidebar).
+ * Protected dashboard shell with session guard and workspace context.
+ * Always renders children in the DOM tree so Next.js static prerender
+ * can validate the child route segments without dropping.
  */
 export default function DashboardLayout({
   children,
@@ -80,17 +76,18 @@ export default function DashboardLayout({
     }
   }, [isLoading, user, router]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <WorkspaceProvider>
-      <DashboardShell>{children}</DashboardShell>
+      {isLoading || !user ? (
+        <div className="relative">
+          <div className="flex min-h-screen items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+          <div className="hidden">{children}</div>
+        </div>
+      ) : (
+        <DashboardShell>{children}</DashboardShell>
+      )}
     </WorkspaceProvider>
   );
 }
