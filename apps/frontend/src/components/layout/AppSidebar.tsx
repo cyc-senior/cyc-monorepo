@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { InviteWorkspaceDialog } from "@/components/projects/InviteWorkspaceDialog";
+import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Folder01Icon,
@@ -44,6 +45,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
     useWorkspace();
   const [accountDialogOpen, setAccountDialogOpen] = React.useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
+  const [workspaceSettingsOpen, setWorkspaceSettingsOpen] = React.useState(false);
 
   // Top Nav Items
   const navItems = [
@@ -215,13 +217,14 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t space-y-1">
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+          <button
+            type="button"
+            onClick={() => setWorkspaceSettingsOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors cursor-pointer text-left"
           >
             <HugeIcon icon={Settings01Icon} size={18} className="shrink-0" />
             <span>Workspace settings</span>
-          </Link>
+          </button>
 
           <a
             href="mailto:support@cyc.app"
@@ -305,6 +308,12 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
         onClose={() => setIsInviteDialogOpen(false)}
         workspaceId={currentWorkspace?.id}
         workspaceName={currentWorkspace?.name}
+      />
+      {/* Workspace Settings Modal */}
+      <WorkspaceSettingsDialog
+        open={workspaceSettingsOpen}
+        onOpenChange={setWorkspaceSettingsOpen}
+        workspace={currentWorkspace}
       />
     </>
   );

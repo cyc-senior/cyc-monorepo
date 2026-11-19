@@ -29,6 +29,19 @@ export async function createWorkspace(name: string): Promise<Workspace> {
 }
 
 /**
+ * Updates a workspace (organization) name.
+ */
+export async function updateWorkspace(
+  organizationId: string,
+  name: string
+): Promise<Workspace> {
+  const response = await api.patch<Workspace>(`/organizations/${organizationId}`, {
+    name,
+  });
+  return response.data;
+}
+
+/**
  * Uploads an avatar picture for a workspace.
  */
 export async function uploadWorkspacePicture(
