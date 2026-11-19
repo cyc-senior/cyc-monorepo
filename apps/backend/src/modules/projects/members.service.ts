@@ -70,6 +70,8 @@ export class MembersService {
       select: { userId: true },
     })
     if (!member) {
+      // TODO: Support inviting unregistered users or cross-org emails by creating an invitation token/record
+      // and sending an email invite, instead of rejecting with NotFoundException.
       throw new NotFoundException(
         'That person is not a member of this project’s organization. Ask an organization owner to add them first.',
       )
