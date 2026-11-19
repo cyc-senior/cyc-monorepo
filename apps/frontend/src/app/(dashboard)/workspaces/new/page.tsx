@@ -136,8 +136,8 @@ export default function CreateWorkspaceScreen8Page() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12 flex flex-col justify-center min-h-[calc(100vh-4rem)]">
-      <div className="rounded-2xl border bg-card text-card-foreground p-8 shadow-sm">
+    <div className="max-w-xl mx-auto px-6 py-12 flex flex-col justify-center min-h-[calc(100vh-4rem)]">
+      <div className="rounded-[14px] border border-border bg-card text-card-foreground p-6 shadow-xs">
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {/* Header (Node 814:9817) */}
           <div className="space-y-1">

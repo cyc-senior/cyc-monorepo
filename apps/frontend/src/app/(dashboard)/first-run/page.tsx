@@ -65,14 +65,14 @@ export default function FirstRunScreen6Page() {
       {/* Options Cards (Node 814:9809) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
         {/* Option 1: Create a workspace (Node 814:9810) */}
-        <div className="rounded-2xl border bg-card text-card-foreground p-8 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
+        <div className="rounded-[14px] border border-border bg-card text-card-foreground p-6 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
-            <div className="h-12 w-12 rounded-full bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-400 flex items-center justify-center">
-              <HugeIcon icon={Building01Icon} size={24} />
+            <div className="h-10 w-10 rounded-full bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-400 flex items-center justify-center">
+              <HugeIcon icon={Building01Icon} size={20} />
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground font-heading">
+              <h2 className="text-lg font-bold text-foreground font-heading">
                 Create a workspace
               </h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -81,22 +81,22 @@ export default function FirstRunScreen6Page() {
             </div>
           </div>
 
-          <div className="pt-8 mt-auto">
-            <Button asChild className="w-full h-11 text-sm font-semibold rounded-xl">
+          <div className="pt-6 mt-auto">
+            <Button asChild className="w-full h-8 text-sm font-semibold rounded-[10px]">
               <Link href="/workspaces/new">Create workspace</Link>
             </Button>
           </div>
         </div>
 
         {/* Option 2: Join testing session with a code (Node 814:9823) */}
-        <div className="rounded-2xl border bg-card text-card-foreground p-8 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
+        <div className="rounded-[14px] border border-border bg-card text-card-foreground p-6 flex flex-col justify-between shadow-xs hover:border-primary/50 transition-colors">
           <div className="space-y-4">
-            <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 flex items-center justify-center">
-              <HugeIcon icon={Key01Icon} size={24} />
+            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 flex items-center justify-center">
+              <HugeIcon icon={Key01Icon} size={20} />
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground font-heading">
+              <h2 className="text-lg font-bold text-foreground font-heading">
                 Join testing session with a code
               </h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -105,7 +105,7 @@ export default function FirstRunScreen6Page() {
             </div>
           </div>
 
-          <form onSubmit={handleJoinSession} className="space-y-3 pt-6 mt-auto" noValidate>
+          <form onSubmit={handleJoinSession} className="space-y-3 pt-4 mt-auto" noValidate>
             {joinError && (
               <Alert variant="destructive" className="py-2">
                 <HugeIcon icon={AlertCircleIcon} size={16} />
@@ -125,7 +125,7 @@ export default function FirstRunScreen6Page() {
                   setSessionCode(e.target.value.toUpperCase());
                   if (joinError) setJoinError(null);
                 }}
-                className="h-10 text-sm font-mono uppercase"
+                className="h-8 text-sm font-mono uppercase"
               />
             </div>
 
@@ -133,11 +133,11 @@ export default function FirstRunScreen6Page() {
               type="submit"
               variant="outline"
               disabled={isJoining}
-              className="w-full h-11 text-sm font-semibold rounded-xl cursor-pointer"
+              className="w-full h-8 text-sm font-semibold rounded-[10px] cursor-pointer"
             >
               {isJoining ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
                   <span>Joining...</span>
                 </>
               ) : (
