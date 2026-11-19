@@ -23,8 +23,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Loader2 } from "lucide-react";
 
-export const instant = false;
-
 export default function CreateWorkspaceScreen8Page() {
   const router = useRouter();
   const { refreshWorkspaces, setCurrentWorkspace } = useWorkspace();
