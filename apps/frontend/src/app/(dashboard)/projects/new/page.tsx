@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { createProject } from "@/services/project.service";
-import { DashboardBreadcrumb } from "@/components/dashboard/DashboardBreadcrumb";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
 export default function CreateProjectPage() {
@@ -112,13 +111,6 @@ export default function CreateProjectPage() {
 
   return (
     <div className="flex flex-col flex-1 w-full bg-background min-h-[calc(100vh-4rem)]">
-      {/* Breadcrumb Header */}
-      <DashboardBreadcrumb
-        workspaces={workspaces}
-        currentWorkspace={currentWorkspace}
-        onSelectWorkspace={setCurrentWorkspace}
-        currentPage="New project"
-      />
 
       {/* Main Content Area (Figma Node 491:5322 - 11 · Create project (Hi-fi)) */}
       <main className="flex-1 w-full">

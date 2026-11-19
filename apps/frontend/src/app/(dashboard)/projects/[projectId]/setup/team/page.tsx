@@ -226,7 +226,7 @@ export default function TeamAndRolesStep3Page() {
                 </Label>
                 <Select
                   value={inviteRole}
-                  onValueChange={(val) => setInviteRole(val as ProjectRole)}
+                  onValueChange={(val: string) => setInviteRole(val as ProjectRole)}
                 >
                   <SelectTrigger id="invite-role">
                     <SelectValue />
@@ -327,7 +327,7 @@ export default function TeamAndRolesStep3Page() {
                         ) : (
                           <Select
                             value={member.role}
-                            onValueChange={(val) =>
+                            onValueChange={(val: string) =>
                               handleChangeRole(member.id, val as ProjectRole)
                             }
                           >

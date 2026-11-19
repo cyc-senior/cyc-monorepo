@@ -12,7 +12,6 @@ import {
   CYCProjectCard,
   InviteWorkspaceDialog,
 } from "@/components/projects";
-import { DashboardBreadcrumb } from "@/components/dashboard/DashboardBreadcrumb";
 
 type ProjectFilterTab = "all" | "in-testing" | "in-progress" | "completed";
 
@@ -159,13 +158,6 @@ function ProjectsView() {
 
   return (
     <div className="flex flex-col w-full min-h-[calc(100vh-64px)] bg-background">
-      {/* 1. Breadcrumbs Bar (Figma Node 220:4421) */}
-      <DashboardBreadcrumb
-        workspaces={workspaces}
-        currentWorkspace={currentWorkspace}
-        onSelectWorkspace={setCurrentWorkspace}
-        currentPage="Projects"
-      />
 
       {/* 2. Main Page Content (Figma Node 220:4442) */}
       <main className="w-full max-w-7xl mx-auto px-6 lg:px-20 py-8 lg:py-10 flex flex-col gap-8">
