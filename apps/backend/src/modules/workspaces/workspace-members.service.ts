@@ -10,74 +10,74 @@ import {
   paginate,
   PaginationQueryDto,
 } from '../../common/dto/pagination.dto'
-import { OrganizationRole, Prisma } from '../../generated/prisma/client'
+import { WorkspaceRole, Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import {
-  AddOrganizationMemberDto,
-  OrganizationMemberDto,
+  AddWorkspaceMemberDto,
+  WorkspaceMemberDto,
   PendingInvitationDto,
-} from './dto/organization.dto'
+} from './dto/workspace.dto'
 
 /** How long an invitation to an unregistered email stays claimable. */
 export const INVITATION_TTL_DAYS = 30
 
 const INCLUDE_USER = {
   user: { select: { id: true, email: true, name: true, image: true } },
-} satisfies Prisma.OrganizationMemberInclude
+} satisfies Prisma.WorkspaceMemberInclude
 
 /**
- * Organization team rules: an organization always keeps one ADMIN; removing a
+ * Workspace team rules: a workspace always keeps one ADMIN; removing a
  * member also removes their project memberships (a project can never contain
- * someone outside its organization) unless they are a project's last designer.
+ * someone outside its workspace) unless they are a project's last designer.
  */
 @Injectable()
-export class OrganizationMembersService {
+export class WorkspaceMembersService {
   constructor(private readonly prisma: PrismaService) {}
 
   list(
-    organizationId: string,
+    workspaceId: string,
     query: PaginationQueryDto,
-  ): Promise<Page<OrganizationMemberDto>> {
-    const where = { organizationId }
+  ): Promise<Page<WorkspaceMemberDto>> {
+    const where = { workspaceId }
 
     return paginate(
       query,
       (page) =>
-        this.prisma.organizationMember.findMany({
+        this.prisma.workspaceMember.findMany({
           where,
           include: INCLUDE_USER,
           orderBy: { joinedAt: 'asc' },
           ...page,
         }),
-      () => this.prisma.organizationMember.count({ where }),
+      () => this.prisma.workspaceMember.count({ where }),
     )
   }
 
   /**
    * Adds a registered user by email, or leaves a pending invitation when the
    * email has no account yet. No email is sent; the invitee claims it after
-   * signing in (`POST /organizations/invitations/:invitationId/accept`).
+   * signing in (`POST /workspaces/invitations/:invitationId/accept`).
    */
   async add(
-    organizationId: string,
-    dto: AddOrganizationMemberDto,
+    workspaceId: string,
+    dto: AddWorkspaceMemberDto,
     invitedById?: string,
-  ): Promise<OrganizationMemberDto | PendingInvitationDto> {
+  ): Promise<WorkspaceMemberDto | PendingInvitationDto> {
     const email = dto.email.trim().toLowerCase()
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: { id: true },
     })
     if (user) {
-      return this.prisma.organizationMember.create({
-        data: { organizationId, userId: user.id, role: dto.role },
+      return this.prisma.workspaceMember.create({
+        data: { workspaceId, userId: user.id, role: dto.role },
         include: INCLUDE_USER,
       })
     }
 
-    return this.prisma.organizationInvitation.create({
+    return this.prisma.workspaceInvitation.create({
       data: {
-        organizationId,
+        workspaceId,
         email,
         role: dto.role,
         invitedById,
@@ -87,18 +87,18 @@ export class OrganizationMembersService {
   }
 
   changeRole(
-    organizationId: string,
+    workspaceId: string,
     memberId: string,
-    role: OrganizationRole,
-  ): Promise<OrganizationMemberDto> {
+    role: WorkspaceRole,
+  ): Promise<WorkspaceMemberDto> {
     return this.prisma.$transaction(async (tx) => {
-      await lockKey(tx, `org-admins:${organizationId}`)
-      const target = await this.find(tx, organizationId, memberId)
+      await lockKey(tx, `workspace-admins:${workspaceId}`)
+      const target = await this.find(tx, workspaceId, memberId)
       if (target.role === 'ADMIN' && role !== 'ADMIN') {
-        await this.assertAnotherAdmin(tx, organizationId, target.id)
+        await this.assertAnotherAdmin(tx, workspaceId, target.id)
       }
 
-      return tx.organizationMember.update({
+      return tx.workspaceMember.update({
         where: { id: target.id },
         data: { role },
         include: INCLUDE_USER,
@@ -108,32 +108,32 @@ export class OrganizationMembersService {
 
   /** Removes a member (anyone may remove themselves, admins may remove anyone). */
   async remove(
-    organizationId: string,
+    workspaceId: string,
     memberId: string,
-    actor: { userId: string; role: OrganizationRole },
+    actor: { userId: string; role: WorkspaceRole },
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await lockKey(tx, `org-admins:${organizationId}`)
-      const target = await this.find(tx, organizationId, memberId)
+      await lockKey(tx, `workspace-admins:${workspaceId}`)
+      const target = await this.find(tx, workspaceId, memberId)
       if (target.userId !== actor.userId && actor.role !== 'ADMIN') {
         throw new NotFoundException('Member not found.')
       }
       if (target.role === 'ADMIN') {
-        await this.assertAnotherAdmin(tx, organizationId, target.id)
+        await this.assertAnotherAdmin(tx, workspaceId, target.id)
       }
-      await this.detachFromProjects(tx, organizationId, target.userId)
-      await tx.organizationMember.delete({ where: { id: target.id } })
+      await this.detachFromProjects(tx, workspaceId, target.userId)
+      await tx.workspaceMember.delete({ where: { id: target.id } })
     })
   }
 
-  /** Drops the user's project memberships in the organization. */
+  /** Drops the user's project memberships in the workspace. */
   private async detachFromProjects(
     tx: Prisma.TransactionClient,
-    organizationId: string,
+    workspaceId: string,
     userId: string,
   ): Promise<void> {
     const memberships = await tx.projectMember.findMany({
-      where: { organizationId, userId },
+      where: { workspaceId, userId },
       select: { id: true, projectId: true, role: true },
       orderBy: { projectId: 'asc' },
     })
@@ -155,16 +155,16 @@ export class OrganizationMembersService {
         }
       }
     }
-    await tx.projectMember.deleteMany({ where: { organizationId, userId } })
+    await tx.projectMember.deleteMany({ where: { workspaceId, userId } })
   }
 
   private async find(
     tx: Prisma.TransactionClient,
-    organizationId: string,
+    workspaceId: string,
     id: string,
   ) {
-    const member = await tx.organizationMember.findFirst({
-      where: { id, organizationId },
+    const member = await tx.workspaceMember.findFirst({
+      where: { id, workspaceId },
     })
     if (!member) {
       throw new NotFoundException('Member not found.')
@@ -175,20 +175,18 @@ export class OrganizationMembersService {
 
   private async assertAnotherAdmin(
     tx: Prisma.TransactionClient,
-    organizationId: string,
+    workspaceId: string,
     excludingMemberId: string,
   ) {
-    const others = await tx.organizationMember.count({
+    const others = await tx.workspaceMember.count({
       where: {
-        organizationId,
+        workspaceId,
         role: 'ADMIN',
         id: { not: excludingMemberId },
       },
     })
     if (others === 0) {
-      throw new ConflictException(
-        'An organization must keep at least one admin.',
-      )
+      throw new ConflictException('A workspace must keep at least one admin.')
     }
   }
 }

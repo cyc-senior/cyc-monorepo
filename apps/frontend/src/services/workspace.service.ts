@@ -1,41 +1,41 @@
 import { api } from "@/lib/api-client";
 import type {
-  OrganizationRole,
+  WorkspaceRole,
   PaginatedWorkspacesResponse,
   Workspace,
 } from "@/types/workspace";
 
 /**
- * Fetches all workspaces (organizations) the current user belongs to.
+ * Fetches all workspaces the current user belongs to.
  */
 export async function listWorkspaces(): Promise<Workspace[]> {
-  // Backend: OrganizationDto now includes `avatarUrl`; the returned URL is a
-  // public picture endpoint backed by the organization's stored blob.
+  // Backend: WorkspaceDto now includes `avatarUrl`; the returned URL is a
+  // public picture endpoint backed by the workspace's stored blob.
   const response = await api.get<PaginatedWorkspacesResponse | Workspace[]>(
-    "/organizations"
+    "/workspaces"
   );
   const payload = response.data;
   return Array.isArray(payload) ? payload : payload?.data || [];
 }
 
 /**
- * Creates a new workspace (organization); the caller automatically becomes its ADMIN.
+ * Creates a new workspace; the caller automatically becomes its ADMIN.
  */
 export async function createWorkspace(name: string): Promise<Workspace> {
   // Backend: accepts an optional PNG/JPEG `avatarUrl` data URL; the caller
   // automatically becomes its ADMIN.
-  const response = await api.post<Workspace>("/organizations", { name });
+  const response = await api.post<Workspace>("/workspaces", { name });
   return response.data;
 }
 
 /**
- * Updates a workspace (organization) name.
+ * Updates a workspace name.
  */
 export async function updateWorkspace(
-  organizationId: string,
+  workspaceId: string,
   name: string
 ): Promise<Workspace> {
-  const response = await api.patch<Workspace>(`/organizations/${organizationId}`, {
+  const response = await api.patch<Workspace>(`/workspaces/${workspaceId}`, {
     name,
   });
   return response.data;
@@ -45,15 +45,15 @@ export async function updateWorkspace(
  * Uploads an avatar picture for a workspace.
  */
 export async function uploadWorkspacePicture(
-  organizationId: string,
+  workspaceId: string,
   file: File
 ): Promise<void> {
   const formData = new FormData();
   formData.append("file", file);
 
-  // Backend: POST /organizations/:organizationId/picture accepts a PNG/JPEG
+  // Backend: POST /workspaces/:workspaceId/picture accepts a PNG/JPEG
   // multipart `file` (max 1 MiB) and rotates the public avatar key.
-  await api.post(`/organizations/${organizationId}/picture`, formData, {
+  await api.post(`/workspaces/${workspaceId}/picture`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -64,13 +64,13 @@ export async function uploadWorkspacePicture(
  * Invites a user by email to join a workspace.
  */
 export async function inviteWorkspaceMember(
-  organizationId: string,
+  workspaceId: string,
   email: string,
-  role: OrganizationRole = "MEMBER"
+  role: WorkspaceRole = "MEMBER"
 ): Promise<void> {
   // Backend: unregistered emails become pending invitations (no email sent);
   // the invitee accepts them after signing in.
-  await api.post(`/organizations/${organizationId}/members`, {
+  await api.post(`/workspaces/${workspaceId}/members`, {
     email,
     role,
   });

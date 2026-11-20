@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common'
 
 /** Avatars are small; keep the blob (and its base64 form) bounded. */
-export const ORG_AVATAR_MAX_BYTES = 1024 * 1024
+export const WORKSPACE_AVATAR_MAX_BYTES = 1024 * 1024
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg'] as const
 
@@ -60,9 +60,9 @@ export function parseUploadedAvatar(
 }
 
 function assertSize(size: number): void {
-  if (size === 0 || size > ORG_AVATAR_MAX_BYTES) {
+  if (size === 0 || size > WORKSPACE_AVATAR_MAX_BYTES) {
     throw new BadRequestException(
-      `A picture must be between 1 byte and ${ORG_AVATAR_MAX_BYTES} bytes.`,
+      `A picture must be between 1 byte and ${WORKSPACE_AVATAR_MAX_BYTES} bytes.`,
     )
   }
 }

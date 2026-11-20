@@ -57,7 +57,7 @@ function ProjectsView() {
         }
       } catch (err) {
         console.error(
-          `Failed to fetch projects from GET /organizations/${workspaceId}/projects:`,
+          `Failed to fetch projects from GET /workspaces/${workspaceId}/projects:`,
           err
         );
         if (isMounted) {

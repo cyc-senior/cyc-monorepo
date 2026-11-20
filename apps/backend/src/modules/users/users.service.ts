@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import {
   parseUploadedAvatar,
   UploadedAvatar,
-} from '../organizations/organization-avatar'
+} from '../workspaces/workspace-avatar'
 
 export interface ExternalProfile {
   provider: AuthProvider

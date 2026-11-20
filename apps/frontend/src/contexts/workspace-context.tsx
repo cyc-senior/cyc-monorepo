@@ -10,9 +10,9 @@ import React, {
 } from "react";
 import { useAuth } from "./auth-context";
 import { listWorkspaces } from "@/services/workspace.service";
-import type { OrganizationRole, Workspace } from "@/types/workspace";
+import type { WorkspaceRole, Workspace } from "@/types/workspace";
 
-export type { OrganizationRole, Workspace };
+export type { WorkspaceRole, Workspace };
 
 interface WorkspaceContextType {
   workspaces: Workspace[];
@@ -87,7 +87,7 @@ export function WorkspaceProvider({
       });
       return list;
     } catch (err) {
-      console.error("Failed to fetch workspaces from GET /organizations:", err);
+      console.error("Failed to fetch workspaces from GET /workspaces:", err);
       setWorkspaces([]);
       setCurrentWorkspace(null);
       return [];
@@ -133,7 +133,7 @@ export function WorkspaceProvider({
           return list[0];
         });
       } catch (err) {
-        console.error("Failed to fetch workspaces from GET /organizations:", err);
+        console.error("Failed to fetch workspaces from GET /workspaces:", err);
         if (isMounted) {
           setWorkspaces([]);
           setCurrentWorkspace(null);

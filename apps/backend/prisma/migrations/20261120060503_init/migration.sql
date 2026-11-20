@@ -1,8 +1,38 @@
 -- CreateEnum
-CREATE TYPE "OrganizationRole" AS ENUM ('OWNER', 'DESIGNER', 'MEMBER');
+CREATE TYPE "AuthProvider" AS ENUM ('GOOGLE');
+
+-- CreateEnum
+CREATE TYPE "WorkspaceRole" AS ENUM ('ADMIN', 'MEMBER');
+
+-- CreateEnum
+CREATE TYPE "ProjectRole" AS ENUM ('DESIGNER', 'PROJECT_MANAGER', 'PRODUCT_OWNER', 'CLIENT', 'DEVELOPER');
+
+-- CreateEnum
+CREATE TYPE "ProjectStatus" AS ENUM ('ACTIVE', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "UiLibrary" AS ENUM ('SHADCN', 'MUI');
+
+-- CreateEnum
+CREATE TYPE "Platform" AS ENUM ('DESKTOP', 'MOBILE', 'TABLET');
+
+-- CreateEnum
+CREATE TYPE "PersonaOrigin" AS ENUM ('MANUAL', 'AI');
+
+-- CreateEnum
+CREATE TYPE "UserStoryStatus" AS ENUM ('DRAFT', 'READY', 'ARCHIVED');
 
 -- CreateEnum
 CREATE TYPE "StoryOrigin" AS ENUM ('MANUAL', 'AI');
+
+-- CreateEnum
+CREATE TYPE "DesignRoundStatus" AS ENUM ('DRAFT', 'APPROVED', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "GenerationJobStatus" AS ENUM ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "UIVariantStatus" AS ENUM ('DRAFT', 'READY', 'APPROVED', 'ARCHIVED');
 
 -- CreateEnum
 CREATE TYPE "TestSessionStatus" AS ENUM ('DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED');
@@ -43,62 +73,262 @@ CREATE TYPE "DecisionType" AS ENUM ('VARIANT_APPROVED', 'ANALYSIS_APPROVED', 'AN
 -- CreateEnum
 CREATE TYPE "ReportType" AS ENUM ('DESIGNER', 'CLIENT', 'DEVELOPER', 'PROJECT_MANAGER');
 
--- AlterEnum
--- This migration adds more than one value to an enum.
--- With PostgreSQL versions 11 and earlier, this is not possible
--- in a single migration. This can be worked around by creating
--- multiple migrations, each migration adding only one value to
--- the enum.
+-- CreateTable
+CREATE TABLE "users" (
+    "id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "name" TEXT,
+    "image" TEXT,
+    "avatarKey" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-
-ALTER TYPE "ProjectRole" ADD VALUE 'CLIENT';
-ALTER TYPE "ProjectRole" ADD VALUE 'DEVELOPER';
-
--- AlterEnum
-ALTER TYPE "UIVariantStatus" ADD VALUE 'APPROVED';
-
--- DropForeignKey
-ALTER TABLE "project_members" DROP CONSTRAINT "project_members_projectId_fkey";
-
--- AlterTable
-ALTER TABLE "generation_jobs" ADD COLUMN     "baseVariantId" UUID,
-ADD COLUMN     "idempotencyKey" TEXT;
-
--- AlterTable
-ALTER TABLE "project_members" ADD COLUMN     "organizationId" UUID;
-
--- AlterTable
-ALTER TABLE "projects" ADD COLUMN     "organizationId" UUID;
-
--- AlterTable
-ALTER TABLE "ui_variants" ADD COLUMN     "approvedAt" TIMESTAMP(3),
-ADD COLUMN     "approvedById" UUID,
-ADD COLUMN     "parentVariantId" UUID;
-
--- AlterTable
-ALTER TABLE "user_stories" ADD COLUMN     "generationId" UUID,
-ADD COLUMN     "origin" "StoryOrigin" NOT NULL DEFAULT 'MANUAL';
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
-CREATE TABLE "organizations" (
+CREATE TABLE "accounts" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "provider" "AuthProvider" NOT NULL,
+    "providerAccountId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "refresh_tokens" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "familyId" UUID NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "workspaces" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
+    "createdById" UUID,
+    "avatarKey" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "workspaces_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_avatars" (
+    "userId" UUID NOT NULL,
+    "contentType" TEXT NOT NULL,
+    "byteSize" INTEGER NOT NULL,
+    "data" BYTEA NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_avatars_pkey" PRIMARY KEY ("userId")
+);
+
+-- CreateTable
+CREATE TABLE "workspace_avatars" (
+    "workspaceId" UUID NOT NULL,
+    "contentType" TEXT NOT NULL,
+    "byteSize" INTEGER NOT NULL,
+    "data" BYTEA NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "workspace_avatars_pkey" PRIMARY KEY ("workspaceId")
+);
+
+-- CreateTable
+CREATE TABLE "workspace_invitations" (
+    "id" UUID NOT NULL,
+    "workspaceId" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "role" "WorkspaceRole" NOT NULL,
+    "invitedById" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
+
+    CONSTRAINT "workspace_invitations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "workspace_members" (
+    "id" UUID NOT NULL,
+    "workspaceId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "role" "WorkspaceRole" NOT NULL,
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "workspace_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "projects" (
+    "id" UUID NOT NULL,
+    "workspaceId" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "clientOrProduct" TEXT NOT NULL,
+    "description" TEXT,
+    "platforms" "Platform"[] DEFAULT ARRAY['DESKTOP']::"Platform"[],
+    "status" "ProjectStatus" NOT NULL DEFAULT 'ACTIVE',
     "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "organizations_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "projects_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "organization_members" (
+CREATE TABLE "design_intents" (
     "id" UUID NOT NULL,
-    "organizationId" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "statement" TEXT,
+    "designSystem" "UiLibrary" NOT NULL DEFAULT 'SHADCN',
+    "designStandards" TEXT[] DEFAULT ARRAY['WCAG 2.1 AA']::TEXT[],
+    "designGuidelines" TEXT,
+    "primaryColor" TEXT,
+    "secondaryColor" TEXT,
+    "accentColor" TEXT,
+    "brandGuidelines" TEXT,
+    "toneOfVoice" TEXT,
+    "legacyBrief" JSONB NOT NULL DEFAULT '{}',
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "design_intents_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_personas" (
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "origin" "PersonaOrigin" NOT NULL DEFAULT 'MANUAL',
+    "generationJobId" UUID,
+    "name" TEXT NOT NULL,
+    "age" INTEGER,
+    "shortDescription" TEXT NOT NULL,
+    "behavioralConsiderations" TEXT[],
+    "frustrations" TEXT[],
+    "goals" TEXT[],
+    "tasks" TEXT[],
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_personas_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "project_members" (
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "workspaceId" UUID NOT NULL,
     "userId" UUID NOT NULL,
-    "role" "OrganizationRole" NOT NULL,
+    "role" "ProjectRole" NOT NULL,
     "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "organization_members_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "project_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_stories" (
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "origin" "StoryOrigin" NOT NULL DEFAULT 'MANUAL',
+    "generationId" UUID,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "acceptanceCriteria" TEXT,
+    "problemStatement" TEXT,
+    "status" "UserStoryStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_stories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "design_rounds" (
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "roundNumber" INTEGER NOT NULL,
+    "title" TEXT,
+    "parentRoundId" UUID,
+    "status" "DesignRoundStatus" NOT NULL DEFAULT 'DRAFT',
+    "approvedById" UUID,
+    "approvedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "design_rounds_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "generation_jobs" (
+    "id" UUID NOT NULL,
+    "roundId" UUID NOT NULL,
+    "requestedById" UUID,
+    "uiLibrary" "UiLibrary" NOT NULL,
+    "prompt" TEXT,
+    "baseVariantId" UUID,
+    "idempotencyKey" TEXT,
+    "variantCount" INTEGER NOT NULL,
+    "modelProvider" TEXT NOT NULL,
+    "modelName" TEXT NOT NULL,
+    "status" "GenerationJobStatus" NOT NULL DEFAULT 'QUEUED',
+    "inputSnapshot" JSONB NOT NULL DEFAULT '{}',
+    "outputMetadata" JSONB NOT NULL DEFAULT '{}',
+    "error" TEXT,
+    "startedAt" TIMESTAMP(3),
+    "finishedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "generation_jobs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ui_variants" (
+    "id" UUID NOT NULL,
+    "roundId" UUID NOT NULL,
+    "generationJobId" UUID,
+    "parentVariantId" UUID,
+    "approvedById" UUID,
+    "approvedAt" TIMESTAMP(3),
+    "name" TEXT NOT NULL,
+    "label" TEXT,
+    "uiLibrary" "UiLibrary" NOT NULL,
+    "html" TEXT,
+    "design" JSONB,
+    "accessibility" JSONB NOT NULL DEFAULT '{}',
+    "thumbnailUrl" TEXT,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "status" "UIVariantStatus" NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ui_variants_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "audit_logs" (
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
+    "actorId" UUID,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" UUID,
+    "changes" JSONB NOT NULL DEFAULT '{}',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -160,6 +390,7 @@ CREATE TABLE "session_participants" (
     "id" UUID NOT NULL,
     "sessionId" UUID NOT NULL,
     "email" TEXT NOT NULL,
+    "userId" UUID,
     "displayName" TEXT,
     "status" "ParticipantStatus" NOT NULL DEFAULT 'INVITED',
     "assignedVariantId" UUID,
@@ -377,14 +608,127 @@ CREATE TABLE "reports" (
     CONSTRAINT "reports_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE INDEX "organizations_createdById_idx" ON "organizations"("createdById");
+-- CreateTable
+CREATE TABLE "_VariantStories" (
+    "A" UUID NOT NULL,
+    "B" UUID NOT NULL,
+
+    CONSTRAINT "_VariantStories_AB_pkey" PRIMARY KEY ("A","B")
+);
 
 -- CreateIndex
-CREATE INDEX "organization_members_userId_idx" ON "organization_members"("userId");
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "organization_members_organizationId_userId_key" ON "organization_members"("organizationId", "userId");
+CREATE UNIQUE INDEX "users_avatarKey_key" ON "users"("avatarKey");
+
+-- CreateIndex
+CREATE INDEX "accounts_userId_idx" ON "accounts"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "accounts_provider_providerAccountId_key" ON "accounts"("provider", "providerAccountId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "refresh_tokens_tokenHash_key" ON "refresh_tokens"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "refresh_tokens_userId_idx" ON "refresh_tokens"("userId");
+
+-- CreateIndex
+CREATE INDEX "refresh_tokens_familyId_idx" ON "refresh_tokens"("familyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspaces_avatarKey_key" ON "workspaces"("avatarKey");
+
+-- CreateIndex
+CREATE INDEX "workspaces_createdById_idx" ON "workspaces"("createdById");
+
+-- CreateIndex
+CREATE INDEX "workspace_invitations_email_idx" ON "workspace_invitations"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspace_invitations_workspaceId_email_key" ON "workspace_invitations"("workspaceId", "email");
+
+-- CreateIndex
+CREATE INDEX "workspace_members_userId_idx" ON "workspace_members"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspace_members_workspaceId_userId_key" ON "workspace_members"("workspaceId", "userId");
+
+-- CreateIndex
+CREATE INDEX "projects_workspaceId_idx" ON "projects"("workspaceId");
+
+-- CreateIndex
+CREATE INDEX "projects_createdById_idx" ON "projects"("createdById");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "projects_id_workspaceId_key" ON "projects"("id", "workspaceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "design_intents_projectId_key" ON "design_intents"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_personas_generationJobId_key" ON "user_personas"("generationJobId");
+
+-- CreateIndex
+CREATE INDEX "user_personas_projectId_createdAt_idx" ON "user_personas"("projectId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "project_members_userId_idx" ON "project_members"("userId");
+
+-- CreateIndex
+CREATE INDEX "project_members_workspaceId_userId_idx" ON "project_members"("workspaceId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "project_members_projectId_userId_key" ON "project_members"("projectId", "userId");
+
+-- CreateIndex
+CREATE INDEX "user_stories_projectId_idx" ON "user_stories"("projectId");
+
+-- CreateIndex
+CREATE INDEX "user_stories_generationId_idx" ON "user_stories"("generationId");
+
+-- CreateIndex
+CREATE INDEX "design_rounds_parentRoundId_idx" ON "design_rounds"("parentRoundId");
+
+-- CreateIndex
+CREATE INDEX "design_rounds_approvedById_idx" ON "design_rounds"("approvedById");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "design_rounds_id_projectId_key" ON "design_rounds"("id", "projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "design_rounds_projectId_roundNumber_key" ON "design_rounds"("projectId", "roundNumber");
+
+-- CreateIndex
+CREATE INDEX "generation_jobs_roundId_idx" ON "generation_jobs"("roundId");
+
+-- CreateIndex
+CREATE INDEX "generation_jobs_requestedById_idx" ON "generation_jobs"("requestedById");
+
+-- CreateIndex
+CREATE INDEX "generation_jobs_baseVariantId_idx" ON "generation_jobs"("baseVariantId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "generation_jobs_roundId_idempotencyKey_key" ON "generation_jobs"("roundId", "idempotencyKey");
+
+-- CreateIndex
+CREATE INDEX "ui_variants_roundId_idx" ON "ui_variants"("roundId");
+
+-- CreateIndex
+CREATE INDEX "ui_variants_generationJobId_idx" ON "ui_variants"("generationJobId");
+
+-- CreateIndex
+CREATE INDEX "ui_variants_parentVariantId_idx" ON "ui_variants"("parentVariantId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ui_variants_id_roundId_key" ON "ui_variants"("id", "roundId");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_projectId_createdAt_idx" ON "audit_logs"("projectId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_actorId_idx" ON "audit_logs"("actorId");
 
 -- CreateIndex
 CREATE INDEX "story_generations_projectId_createdAt_idx" ON "story_generations"("projectId", "createdAt");
@@ -412,6 +756,9 @@ CREATE INDEX "session_variants_variantId_idx" ON "session_variants"("variantId")
 
 -- CreateIndex
 CREATE UNIQUE INDEX "session_participants_inviteTokenHash_key" ON "session_participants"("inviteTokenHash");
+
+-- CreateIndex
+CREATE INDEX "session_participants_userId_idx" ON "session_participants"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "session_participants_sessionId_email_key" ON "session_participants"("sessionId", "email");
@@ -495,121 +842,100 @@ CREATE INDEX "round_acknowledgements_userId_idx" ON "round_acknowledgements"("us
 CREATE INDEX "reports_projectId_type_createdAt_idx" ON "reports"("projectId", "type", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "design_rounds_id_projectId_key" ON "design_rounds"("id", "projectId");
-
--- CreateIndex
-CREATE INDEX "generation_jobs_baseVariantId_idx" ON "generation_jobs"("baseVariantId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "generation_jobs_roundId_idempotencyKey_key" ON "generation_jobs"("roundId", "idempotencyKey");
-
--- CreateIndex
-CREATE INDEX "project_members_organizationId_userId_idx" ON "project_members"("organizationId", "userId");
-
--- CreateIndex
-CREATE INDEX "projects_organizationId_idx" ON "projects"("organizationId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "projects_id_organizationId_key" ON "projects"("id", "organizationId");
-
--- CreateIndex
-CREATE INDEX "ui_variants_parentVariantId_idx" ON "ui_variants"("parentVariantId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ui_variants_id_roundId_key" ON "ui_variants"("id", "roundId");
-
--- CreateIndex
-CREATE INDEX "user_stories_generationId_idx" ON "user_stories"("generationId");
-
--- ---------------------------------------------------------------------------
--- Backfill: every existing project is put into an organization.
---   owner of a project = its creator, else its earliest DESIGNER;
---   one organization per distinct owner; a project nobody owns (no creator and
---   no designer) gets its own organization with no members.
--- Nothing is deleted or rewritten; existing members keep access through
--- organization membership (project DESIGNER -> organization DESIGNER).
--- ---------------------------------------------------------------------------
-CREATE TABLE "_project_owner" AS
-SELECT p."id" AS "project_id",
-       COALESCE(
-         p."createdById",
-         (SELECT m."userId" FROM "project_members" m
-           WHERE m."projectId" = p."id" AND m."role" = 'DESIGNER'
-           ORDER BY m."joinedAt" LIMIT 1)
-       ) AS "owner_id"
-FROM "projects" p;
-
-CREATE TABLE "_owner_org" AS
-SELECT o."owner_id", gen_random_uuid() AS "org_id"
-FROM (SELECT DISTINCT "owner_id" FROM "_project_owner" WHERE "owner_id" IS NOT NULL) o;
-
-CREATE TABLE "_project_org" AS
-SELECT po."project_id", COALESCE(oo."org_id", gen_random_uuid()) AS "org_id", (oo."org_id" IS NULL) AS "orphan"
-FROM "_project_owner" po
-LEFT JOIN "_owner_org" oo ON oo."owner_id" = po."owner_id";
-
-INSERT INTO "organizations" ("id", "name", "createdById", "createdAt", "updatedAt")
-SELECT oo."org_id", LEFT(COALESCE(NULLIF(u."name", ''), u."email") || '''s organization', 160), oo."owner_id", now(), now()
-FROM "_owner_org" oo JOIN "users" u ON u."id" = oo."owner_id";
-
-INSERT INTO "organizations" ("id", "name", "createdById", "createdAt", "updatedAt")
-SELECT pr."org_id", LEFT(p."name", 160), NULL, now(), now()
-FROM "_project_org" pr JOIN "projects" p ON p."id" = pr."project_id"
-WHERE pr."orphan";
-
-INSERT INTO "organization_members" ("id", "organizationId", "userId", "role", "joinedAt")
-SELECT gen_random_uuid(), oo."org_id", oo."owner_id", 'OWNER', now() FROM "_owner_org" oo;
-
-INSERT INTO "organization_members" ("id", "organizationId", "userId", "role", "joinedAt")
-SELECT gen_random_uuid(), pr."org_id", m."userId",
-       (CASE WHEN bool_or(m."role" = 'DESIGNER') THEN 'DESIGNER' ELSE 'MEMBER' END)::"OrganizationRole",
-       now()
-FROM "_project_org" pr JOIN "project_members" m ON m."projectId" = pr."project_id"
-GROUP BY pr."org_id", m."userId"
-ON CONFLICT ("organizationId", "userId") DO NOTHING;
-
-UPDATE "projects" p SET "organizationId" = pr."org_id"
-FROM "_project_org" pr WHERE pr."project_id" = p."id";
-
-UPDATE "project_members" m SET "organizationId" = p."organizationId"
-FROM "projects" p WHERE p."id" = m."projectId";
-
-ALTER TABLE "projects" ALTER COLUMN "organizationId" SET NOT NULL;
-ALTER TABLE "project_members" ALTER COLUMN "organizationId" SET NOT NULL;
-
-DROP TABLE "_project_org";
-DROP TABLE "_owner_org";
-DROP TABLE "_project_owner";
+CREATE INDEX "_VariantStories_B_index" ON "_VariantStories"("B");
 
 -- AddForeignKey
-ALTER TABLE "organizations" ADD CONSTRAINT "organizations_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "accounts" ADD CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "organization_members" ADD CONSTRAINT "organization_members_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "organization_members" ADD CONSTRAINT "organization_members_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "projects" ADD CONSTRAINT "projects_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_avatars" ADD CONSTRAINT "user_avatars_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_members" ADD CONSTRAINT "project_members_projectId_organizationId_fkey" FOREIGN KEY ("projectId", "organizationId") REFERENCES "projects"("id", "organizationId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "workspace_avatars" ADD CONSTRAINT "workspace_avatars_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_members" ADD CONSTRAINT "project_members_organizationId_userId_fkey" FOREIGN KEY ("organizationId", "userId") REFERENCES "organization_members"("organizationId", "userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "workspace_invitations" ADD CONSTRAINT "workspace_invitations_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_invitations" ADD CONSTRAINT "workspace_invitations_invitedById_fkey" FOREIGN KEY ("invitedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "design_intents" ADD CONSTRAINT "design_intents_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_personas" ADD CONSTRAINT "user_personas_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_personas" ADD CONSTRAINT "user_personas_generationJobId_fkey" FOREIGN KEY ("generationJobId") REFERENCES "generation_jobs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_projectId_workspaceId_fkey" FOREIGN KEY ("projectId", "workspaceId") REFERENCES "projects"("id", "workspaceId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_workspaceId_userId_fkey" FOREIGN KEY ("workspaceId", "userId") REFERENCES "workspace_members"("workspaceId", "userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_stories" ADD CONSTRAINT "user_stories_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_stories" ADD CONSTRAINT "user_stories_generationId_fkey" FOREIGN KEY ("generationId") REFERENCES "story_generations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "design_rounds" ADD CONSTRAINT "design_rounds_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "design_rounds" ADD CONSTRAINT "design_rounds_parentRoundId_fkey" FOREIGN KEY ("parentRoundId") REFERENCES "design_rounds"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "design_rounds" ADD CONSTRAINT "design_rounds_approvedById_fkey" FOREIGN KEY ("approvedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "generation_jobs" ADD CONSTRAINT "generation_jobs_roundId_fkey" FOREIGN KEY ("roundId") REFERENCES "design_rounds"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "generation_jobs" ADD CONSTRAINT "generation_jobs_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "generation_jobs" ADD CONSTRAINT "generation_jobs_baseVariantId_fkey" FOREIGN KEY ("baseVariantId") REFERENCES "ui_variants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ui_variants" ADD CONSTRAINT "ui_variants_roundId_fkey" FOREIGN KEY ("roundId") REFERENCES "design_rounds"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ui_variants" ADD CONSTRAINT "ui_variants_generationJobId_fkey" FOREIGN KEY ("generationJobId") REFERENCES "generation_jobs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ui_variants" ADD CONSTRAINT "ui_variants_parentVariantId_fkey" FOREIGN KEY ("parentVariantId") REFERENCES "ui_variants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ui_variants" ADD CONSTRAINT "ui_variants_approvedById_fkey" FOREIGN KEY ("approvedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "story_generations" ADD CONSTRAINT "story_generations_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -634,6 +960,9 @@ ALTER TABLE "session_variants" ADD CONSTRAINT "session_variants_variantId_roundI
 
 -- AddForeignKey
 ALTER TABLE "session_participants" ADD CONSTRAINT "session_participants_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "test_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "session_participants" ADD CONSTRAINT "session_participants_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "session_participants" ADD CONSTRAINT "session_participants_sessionId_assignedVariantId_fkey" FOREIGN KEY ("sessionId", "assignedVariantId") REFERENCES "session_variants"("sessionId", "variantId") ON DELETE NO ACTION ON UPDATE CASCADE;
@@ -755,52 +1084,8 @@ ALTER TABLE "reports" ADD CONSTRAINT "reports_roundId_fkey" FOREIGN KEY ("roundI
 -- AddForeignKey
 ALTER TABLE "reports" ADD CONSTRAINT "reports_generatedById_fkey" FOREIGN KEY ("generatedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- ---------------------------------------------------------------------------
--- Integrity rules Prisma cannot express
--- ---------------------------------------------------------------------------
+-- AddForeignKey
+ALTER TABLE "_VariantStories" ADD CONSTRAINT "_VariantStories_A_fkey" FOREIGN KEY ("A") REFERENCES "ui_variants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Feedback is either a comment or an explicit skip; component feedback names its node.
-ALTER TABLE "feedback" ADD CONSTRAINT "feedback_comment_or_skipped_check"
-  CHECK ("skipped" OR ("comment" IS NOT NULL AND length(btrim("comment")) > 0));
-ALTER TABLE "feedback" ADD CONSTRAINT "feedback_component_node_check"
-  CHECK ("scope" <> 'COMPONENT' OR "nodeId" IS NOT NULL);
-ALTER TABLE "feedback" ADD CONSTRAINT "feedback_rating_range_check"
-  CHECK ("rating" IS NULL OR "rating" BETWEEN 1 AND 5);
-
-ALTER TABLE "test_sessions" ADD CONSTRAINT "test_sessions_window_check"
-  CHECK ("expiresAt" IS NULL OR "startsAt" IS NULL OR "expiresAt" > "startsAt");
-
--- Raw participant feedback is immutable: what the participant said is never
--- overwritten (analysis and designer edits live in feedback_themes).
-CREATE FUNCTION "feedback_prevent_update"() RETURNS trigger AS $$
-BEGIN
-  RAISE EXCEPTION 'feedback is immutable (id %)', OLD."id" USING ERRCODE = 'check_violation';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER "feedback_immutable"
-  BEFORE UPDATE ON "feedback"
-  FOR EACH ROW
-  WHEN (
-    NEW."comment" IS DISTINCT FROM OLD."comment"
-    OR NEW."skipped" IS DISTINCT FROM OLD."skipped"
-    OR NEW."rating" IS DISTINCT FROM OLD."rating"
-    OR NEW."scope" IS DISTINCT FROM OLD."scope"
-    OR NEW."nodeId" IS DISTINCT FROM OLD."nodeId"
-    OR NEW."screenId" IS DISTINCT FROM OLD."screenId"
-    OR NEW."participantId" IS DISTINCT FROM OLD."participantId"
-    OR NEW."variantId" IS DISTINCT FROM OLD."variantId"
-    OR NEW."sessionId" IS DISTINCT FROM OLD."sessionId"
-  )
-  EXECUTE FUNCTION "feedback_prevent_update"();
-
--- Consent history is append-only.
-CREATE FUNCTION "consent_records_prevent_update"() RETURNS trigger AS $$
-BEGIN
-  RAISE EXCEPTION 'consent records are append-only' USING ERRCODE = 'check_violation';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER "consent_records_no_update"
-  BEFORE UPDATE ON "consent_records"
-  FOR EACH ROW EXECUTE FUNCTION "consent_records_prevent_update"();
+-- AddForeignKey
+ALTER TABLE "_VariantStories" ADD CONSTRAINT "_VariantStories_B_fkey" FOREIGN KEY ("B") REFERENCES "user_stories"("id") ON DELETE CASCADE ON UPDATE CASCADE;

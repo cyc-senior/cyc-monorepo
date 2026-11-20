@@ -17,7 +17,7 @@ export interface ProjectMemberSummary {
 
 export interface ProjectWithRole {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   name: string;
   clientOrProduct: string;
   description: string | null;

@@ -22,9 +22,9 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { Public } from '../auth/decorators/public.decorator'
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface'
 import {
-  ORG_AVATAR_MAX_BYTES,
+  WORKSPACE_AVATAR_MAX_BYTES,
   UploadedAvatar,
-} from '../organizations/organization-avatar'
+} from '../workspaces/workspace-avatar'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { UserResponseDto } from './dto/user-response.dto'
 import { UsersService } from './users.service'
@@ -76,7 +76,7 @@ export class UsersController {
   @Post('me/picture')
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: ORG_AVATAR_MAX_BYTES, files: 1 },
+      limits: { fileSize: WORKSPACE_AVATAR_MAX_BYTES, files: 1 },
     }),
   )
   async uploadPicture(

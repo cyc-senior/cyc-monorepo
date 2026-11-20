@@ -3,8 +3,8 @@ import { ApiTags } from '@nestjs/swagger'
 
 import { UuidParam } from '../../common/decorators/uuid-param.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
-import { AuthorizeOrg } from '../access/authorize-org.decorator'
-import { OrgPermission } from '../access/org-permissions'
+import { AuthorizeWorkspace } from '../access/authorize-workspace.decorator'
+import { WorkspacePermission } from '../access/workspace-permissions'
 import { AuditEntity } from '../audit/audit.decorators'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import {
@@ -14,34 +14,34 @@ import {
 } from './dto/project.dto'
 import { ProjectsService } from './projects.service'
 
-/** Projects are opened inside an organization; this is the only way to create one. */
+/** Projects are opened inside a workspace; this is the only way to create one. */
 @ApiTags('projects')
 @AuditEntity('Project')
-@Controller('organizations/:organizationId/projects')
-export class OrganizationProjectsController {
+@Controller('workspaces/:workspaceId/projects')
+export class WorkspaceProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   /**
-   * List the caller's projects in the organization.
+   * List the caller's projects in the workspace.
    *
-   * @remarks Organization membership is not project access: only projects the
+   * @remarks Workspace membership is not project access: only projects the
    * caller is a member of are listed.
    */
   @Get()
-  @AuthorizeOrg(OrgPermission.OrgRead)
+  @AuthorizeWorkspace(WorkspacePermission.WorkspaceRead)
   @ApiPaginatedResponse(ProjectWithRoleDto)
   list(
-    @UuidParam('organizationId') organizationId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser('id') userId: string,
     @Query() query: ProjectQueryDto,
   ): Promise<Page<ProjectWithRoleDto>> {
-    return this.projects.list(userId, { ...query, organizationId })
+    return this.projects.list(userId, { ...query, workspaceId })
   }
 
   /**
    * Create a project.
    *
-   * @remarks Requires the organization role ADMIN. Takes the project name,
+   * @remarks Requires the workspace role ADMIN. Takes the project name,
    * the client or product, a description and the platforms to design and test
    * for. The caller becomes the project's DESIGNER. Next step: define the
    * design intent (`PUT /projects/{projectId}/design-intent`) and its user
@@ -49,12 +49,12 @@ export class OrganizationProjectsController {
    * (#1) is created with the project.
    */
   @Post()
-  @AuthorizeOrg(OrgPermission.OrgProjectCreate)
+  @AuthorizeWorkspace(WorkspacePermission.WorkspaceProjectCreate)
   create(
-    @UuidParam('organizationId') organizationId: string,
+    @UuidParam('workspaceId') workspaceId: string,
     @CurrentUser('id') userId: string,
     @Body() dto: CreateProjectDto,
   ): Promise<ProjectWithRoleDto> {
-    return this.projects.create(userId, organizationId, dto)
+    return this.projects.create(userId, workspaceId, dto)
   }
 }

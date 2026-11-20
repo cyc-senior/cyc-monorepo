@@ -5,23 +5,23 @@ import { ConfigService } from '@nestjs/config'
 
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { EnvironmentVariables } from '../../config/env.validation'
-import { OrganizationRole, Prisma } from '../../generated/prisma/client'
+import { WorkspaceRole, Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import {
-  CreateOrganizationDto,
-  OrganizationDto,
-  OrganizationQueryDto,
-  OrganizationWithRoleDto,
-  UpdateOrganizationDto,
-} from './dto/organization.dto'
+  CreateWorkspaceDto,
+  WorkspaceDto,
+  WorkspaceQueryDto,
+  WorkspaceWithRoleDto,
+  UpdateWorkspaceDto,
+} from './dto/workspace.dto'
 import {
   parseAvatarDataUrl,
   parseUploadedAvatar,
   UploadedAvatar,
-} from './organization-avatar'
+} from './workspace-avatar'
 
 /** Only the avatar's type is needed to build its URL, never its bytes. */
-const ORG_FIELDS = {
+const WORKSPACE_FIELDS = {
   id: true,
   name: true,
   createdById: true,
@@ -29,14 +29,14 @@ const ORG_FIELDS = {
   updatedAt: true,
   avatarKey: true,
   avatar: { select: { contentType: true } },
-} satisfies Prisma.OrganizationSelect
+} satisfies Prisma.WorkspaceSelect
 
-type OrganizationRow = Prisma.OrganizationGetPayload<{
-  select: typeof ORG_FIELDS
+type WorkspaceRow = Prisma.WorkspaceGetPayload<{
+  select: typeof WORKSPACE_FIELDS
 }>
 
 @Injectable()
-export class OrganizationsService {
+export class WorkspacesService {
   private readonly apiUrl: string
 
   constructor(
@@ -48,89 +48,87 @@ export class OrganizationsService {
       .replace(/\/$/, '')
   }
 
-  /** Organizations the user belongs to, with their role in each. */
+  /** Workspaces the user belongs to, with their role in each. */
   list(
     userId: string,
-    query: OrganizationQueryDto,
-  ): Promise<Page<OrganizationWithRoleDto>> {
+    query: WorkspaceQueryDto,
+  ): Promise<Page<WorkspaceWithRoleDto>> {
     const where = { userId }
 
     return paginate(
       query,
       async (page) => {
-        const memberships = await this.prisma.organizationMember.findMany({
+        const memberships = await this.prisma.workspaceMember.findMany({
           where,
-          include: { organization: { select: ORG_FIELDS } },
-          orderBy: { organization: { createdAt: 'desc' } },
+          include: { workspace: { select: WORKSPACE_FIELDS } },
+          orderBy: { workspace: { createdAt: 'desc' } },
           ...page,
         })
 
-        return memberships.map(({ organization, role }) => ({
-          ...this.toDto(organization),
+        return memberships.map(({ workspace, role }) => ({
+          ...this.toDto(workspace),
           role,
         }))
       },
-      () => this.prisma.organizationMember.count({ where }),
+      () => this.prisma.workspaceMember.count({ where }),
     )
   }
 
-  /** Creates an organization; the creator becomes its ADMIN. */
+  /** Creates a workspace; the creator becomes its ADMIN. */
   async create(
     userId: string,
-    dto: CreateOrganizationDto,
-  ): Promise<OrganizationWithRoleDto> {
+    dto: CreateWorkspaceDto,
+  ): Promise<WorkspaceWithRoleDto> {
     const avatar = dto.avatarUrl ? parseAvatarDataUrl(dto.avatarUrl) : null
 
     return this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
+      const workspace = await tx.workspace.create({
         data: {
           name: dto.name,
           createdById: userId,
+          avatarKey: avatar ? randomUUID() : undefined,
           avatar: avatar ? { create: avatar } : undefined,
         },
-        select: ORG_FIELDS,
+        select: WORKSPACE_FIELDS,
       })
-      await tx.organizationMember.create({
-        data: { organizationId: organization.id, userId, role: 'ADMIN' },
+      await tx.workspaceMember.create({
+        data: { workspaceId: workspace.id, userId, role: 'ADMIN' },
       })
 
-      return { ...this.toDto(organization), role: 'ADMIN' as OrganizationRole }
+      return { ...this.toDto(workspace), role: 'ADMIN' as WorkspaceRole }
     })
   }
 
-  async get(
-    id: string,
-    role: OrganizationRole,
-  ): Promise<OrganizationWithRoleDto> {
-    const organization = await this.prisma.organization.findUniqueOrThrow({
+  async get(id: string, role: WorkspaceRole): Promise<WorkspaceWithRoleDto> {
+    const workspace = await this.prisma.workspace.findUniqueOrThrow({
       where: { id },
-      select: ORG_FIELDS,
+      select: WORKSPACE_FIELDS,
     })
 
-    return { ...this.toDto(organization), role }
+    return { ...this.toDto(workspace), role }
   }
 
-  update(id: string, dto: UpdateOrganizationDto): Promise<OrganizationDto> {
-    return this.prisma.organization
+  update(id: string, dto: UpdateWorkspaceDto): Promise<WorkspaceDto> {
+    return this.prisma.workspace
       .update({
         where: { id },
         data: { name: dto.name },
-        select: ORG_FIELDS,
+        select: WORKSPACE_FIELDS,
       })
-      .then((organization) => this.toDto(organization))
+      .then((workspace) => this.toDto(workspace))
   }
 
   /** Replaces the picture (or adds the first one) and rotates its public key. */
   uploadPicture(
-    organizationId: string,
+    workspaceId: string,
     file: UploadedAvatar | undefined,
   ): Promise<string> {
     const avatar = parseUploadedAvatar(file)
     const key = randomUUID()
 
-    return this.prisma.organization
+    return this.prisma.workspace
       .update({
-        where: { id: organizationId },
+        where: { id: workspaceId },
         data: {
           avatarKey: key,
           avatar: {
@@ -142,7 +140,7 @@ export class OrganizationsService {
         },
         select: { avatarKey: true },
       })
-      .then(({ avatarKey }) => this.pictureUrl(organizationId, avatarKey))
+      .then(({ avatarKey }) => this.pictureUrl(workspaceId, avatarKey))
   }
 
   /**
@@ -150,25 +148,25 @@ export class OrganizationsService {
    * token), so the URL carries an unguessable key that upload/removal rotates.
    */
   async picture(
-    organizationId: string,
+    workspaceId: string,
     key: string,
   ): Promise<{ contentType: string; data: Uint8Array } | null> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
       select: {
         avatarKey: true,
         avatar: { select: { contentType: true, data: true } },
       },
     })
-    if (!organization?.avatar || organization.avatarKey !== key) {
+    if (!workspace?.avatar || workspace.avatarKey !== key) {
       return null
     }
 
-    return organization.avatar
+    return workspace.avatar
   }
 
   /**
-   * Deletes an organization that has no projects.
+   * Deletes a workspace that has no projects.
    *
    * @throws ConflictException while it still owns projects (their data must
    *   not disappear as a side effect).
@@ -176,20 +174,19 @@ export class OrganizationsService {
   async remove(id: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const projects = await tx.project.count({
-        where: { organizationId: id },
+        where: { workspaceId: id },
       })
       if (projects > 0) {
         throw new ConflictException(
-          'Delete or move the organization’s projects first.',
+          'Delete or move the workspace’s projects first.',
         )
       }
-      await tx.organization.delete({ where: { id } })
+      await tx.workspace.delete({ where: { id } })
     })
   }
 
-  private toDto(organization: OrganizationRow): OrganizationDto {
-    const { id, name, createdById, createdAt, updatedAt, avatarKey } =
-      organization
+  private toDto(workspace: WorkspaceRow): WorkspaceDto {
+    const { id, name, createdById, createdAt, updatedAt, avatarKey } = workspace
 
     return {
       id,
@@ -202,11 +199,11 @@ export class OrganizationsService {
   }
 
   private pictureUrl(
-    organizationId: string,
+    workspaceId: string,
     avatarKey: string | null,
   ): string | null {
     return avatarKey
-      ? `${this.apiUrl}/organizations/${organizationId}/picture?key=${encodeURIComponent(avatarKey)}`
+      ? `${this.apiUrl}/workspaces/${workspaceId}/picture?key=${encodeURIComponent(avatarKey)}`
       : null
   }
 }

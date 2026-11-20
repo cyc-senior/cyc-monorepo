@@ -9,9 +9,9 @@ import {
 
 import { EmailField } from '../../../common/decorators/email-field.decorator'
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
-import { OrganizationRole } from '../../../generated/prisma/client'
+import { WorkspaceRole } from '../../../generated/prisma/client'
 
-export class CreateOrganizationDto {
+export class CreateWorkspaceDto {
   /** @example 'Acme Design Studio' */
   @IsString()
   @IsNotEmpty()
@@ -29,14 +29,14 @@ export class CreateOrganizationDto {
   avatarUrl?: string
 }
 
-export class UpdateOrganizationDto {
+export class UpdateWorkspaceDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(160)
   name: string
 }
 
-export class OrganizationDto {
+export class WorkspaceDto {
   @ApiProperty({ format: 'uuid' })
   id: string
 
@@ -57,34 +57,34 @@ export class OrganizationDto {
   updatedAt: Date
 }
 
-/** Response of `POST /organizations/:organizationId/picture`. */
-export class OrganizationPictureDto {
+/** Response of `POST /workspaces/:workspaceId/picture`. */
+export class WorkspacePictureDto {
   avatarUrl: string
 }
 
-export class OrganizationWithRoleDto extends OrganizationDto {
-  /** The caller's role in this organization. */
-  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
-  role: OrganizationRole
+export class WorkspaceWithRoleDto extends WorkspaceDto {
+  /** The caller's role in this workspace. */
+  @ApiProperty({ enum: WorkspaceRole, enumName: 'WorkspaceRole' })
+  role: WorkspaceRole
 }
 
-export class AddOrganizationMemberDto {
+export class AddWorkspaceMemberDto {
   /** Email of a user who has already signed in once. */
   @EmailField()
   email: string
 
-  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
-  @IsEnum(OrganizationRole)
-  role: OrganizationRole
+  @ApiProperty({ enum: WorkspaceRole, enumName: 'WorkspaceRole' })
+  @IsEnum(WorkspaceRole)
+  role: WorkspaceRole
 }
 
-export class UpdateOrganizationMemberDto {
-  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
-  @IsEnum(OrganizationRole)
-  role: OrganizationRole
+export class UpdateWorkspaceMemberDto {
+  @ApiProperty({ enum: WorkspaceRole, enumName: 'WorkspaceRole' })
+  @IsEnum(WorkspaceRole)
+  role: WorkspaceRole
 }
 
-export class OrganizationMemberUserDto {
+export class WorkspaceMemberUserDto {
   @ApiProperty({ format: 'uuid' })
   id: string
 
@@ -102,13 +102,13 @@ export class PendingInvitationDto {
   id: string
 
   @ApiProperty({ format: 'uuid' })
-  organizationId: string
+  workspaceId: string
 
   @ApiProperty({ format: 'email' })
   email: string
 
-  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
-  role: OrganizationRole
+  @ApiProperty({ enum: WorkspaceRole, enumName: 'WorkspaceRole' })
+  role: WorkspaceRole
 
   @ApiProperty({ format: 'uuid' })
   invitedById: string | null
@@ -118,23 +118,23 @@ export class PendingInvitationDto {
   expiresAt: Date | null
 }
 
-export class OrganizationMemberDto {
+export class WorkspaceMemberDto {
   /** Membership id. */
   @ApiProperty({ format: 'uuid' })
   id: string
 
   @ApiProperty({ format: 'uuid' })
-  organizationId: string
+  workspaceId: string
 
   @ApiProperty({ format: 'uuid' })
   userId: string
 
-  @ApiProperty({ enum: OrganizationRole, enumName: 'OrganizationRole' })
-  role: OrganizationRole
+  @ApiProperty({ enum: WorkspaceRole, enumName: 'WorkspaceRole' })
+  role: WorkspaceRole
 
   joinedAt: Date
 
-  user: OrganizationMemberUserDto
+  user: WorkspaceMemberUserDto
 }
 
-export class OrganizationQueryDto extends PaginationQueryDto {}
+export class WorkspaceQueryDto extends PaginationQueryDto {}

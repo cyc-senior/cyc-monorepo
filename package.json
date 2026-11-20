@@ -17,6 +17,7 @@
     "db:deploy": "pnpm --filter backend run db:deploy",
     "db:seed": "pnpm --filter backend run db:seed",
     "db:studio": "pnpm --filter backend run db:studio",
+    "db:reset": "pnpm --filter backend run db:reset",
     "dev:token": "pnpm --filter backend run dev:token",
     "build": "turbo run build",
     "lint": "turbo run lint",

@@ -1,9 +1,9 @@
-export type OrganizationRole = "ADMIN" | "MEMBER";
+export type WorkspaceRole = "ADMIN" | "MEMBER";
 
 export interface Workspace {
   id: string;
   name: string;
-  role?: OrganizationRole;
+  role?: WorkspaceRole;
   avatarUrl?: string | null;
   createdById?: string | null;
   createdAt?: string;

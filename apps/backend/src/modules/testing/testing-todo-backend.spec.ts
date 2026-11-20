@@ -119,7 +119,7 @@ describe('testing frontend TODO support', () => {
               project: {
                 name: 'Fintech checkout',
                 platforms: ['MOBILE'],
-                organization: { name: 'Studio workspace' },
+                workspace: { name: 'Studio workspace' },
               },
               tasks: [{ title: 'Book a study room' }],
             },

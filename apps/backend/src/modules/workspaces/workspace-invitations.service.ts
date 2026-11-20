@@ -12,35 +12,32 @@ import {
 } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
-import {
-  OrganizationMemberDto,
-  PendingInvitationDto,
-} from './dto/organization.dto'
+import { WorkspaceMemberDto, PendingInvitationDto } from './dto/workspace.dto'
 
 const INCLUDE_USER = {
   user: { select: { id: true, email: true, name: true, image: true } },
-} satisfies Prisma.OrganizationMemberInclude
+} satisfies Prisma.WorkspaceMemberInclude
 
 /** Pending invitations: no mail is sent, the invitee claims one after sign-in. */
 @Injectable()
-export class OrganizationInvitationsService {
+export class WorkspaceInvitationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   list(
-    organizationId: string,
+    workspaceId: string,
     query: PaginationQueryDto,
   ): Promise<Page<PendingInvitationDto>> {
-    const where = { organizationId }
+    const where = { workspaceId }
 
     return paginate(
       query,
       (page) =>
-        this.prisma.organizationInvitation.findMany({
+        this.prisma.workspaceInvitation.findMany({
           where,
           orderBy: { createdAt: 'desc' },
           ...page,
         }),
-      () => this.prisma.organizationInvitation.count({ where }),
+      () => this.prisma.workspaceInvitation.count({ where }),
     )
   }
 
@@ -54,19 +51,19 @@ export class OrganizationInvitationsService {
     return paginate(
       query,
       (page) =>
-        this.prisma.organizationInvitation.findMany({
+        this.prisma.workspaceInvitation.findMany({
           where,
-          include: { organization: { select: { name: true } } },
+          include: { workspace: { select: { name: true } } },
           orderBy: { createdAt: 'desc' },
           ...page,
         }),
-      () => this.prisma.organizationInvitation.count({ where }),
+      () => this.prisma.workspaceInvitation.count({ where }),
     )
   }
 
-  async cancel(organizationId: string, invitationId: string): Promise<void> {
-    const deleted = await this.prisma.organizationInvitation.deleteMany({
-      where: { id: invitationId, organizationId },
+  async cancel(workspaceId: string, invitationId: string): Promise<void> {
+    const deleted = await this.prisma.workspaceInvitation.deleteMany({
+      where: { id: invitationId, workspaceId },
     })
     if (deleted.count === 0) {
       throw new NotFoundException('Invitation not found.')
@@ -77,9 +74,9 @@ export class OrganizationInvitationsService {
   async accept(
     invitationId: string,
     user: { id: string; email: string },
-  ): Promise<OrganizationMemberDto> {
+  ): Promise<WorkspaceMemberDto> {
     return this.prisma.$transaction(async (tx) => {
-      const invitation = await tx.organizationInvitation.findUniqueOrThrow({
+      const invitation = await tx.workspaceInvitation.findUniqueOrThrow({
         where: { id: invitationId },
       })
       if (invitation.email !== user.email.trim().toLowerCase()) {
@@ -91,15 +88,15 @@ export class OrganizationInvitationsService {
         throw new ConflictException('This invitation has expired.')
       }
 
-      const member = await tx.organizationMember.create({
+      const member = await tx.workspaceMember.create({
         data: {
-          organizationId: invitation.organizationId,
+          workspaceId: invitation.workspaceId,
           userId: user.id,
           role: invitation.role,
         },
         include: INCLUDE_USER,
       })
-      await tx.organizationInvitation.delete({ where: { id: invitationId } })
+      await tx.workspaceInvitation.delete({ where: { id: invitationId } })
 
       return member
     })

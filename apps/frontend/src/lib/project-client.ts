@@ -19,7 +19,7 @@ export interface CreateProjectPayload {
 
 export interface ProjectDetails {
   id: string;
-  organizationId: string;
+  workspaceId: string;
   name: string;
   clientOrProduct: string;
   platforms: ProjectPlatform[];
@@ -127,10 +127,10 @@ export interface StartGenerationJobPayload {
 
 /** Project API calls */
 export async function createProject(
-  orgId: string,
+  workspaceId: string,
   payload: CreateProjectPayload
 ): Promise<ProjectDetails> {
-  return apiFetch<ProjectDetails>(`/organizations/${orgId}/projects`, {
+  return apiFetch<ProjectDetails>(`/workspaces/${workspaceId}/projects`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

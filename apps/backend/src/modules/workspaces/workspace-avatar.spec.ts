@@ -1,10 +1,10 @@
 import { BadRequestException } from '@nestjs/common'
 
 import {
-  ORG_AVATAR_MAX_BYTES,
+  WORKSPACE_AVATAR_MAX_BYTES,
   parseAvatarDataUrl,
   parseUploadedAvatar,
-} from './organization-avatar'
+} from './workspace-avatar'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -25,7 +25,7 @@ describe('workspace picture validation', () => {
   })
 
   it('rejects oversized data URLs', () => {
-    const huge = 'a'.repeat((ORG_AVATAR_MAX_BYTES + 1) * 2)
+    const huge = 'a'.repeat((WORKSPACE_AVATAR_MAX_BYTES + 1) * 2)
 
     expect(() => parseAvatarDataUrl(`data:image/png;base64,${huge}`)).toThrow(
       BadRequestException,

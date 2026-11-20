@@ -81,20 +81,20 @@ export class ProjectQueryDto extends PaginationQueryDto {
   @MaxLength(160)
   search?: string
 
-  /** Only projects of this organization. */
+  /** Only projects of this workspace. */
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  organizationId?: string
+  workspaceId?: string
 }
 
 export class ProjectDto {
   @ApiProperty({ format: 'uuid' })
   id: string
 
-  /** The organization the project belongs to (fixed at creation). */
+  /** The workspace the project belongs to (fixed at creation). */
   @ApiProperty({ format: 'uuid' })
-  organizationId: string
+  workspaceId: string
 
   name: string
 

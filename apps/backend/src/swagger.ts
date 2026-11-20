@@ -11,12 +11,12 @@ const TAGS: Array<[string, string]> = [
   ['auth', 'Sign-in and token refresh.'],
   ['users', 'The signed-in user.'],
   [
-    'organizations',
-    'The tenant boundary: an organization, its members and who may open projects.',
+    'workspaces',
+    'The tenant boundary: a workspace, its members and who may open projects.',
   ],
   [
     'projects',
-    'The workspace inside an organization: name, client or product, description, platforms, and the caller’s role.',
+    'The workspace inside a workspace: name, client or product, description, platforms, and the caller’s role.',
   ],
   ['members', 'The project team, and each member’s role.'],
   [
@@ -25,7 +25,7 @@ const TAGS: Array<[string, string]> = [
   ],
   [
     'personas',
-    'User personas of a project (Organization → Project → User Persona), written by designers or synthesized from design prompts.',
+    'User personas of a project (Workspace → Project → User Persona), written by designers or synthesized from design prompts.',
   ],
   ['user-stories', 'Problems and acceptance criteria designs address.'],
   ['design-rounds', 'Iterations of a project; approving one freezes it.'],
@@ -84,11 +84,11 @@ nothing generated or analysed is approved, selected or applied without an
 explicit designer action.
 
 ## Workflow (milestones M1–M3, designer)
-1. **Sign in** with Google, then **create an organization** (you become its ADMIN).
-2. **Create a project** in it (org ADMIN): name, client or product, description
+1. **Sign in** with Google, then **create a workspace** (you become its ADMIN).
+2. **Create a project** in it (workspace ADMIN): name, client or product, description
    and the platforms to test (\`DESKTOP\`, \`MOBILE\`, \`TABLET\`). You become the
    project's DESIGNER; project roles (DESIGNER, PROJECT_MANAGER, PRODUCT_OWNER,
-   DEVELOPER, CLIENT) are separate from organization roles (ADMIN, MEMBER).
+   DEVELOPER, CLIENT) are separate from workspace roles (ADMIN, MEMBER).
 3. **Define the design intent**: \`PUT .../design-intent\` (design system &
    standards, brand & CI with three colors, tone of voice, intent statement) and
    **user personas** (\`POST .../personas\`: name, age, short description,
@@ -114,7 +114,7 @@ separate, short-lived tester token that only works on \`/testing/...\`.
 
 ## Access control
 Two scopes, both checked on the server on every request:
-- **Organization** roles (ADMIN, MEMBER) decide who manages the organization
+- **Workspace** roles (ADMIN, MEMBER) decide who manages the workspace
   and who opens projects (ADMIN). They never grant project access.
 - **Project** roles (below) decide everything inside a project. Each endpoint
   lists the permission it needs and the roles that hold it. A caller who is not
@@ -122,8 +122,8 @@ Two scopes, both checked on the server on every request:
 
 ${permissionTable()}
 
-Membership rules: a project member must belong to the project's organization;
-a project always keeps at least one DESIGNER; an organization always keeps one
+Membership rules: a project member must belong to the project's workspace;
+a project always keeps at least one DESIGNER; a workspace always keeps one
 ADMIN; anyone can leave.
 
 ## Conventions

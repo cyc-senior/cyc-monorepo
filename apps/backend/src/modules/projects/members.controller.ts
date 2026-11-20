@@ -44,13 +44,13 @@ export class MembersController {
   }
 
   /**
-   * Add a member of the project's organization to the project with a role.
+   * Add a member of the project's workspace to the project with a role.
    *
    * @remarks As DESIGNER (co-owner), PROJECT_MANAGER, PRODUCT_OWNER, DEVELOPER
-   * or CLIENT. Project roles are separate from organization roles. The person
+   * or CLIENT. Project roles are separate from workspace roles. The person
    * must already belong to the
-   * organization; anyone else gets the same 404.
-   * @throws {404} Not a member of the project's organization.
+   * workspace; anyone else gets the same 404.
+   * @throws {404} Not a member of the project's workspace.
    * @throws {409} The user is already a member.
    */
   @Post()
@@ -60,7 +60,7 @@ export class MembersController {
     @Access() access: AccessContext,
     @Body() dto: AddMemberDto,
   ): Promise<MemberDto> {
-    return this.members.add(projectId, access.organizationId, dto)
+    return this.members.add(projectId, access.workspaceId, dto)
   }
 
   /**

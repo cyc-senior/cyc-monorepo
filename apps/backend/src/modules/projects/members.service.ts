@@ -52,35 +52,35 @@ export class MembersService {
   }
 
   /**
-   * Adds a member of the project's organization (looked up by email). Anyone
+   * Adds a member of the project's workspace (looked up by email). Anyone
    * else — unknown, or merely registered elsewhere — gets the same answer, so
    * this cannot be used to find out who has an account. The composite foreign
    * keys on `project_members` back this up in the database.
    */
   async add(
     projectId: string,
-    organizationId: string,
+    workspaceId: string,
     dto: AddMemberDto,
   ): Promise<MemberDto> {
-    const member = await this.prisma.organizationMember.findFirst({
+    const member = await this.prisma.workspaceMember.findFirst({
       where: {
-        organizationId,
+        workspaceId,
         user: { email: { equals: dto.email, mode: 'insensitive' } },
       },
       select: { userId: true },
     })
     if (!member) {
-      // TODO: Support inviting unregistered users or cross-org emails by creating an invitation token/record
+      // TODO: Support inviting unregistered users or cross-workspace emails by creating an invitation token/record
       // and sending an email invite, instead of rejecting with NotFoundException.
       throw new NotFoundException(
-        'That person is not a member of this project’s organization. Ask an organization owner to add them first.',
+        'That person is not a member of this project’s workspace. Ask a workspace owner to add them first.',
       )
     }
 
     return this.prisma.projectMember.create({
       data: {
         projectId,
-        organizationId,
+        workspaceId,
         userId: member.userId,
         role: dto.role,
       },

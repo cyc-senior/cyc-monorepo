@@ -12,19 +12,19 @@ import { Reflector } from '@nestjs/core'
 import { isUUID } from 'class-validator'
 
 import { logEvent } from '../../common/logging/log-event'
-import { ORG_PERMISSION_KEY } from './access.constants'
+import { WORKSPACE_PERMISSION_KEY } from './access.constants'
 import { AccessService } from './access.service'
 import { AccessRequest } from './access.types'
-import { canInOrg, OrgPermission } from './org-permissions'
+import { canInWorkspace, WorkspacePermission } from './workspace-permissions'
 
 /**
- * Enforces `@AuthorizeOrg(permission)` on routes with an `:organizationId`
- * param. Non-members get a 404 (never confirm that an organization exists);
+ * Enforces `@AuthorizeWorkspace(permission)` on routes with an `:workspaceId`
+ * param. Non-members get a 404 (never confirm that a workspace exists);
  * members without the permission get a 403.
  */
 @Injectable()
-export class OrganizationPermissionsGuard implements CanActivate {
-  private readonly logger = new Logger(OrganizationPermissionsGuard.name)
+export class WorkspacePermissionsGuard implements CanActivate {
+  private readonly logger = new Logger(WorkspacePermissionsGuard.name)
 
   constructor(
     private readonly reflector: Reflector,
@@ -33,8 +33,8 @@ export class OrganizationPermissionsGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const permission = this.reflector.getAllAndOverride<
-      OrgPermission | undefined
-    >(ORG_PERMISSION_KEY, [context.getHandler(), context.getClass()])
+      WorkspacePermission | undefined
+    >(WORKSPACE_PERMISSION_KEY, [context.getHandler(), context.getClass()])
     if (!permission) {
       return true
     }
@@ -43,47 +43,44 @@ export class OrganizationPermissionsGuard implements CanActivate {
     if (!request.user) {
       throw new UnauthorizedException()
     }
-    const { organizationId } = request.params as Record<
-      string,
-      string | undefined
-    >
-    if (organizationId === undefined) {
-      // A guarded route without an organization is a programming error: fail closed.
+    const { workspaceId } = request.params as Record<string, string | undefined>
+    if (workspaceId === undefined) {
+      // A guarded route without a workspace is a programming error: fail closed.
       this.logger.error(
-        `@AuthorizeOrg used on ${request.method} ${request.route?.path} without :organizationId`,
+        `@AuthorizeWorkspace used on ${request.method} ${request.route?.path} without :workspaceId`,
       )
       throw new InternalServerErrorException()
     }
 
-    const access = isUUID(organizationId)
-      ? await this.access.forOrganization(request.user.id, organizationId)
+    const access = isUUID(workspaceId)
+      ? await this.access.forWorkspace(request.user.id, workspaceId)
       : null
     if (!access) {
       this.logger.warn(
         logEvent('access.denied', {
-          reason: 'not_an_org_member',
+          reason: 'not_an_workspace_member',
           permission,
           user: request.user.id,
-          organization: organizationId,
+          workspace: workspaceId,
         }),
       )
-      throw new NotFoundException('Organization not found.')
+      throw new NotFoundException('Workspace not found.')
     }
-    if (!canInOrg(access.role, permission)) {
+    if (!canInWorkspace(access.role, permission)) {
       this.logger.warn(
         logEvent('access.denied', {
-          reason: 'missing_org_permission',
+          reason: 'missing_workspace_permission',
           permission,
           role: access.role,
           user: request.user.id,
-          organization: organizationId,
+          workspace: workspaceId,
         }),
       )
       throw new ForbiddenException(
-        'Your role in this organization does not allow this action.',
+        'Your role in this workspace does not allow this action.',
       )
     }
-    request.orgAccess = access
+    request.workspaceAccess = access
 
     return true
   }
