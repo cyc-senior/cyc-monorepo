@@ -62,7 +62,7 @@ export function parseUploadedAvatar(
 function assertSize(size: number): void {
   if (size === 0 || size > ORG_AVATAR_MAX_BYTES) {
     throw new BadRequestException(
-      `A workspace picture must be between 1 byte and ${ORG_AVATAR_MAX_BYTES} bytes.`,
+      `A picture must be between 1 byte and ${ORG_AVATAR_MAX_BYTES} bytes.`,
     )
   }
 }
