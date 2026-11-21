@@ -30,35 +30,71 @@ export interface ProjectDetails {
   updatedAt: string;
 }
 
+export type UiLibrary = "SHADCN" | "MUI";
+
 export interface DesignIntentPayload {
+  statement?: string;
+  designSystem: UiLibrary;
+  designStandards?: string[];
+  designGuidelines?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  brandGuidelines?: string;
+  toneOfVoice?: string;
+}
+
+export interface DesignIntentDetail {
+  id?: string;
+  projectId?: string;
   statement?: string | null;
+  designSystem?: UiLibrary | string;
+  designStandards?: string[];
+  designGuidelines?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  brandGuidelines?: string | null;
+  toneOfVoice?: string | null;
+  legacyBrief?: unknown;
+  version?: number;
+  // Aliases for compatibility with other views
   brandColorPrimary?: string | null;
   brandColorSecondary?: string | null;
   brandColorAccent?: string | null;
   brandNotes?: string | null;
   voiceTone?: string | null;
-  targetAudience?: string | null;
   designPrinciples?: string[];
-}
-
-export interface DesignIntentDetail extends DesignIntentPayload {
-  id?: string;
-  projectId?: string;
 }
 
 export interface PersonaPayload {
   name: string;
-  role: string;
-  description: string;
-  goals: string[];
-  painPoints: string[];
+  age?: number;
+  shortDescription: string;
+  behavioralConsiderations?: string[];
+  frustrations?: string[];
+  goals?: string[];
+  tasks?: string[];
 }
 
-export interface PersonaItem extends PersonaPayload {
+export interface PersonaItem {
   id: string;
   projectId: string;
   origin: "MANUAL" | "AI";
-  createdAt: string;
+  generationJobId?: string | null;
+  name: string;
+  age?: number | null;
+  shortDescription: string;
+  behavioralConsiderations?: string[];
+  frustrations?: string[];
+  goals?: string[];
+  tasks?: string[];
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  // Aliases for compatibility with other views
+  role?: string;
+  description?: string;
+  painPoints?: string[];
 }
 
 export interface ProjectMemberUser {

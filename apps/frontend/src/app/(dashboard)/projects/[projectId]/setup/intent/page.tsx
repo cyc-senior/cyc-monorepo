@@ -27,6 +27,7 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   Delete02Icon,
+  File01Icon,
 } from "@hugeicons/core-free-icons";
 import {
   getDesignIntent,
@@ -43,31 +44,28 @@ export default function DesignIntentStep2Page() {
   const projectId = params.projectId as string;
 
   // Form states
-  const [designSystem, setDesignSystem] = React.useState("shadcn");
+  const [designSystem, setDesignSystem] = React.useState<"SHADCN" | "MUI">("SHADCN");
   const [accessibilityStandard, setAccessibilityStandard] = React.useState("WCAG 2.2 AA");
-  const [brandColors, setBrandColors] = React.useState<string[]>([
-    "#f2652a",
-    "#ffb81c",
-    "#1e1e1e",
-  ]);
+  const [brandColors, setBrandColors] = React.useState<string[]>([]);
   const [ciGuideline, setCiGuideline] = React.useState("");
-  const [toneTags, setToneTags] = React.useState<string[]>([
-    "Friendly",
-    "Clear",
-    "Helpful",
-  ]);
+  const [toneTags, setToneTags] = React.useState<string[]>([]);
   const [newTagInput, setNewTagInput] = React.useState("");
   const [isAddingTag, setIsAddingTag] = React.useState(false);
-  const [toneNotes, setToneNotes] = React.useState(
-    "Plain words, no library jargon. Show the room and time before confirming."
-  );
+  const [toneNotes, setToneNotes] = React.useState("");
 
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
 
-  // Hidden file input for uploading CI guideline
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Modal 12C: Add brand colour State matching Figma Node 915:20674
+  const [isAddColorModalOpen, setIsAddColorModalOpen] = React.useState(false);
+  const [customHex, setCustomHex] = React.useState("#1A73E8");
+
+  // Modal 12D: Upload CI guideline State matching Figma Node 916:20544
+  const [isUploadCiModalOpen, setIsUploadCiModalOpen] = React.useState(false);
+  const [pendingCiFile, setPendingCiFile] = React.useState<File | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const modalFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Modal 12A: Add Persona State matching Figma Node 815:10541
   const [isPersonaModalOpen, setIsPersonaModalOpen] = React.useState(false);
@@ -90,22 +88,24 @@ export default function DesignIntentStep2Page() {
         ]);
         if (intent) {
           if (intent.statement) setToneNotes(intent.statement);
-          if (intent.brandNotes) setCiGuideline(intent.brandNotes);
-          if (intent.voiceTone) {
-            const tags = intent.voiceTone.split(",").map((t) => t.trim()).filter(Boolean);
+          if (intent.brandGuidelines) setCiGuideline(intent.brandGuidelines);
+          if (intent.toneOfVoice) {
+            const tags = intent.toneOfVoice.split(",").map((t) => t.trim()).filter(Boolean);
             if (tags.length > 0) setToneTags(tags);
           }
-          if (intent.brandColorPrimary) {
+          if (intent.primaryColor) {
             const colors = [
-              intent.brandColorPrimary,
-              intent.brandColorSecondary || "#ffb81c",
-              intent.brandColorAccent || "#1e1e1e",
+              intent.primaryColor,
+              intent.secondaryColor || "#0F172A",
+              intent.accentColor || "#F59E0B",
             ].filter(Boolean) as string[];
             setBrandColors(colors);
           }
-          if (intent.designPrinciples && intent.designPrinciples.length > 0) {
-            if (intent.designPrinciples[0]) setDesignSystem(intent.designPrinciples[0]);
-            if (intent.designPrinciples[1]) setAccessibilityStandard(intent.designPrinciples[1]);
+          if (intent.designSystem) {
+            setDesignSystem(intent.designSystem === "MUI" ? "MUI" : "SHADCN");
+          }
+          if (intent.designStandards && intent.designStandards.length > 0) {
+            setAccessibilityStandard(intent.designStandards[0]);
           }
         }
         setPersonas(personaList);
@@ -118,27 +118,6 @@ export default function DesignIntentStep2Page() {
     }
   }, [projectId]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        setCiGuideline((prev) =>
-          prev ? `${prev}\n\n# ${file.name}\n${content}` : `# ${file.name}\n${content}`
-        );
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleAddColor = () => {
-    const defaultNewColors = ["#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#f59e0b"];
-    const unusedColor = defaultNewColors.find((c) => !brandColors.includes(c)) || "#6366f1";
-    setBrandColors((prev) => [...prev, unusedColor]);
-  };
-
   const handleColorChange = (index: number, newColor: string) => {
     setBrandColors((prev) => {
       const updated = [...prev];
@@ -148,7 +127,6 @@ export default function DesignIntentStep2Page() {
   };
 
   const handleRemoveColor = (index: number) => {
-    if (brandColors.length <= 1) return;
     setBrandColors((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -172,28 +150,34 @@ export default function DesignIntentStep2Page() {
       setPersonaModalError("Persona name is required.");
       return;
     }
+    const shortDesc = personaDesc.trim();
+    if (!shortDesc) {
+      setPersonaModalError("Short description is required.");
+      return;
+    }
     setPersonaModalError(null);
     setIsSavingPersona(true);
 
     try {
-      const goalsList = [
-        ...personaGoals.split("\n").map((s) => s.trim()).filter(Boolean),
-        ...personaTasks.split("\n").map((s) => s.trim()).filter(Boolean),
-      ];
-      const painsList = personaFrustrations
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const parsedAge = personaAge.trim() ? parseInt(personaAge.trim(), 10) : undefined;
+      const validAge =
+        parsedAge !== undefined && !isNaN(parsedAge) && parsedAge >= 1 && parsedAge <= 120
+          ? parsedAge
+          : undefined;
+
+      const behaviorsList = personaBehaviors.split("\n").map((s) => s.trim()).filter(Boolean);
+      const frustrationsList = personaFrustrations.split("\n").map((s) => s.trim()).filter(Boolean);
+      const goalsList = personaGoals.split("\n").map((s) => s.trim()).filter(Boolean);
+      const tasksList = personaTasks.split("\n").map((s) => s.trim()).filter(Boolean);
 
       const created = await createPersona(projectId, {
         name: personaName.trim(),
-        role: personaAge.trim() ? `Age ${personaAge.trim()}` : "User",
-        description:
-          personaDesc.trim() ||
-          personaBehaviors.trim() ||
-          "Target persona",
-        goals: goalsList.length > 0 ? goalsList : ["Achieve goal"],
-        painPoints: painsList.length > 0 ? painsList : ["Friction points"],
+        age: validAge,
+        shortDescription: shortDesc,
+        behavioralConsiderations: behaviorsList.length > 0 ? behaviorsList : undefined,
+        frustrations: frustrationsList.length > 0 ? frustrationsList : undefined,
+        goals: goalsList.length > 0 ? goalsList : undefined,
+        tasks: tasksList.length > 0 ? tasksList : undefined,
       });
 
       setPersonas((prev) => [...prev, created]);
@@ -232,12 +216,14 @@ export default function DesignIntentStep2Page() {
     try {
       await putDesignIntent(projectId, {
         statement: toneNotes.trim() || undefined,
-        brandColorPrimary: brandColors[0] || undefined,
-        brandColorSecondary: brandColors[1] || undefined,
-        brandColorAccent: brandColors[2] || undefined,
-        brandNotes: ciGuideline.trim() || undefined,
-        voiceTone: toneTags.join(", ") || undefined,
-        designPrinciples: [designSystem, accessibilityStandard].filter(Boolean),
+        designSystem: designSystem === "MUI" ? "MUI" : "SHADCN",
+        designStandards: accessibilityStandard ? [accessibilityStandard] : ["WCAG 2.1 AA"],
+        designGuidelines: undefined,
+        primaryColor: brandColors[0]?.startsWith("#") ? brandColors[0] : "#1A73E8",
+        secondaryColor: brandColors[1]?.startsWith("#") ? brandColors[1] : "#0F172A",
+        accentColor: brandColors[2]?.startsWith("#") ? brandColors[2] : "#F59E0B",
+        brandGuidelines: ciGuideline.trim() || undefined,
+        toneOfVoice: toneTags.join(", ") || undefined,
       });
 
       router.push(`/projects/${projectId}/setup/team`);
@@ -253,7 +239,7 @@ export default function DesignIntentStep2Page() {
 
   // Checklist completion states
   const isPersonasCompleted = personas.length > 0;
-  const isDesignSystemCompleted = Boolean(designSystem && designSystem !== "none");
+  const isDesignSystemCompleted = Boolean(designSystem);
   const isAccessibilityCompleted = Boolean(accessibilityStandard);
   const isBrandColoursCompleted = brandColors.length > 0;
   const isCiGuidelineCompleted = ciGuideline.trim().length > 0;
@@ -323,10 +309,10 @@ export default function DesignIntentStep2Page() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">
                               {persona.name}
-                              {persona.role ? `, ${persona.role.replace(/^Age\s*/i, "")}` : ""}
+                              {persona.age ? `, ${persona.age}` : persona.role ? `, ${persona.role.replace(/^Age\s*/i, "")}` : ""}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">
-                              {persona.description || "Target persona"}
+                              {persona.shortDescription || persona.description || "Target persona"}
                             </p>
                           </div>
                         </div>
@@ -370,14 +356,11 @@ export default function DesignIntentStep2Page() {
                   <select
                     id="design-system"
                     value={designSystem}
-                    onChange={(e) => setDesignSystem(e.target.value)}
+                    onChange={(e) => setDesignSystem(e.target.value as "SHADCN" | "MUI")}
                     className="w-full h-9 rounded-[10px] border border-border bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring shadow-xs cursor-pointer"
                   >
-                    <option value="shadcn">shadcn</option>
-                    <option value="Tailwind UI">Tailwind UI</option>
-                    <option value="Material UI">Material UI</option>
-                    <option value="Ant Design">Ant Design</option>
-                    <option value="Custom / None">Custom / None</option>
+                    <option value="SHADCN">shadcn</option>
+                    <option value="MUI">Material UI</option>
                   </select>
                 </div>
 
@@ -394,9 +377,18 @@ export default function DesignIntentStep2Page() {
                     <option value="WCAG 2.2 AA">WCAG 2.2 AA</option>
                     <option value="WCAG 2.2 AAA">WCAG 2.2 AAA</option>
                     <option value="WCAG 2.1 AA">WCAG 2.1 AA</option>
-                    <option value="Section 508">Section 508</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Design system demo preview matching Figma Node 847:17946 */}
+              <div className="rounded-[10px] border border-border overflow-hidden bg-muted/20 relative aspect-video max-h-[360px] w-full flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={designSystem === "MUI" ? "/mui_demo.jpg" : "/shadcn_demo.jpg"}
+                  alt={designSystem === "MUI" ? "Material UI components preview" : "shadcn components preview"}
+                  className="w-full h-full object-cover object-top"
+                />
               </div>
             </div>
 
@@ -408,47 +400,49 @@ export default function DesignIntentStep2Page() {
 
               <div className="space-y-4">
                 {/* Brand Colors Swatches */}
-                <div className="space-y-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {brandColors.map((color, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-[10px] border border-border p-2 flex items-center justify-between gap-2.5 bg-card shadow-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <label
-                            className="h-10 w-10 rounded-[10px] border border-border shrink-0 cursor-pointer block relative overflow-hidden"
-                            style={{ backgroundColor: color }}
-                          >
+                <div className="space-y-3">
+                  {brandColors.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {brandColors.map((color, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-[10px] border border-border p-2 flex items-center justify-between gap-2.5 bg-card shadow-xs min-w-[150px] flex-1 sm:flex-initial relative"
+                        >
+                          <label className="flex items-center gap-2.5 flex-1 cursor-pointer">
+                            <span
+                              className="h-10 w-10 rounded-[10px] border border-border shrink-0 block relative overflow-hidden shadow-2xs"
+                              style={{ backgroundColor: color }}
+                            />
                             <input
                               type="color"
                               value={color}
                               onChange={(e) => handleColorChange(idx, e.target.value)}
-                              className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                              className="sr-only"
                             />
+                            <span className="text-sm font-medium text-foreground uppercase font-mono select-none">
+                              {color}
+                            </span>
                           </label>
-                          <span className="text-sm font-medium text-foreground uppercase font-mono">
-                            {color}
-                          </span>
-                        </div>
-                        {brandColors.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => handleRemoveColor(idx)}
-                            className="text-muted-foreground hover:text-destructive p-1 rounded cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveColor(idx);
+                            }}
+                            className="text-muted-foreground hover:text-destructive p-1 rounded cursor-pointer relative z-10"
                           >
                             <HugeIcon icon={Cancel01Icon} size={14} />
                           </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={handleAddColor}
+                      onClick={() => setIsAddColorModalOpen(true)}
                       className="gap-1 rounded-[10px] h-8 px-2.5 font-medium text-sm border-border cursor-pointer hover:bg-muted"
                     >
                       <HugeIcon icon={Add01Icon} size={16} />
@@ -473,17 +467,10 @@ export default function DesignIntentStep2Page() {
 
                   {/* Upload row matching Figma Node 815:10158 */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-1">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      accept=".md,.pdf,.doc,.docx,.txt"
-                      className="hidden"
-                    />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => setIsUploadCiModalOpen(true)}
                       className="gap-1 rounded-[10px] h-8 px-2.5 font-medium text-sm border-border cursor-pointer hover:bg-muted shrink-0"
                     >
                       <HugeIcon icon={Upload01Icon} size={16} />
@@ -588,7 +575,7 @@ export default function DesignIntentStep2Page() {
           </div>
 
           {/* Right Column: "What AI knows so far" matching Figma Node 815:10136 / 815:10842 */}
-          <div className="w-full lg:w-[400px] shrink-0 h-fit">
+          <div className="w-full lg:w-80 xl:w-96 shrink-0 h-fit lg:sticky lg:top-6 self-start">
             <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-4">
               <h3 className="font-heading font-medium text-xl text-foreground">
                 What AI knows so far
@@ -897,6 +884,255 @@ export default function DesignIntentStep2Page() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 12C: Add brand colour dialog matching Figma Node 915:20674 */}
+      <Dialog open={isAddColorModalOpen} onOpenChange={setIsAddColorModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-[14px] p-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formatted = customHex.startsWith("#") ? customHex : `#${customHex}`;
+              if (/^#[0-9A-Fa-f]{6}$/.test(formatted)) {
+                if (!brandColors.includes(formatted.toUpperCase())) {
+                  setBrandColors((prev) => [...prev, formatted.toUpperCase()]);
+                }
+                setIsAddColorModalOpen(false);
+              }
+            }}
+            className="space-y-5"
+          >
+            <DialogHeader className="flex flex-row items-center justify-between pb-1">
+              <DialogTitle className="font-heading font-medium text-xl text-foreground">
+                Add brand colour
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Native / interactive color picker */}
+              <div className="rounded-[10px] border border-border p-3 flex flex-col gap-3 bg-muted/20">
+                <div
+                  className="h-32 w-full rounded-[8px] border border-border relative overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
+                  style={{ backgroundColor: customHex }}
+                >
+                  <input
+                    type="color"
+                    value={customHex.startsWith("#") && customHex.length === 7 ? customHex : "#1A73E8"}
+                    onChange={(e) => setCustomHex(e.target.value.toUpperCase())}
+                    className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                  />
+                  <span className="bg-black/50 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs font-mono select-none">
+                    Click to pick shade
+                  </span>
+                </div>
+
+                {/* Preset Swatches for quick selection */}
+                <div className="flex items-center justify-between gap-1.5 pt-1">
+                  {[
+                    "#1A73E8",
+                    "#0F172A",
+                    "#F59E0B",
+                    "#10B981",
+                    "#8B5CF6",
+                    "#EC4899",
+                    "#EF4444",
+                    "#06B6D4",
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCustomHex(preset)}
+                      className={`size-7 rounded-[6px] border border-border shrink-0 cursor-pointer transition-transform hover:scale-110 ${
+                        customHex.toUpperCase() === preset ? "ring-2 ring-primary ring-offset-1" : ""
+                      }`}
+                      style={{ backgroundColor: preset }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Hex Row matching Figma Node 915:20839 */}
+              <div className="space-y-1.5">
+                <Label htmlFor="hex-code" className="text-sm font-medium text-foreground">
+                  Hex
+                </Label>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="size-10 rounded-[10px] border border-border shrink-0 shadow-2xs"
+                    style={{ backgroundColor: customHex }}
+                  />
+                  <Input
+                    id="hex-code"
+                    value={customHex}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setCustomHex(val.startsWith("#") ? val : `#${val}`);
+                    }}
+                    placeholder="#1A73E8"
+                    maxLength={7}
+                    className="font-mono uppercase text-sm rounded-[10px]"
+                  />
+                </div>
+                {!/^#[0-9A-Fa-f]{6}$/.test(customHex) && (
+                  <p className="text-xs text-destructive">Must be a 6-digit hex color like #1A73E8</p>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsAddColorModalOpen(false)}
+                className="rounded-[10px] h-8 px-3 text-sm cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!/^#[0-9A-Fa-f]{6}$/.test(customHex)}
+                className="rounded-[10px] h-8 px-3.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover cursor-pointer"
+              >
+                Add colour
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 12D: Upload CI guideline dialog matching Figma Node 916:20544 */}
+      <Dialog open={isUploadCiModalOpen} onOpenChange={setIsUploadCiModalOpen}>
+        <DialogContent className="sm:max-w-lg rounded-[14px] p-6">
+          <div className="space-y-5">
+            <DialogHeader className="flex flex-row items-center justify-between pb-1">
+              <DialogTitle className="font-heading font-medium text-xl text-foreground">
+                Upload CI guideline
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Dropzone matching Figma Node 916:20686 */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) setPendingCiFile(file);
+                }}
+                className={`rounded-[12px] border-2 border-dashed p-6 flex flex-col items-center justify-center gap-2 text-center transition-colors ${
+                  isDragging ? "border-primary bg-primary/5" : "border-border bg-muted/10 hover:bg-muted/20"
+                }`}
+              >
+                <div className="size-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-1">
+                  <HugeIcon icon={Upload01Icon} size={20} />
+                </div>
+                <p className="text-sm font-medium text-foreground">Drag a file here</p>
+                <p className="text-xs text-muted-foreground">.md, PDF or Word</p>
+                <input
+                  type="file"
+                  ref={modalFileInputRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setPendingCiFile(file);
+                  }}
+                  accept=".md,.pdf,.doc,.docx,.txt"
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => modalFileInputRef.current?.click()}
+                  className="rounded-[8px] h-7 px-2.5 text-xs mt-2 border-border cursor-pointer"
+                >
+                  Browse files
+                </Button>
+              </div>
+
+              {/* Uploaded file preview matching Figma Node 916:20708 */}
+              {pendingCiFile && (
+                <div className="rounded-[10px] border border-border p-3 flex items-center justify-between gap-3 bg-card shadow-2xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="size-9 rounded-[8px] bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                      <HugeIcon icon={File01Icon} size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {pendingCiFile.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(pendingCiFile.size / (1024 * 1024)).toFixed(1)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPendingCiFile(null)}
+                    className="text-muted-foreground hover:text-destructive h-7 w-7 shrink-0 cursor-pointer"
+                  >
+                    <HugeIcon icon={Cancel01Icon} size={14} />
+                  </Button>
+                </div>
+              )}
+
+              {/* Upload note matching Figma Node 916:20734 */}
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                PDF and Word files are turned into Markdown so AI can read them. .md works best.
+              </p>
+            </div>
+
+            <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setPendingCiFile(null);
+                  setIsUploadCiModalOpen(false);
+                }}
+                className="rounded-[10px] h-8 px-3 text-sm cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!pendingCiFile}
+                onClick={() => {
+                  if (!pendingCiFile) return;
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const content = event.target?.result as string;
+                    if (content) {
+                      setCiGuideline((prev) =>
+                        prev
+                          ? `${prev}\n\n# ${pendingCiFile.name}\n${content}`
+                          : `# ${pendingCiFile.name}\n${content}`
+                      );
+                    } else {
+                      setCiGuideline((prev) =>
+                        prev
+                          ? `${prev}\n\n[Uploaded CI: ${pendingCiFile.name}]`
+                          : `[Uploaded CI: ${pendingCiFile.name}]`
+                      );
+                    }
+                  };
+                  reader.readAsText(pendingCiFile);
+                  setPendingCiFile(null);
+                  setIsUploadCiModalOpen(false);
+                }}
+                className="rounded-[10px] h-8 px-3.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover cursor-pointer"
+              >
+                Upload
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
