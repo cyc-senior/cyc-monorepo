@@ -7,8 +7,11 @@ import axios, {
 } from "axios";
 import { AuthTokens } from "@/types/auth";
 
-const API_URL =
+const rawApiUrl =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = rawApiUrl.endsWith("/api")
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/$/, "")}/api`;
 
 let inMemoryToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;

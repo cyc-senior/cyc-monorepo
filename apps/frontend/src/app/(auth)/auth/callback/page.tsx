@@ -3,8 +3,9 @@
 import React, { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -35,7 +36,7 @@ function CallbackHandler() {
   return (
     <Card className="w-full shadow-sm">
       <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <HugeIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
         <div>
           <h2 className="text-lg font-medium text-foreground">
             Completing sign-in...
@@ -54,7 +55,7 @@ export default function AuthCallbackPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <HugeIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
         </div>
       }
     >

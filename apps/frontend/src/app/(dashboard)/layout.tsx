@@ -1,45 +1,104 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
-import { Navbar, NavbarUser } from "@/components/layout/Navbar";
-import { Loader2 } from "lucide-react";
+import { BreadcrumbProvider } from "@/contexts/breadcrumb-context";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { SidebarHeader } from "@/components/layout/SidebarHeader";
+import { MinimalNav } from "@/components/layout/MinimalNav";
 
-function DashboardShell({
-  user,
-  onSignOut,
-  children,
+function WorkspaceRedirectGuard() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+  const isPreWorkspaceRoute =
+    pathname === "/first-run" || pathname === "/workspaces/new";
+
+  useEffect(() => {
+    if (!workspaceLoading) {
+      if (workspaces.length === 0 && !isPreWorkspaceRoute) {
+        router.replace("/first-run");
+      } else if (workspaces.length > 0 && pathname === "/first-run") {
+        router.replace("/projects");
+      }
+    }
+  }, [workspaceLoading, workspaces.length, isPreWorkspaceRoute, pathname, router]);
+
+  return null;
+}
+
+function DashboardSidebarWrapper({
+  collapsed,
 }: {
-  user: NavbarUser;
-  onSignOut: () => void;
-  children: React.ReactNode;
+  collapsed: boolean;
 }) {
-  const { isTester } = useWorkspace();
+  const pathname = usePathname();
+  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+
+  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
+  const isPreWorkspaceRoute =
+    pathname === "/first-run" || pathname === "/workspaces/new";
+  const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
+
+  if (!showSidebar) return null;
+  return <AppSidebar collapsed={collapsed} />;
+}
+
+function DashboardHeaderWrapper({
+  onToggleSidebar,
+}: {
+  onToggleSidebar: () => void;
+}) {
+  const pathname = usePathname();
+  const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+
+  const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
+  const isPreWorkspaceRoute =
+    pathname === "/first-run" || pathname === "/workspaces/new";
+  const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
+
+  if (showSidebar) {
+    return <SidebarHeader onToggleSidebar={onToggleSidebar} />;
+  }
+  return <MinimalNav />;
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navbar
-        variant="default"
-        user={user}
-        onSignOut={onSignOut}
-        hideWorkspaceLinks={isTester}
-      />
-      <main className="flex-1 flex flex-col w-full">{children}</main>
+    <div className="h-screen flex bg-background overflow-hidden">
+      <Suspense fallback={null}>
+        <WorkspaceRedirectGuard />
+        <DashboardSidebarWrapper collapsed={sidebarCollapsed} />
+      </Suspense>
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <Suspense
+          fallback={<div className="h-14 border-b bg-background shrink-0" />}
+        >
+          <DashboardHeaderWrapper
+            onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          />
+        </Suspense>
+        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+      </div>
     </div>
   );
 }
 
 /**
- * Protected dashboard shell with session guard, workspace context, and navigation header.
+ * Protected dashboard shell with session guard and workspace context.
+ * Always renders children uniformly so Next.js static prerender
+ * validates child route segments without dropping.
  */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -48,25 +107,11 @@ export default function DashboardLayout({
     }
   }, [isLoading, user, router]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const navbarUser: NavbarUser = {
-    name: user.name || user.email,
-    email: user.email,
-    avatarUrl: user.image || undefined,
-  };
-
   return (
     <WorkspaceProvider>
-      <DashboardShell user={navbarUser} onSignOut={logout}>
-        {children}
-      </DashboardShell>
+      <BreadcrumbProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </BreadcrumbProvider>
     </WorkspaceProvider>
   );
 }

@@ -65,7 +65,7 @@ export class ProjectsService {
   ): Promise<Page<ProjectWithRoleDto>> {
     const where: Prisma.ProjectMemberWhereInput = {
       userId,
-      organizationId: query.organizationId,
+      workspaceId: query.workspaceId,
       project: {
         status: query.status,
         name: query.search
@@ -94,23 +94,23 @@ export class ProjectsService {
   }
 
   /**
-   * Creates the project inside the organization, makes the creator its
+   * Creates the project inside the workspace, makes the creator its
    * designer and opens the first design round. The design intent is defined
    * in the next step.
    *
-   * The caller's right to open projects in the organization was checked by
-   * the organization guard; `organizationId` never comes from the body.
+   * The caller's right to open projects in the workspace was checked by
+   * the workspace guard; `workspaceId` never comes from the body.
    */
   create(
     userId: string,
-    organizationId: string,
+    workspaceId: string,
     dto: CreateProjectDto,
   ): Promise<ProjectWithRoleDto> {
     return this.prisma.$transaction(async (tx) => {
       const project = await tx.project.create({
         data: {
           ...dto,
-          organizationId,
+          workspaceId,
           createdById: userId,
           rounds: { create: { roundNumber: 1 } },
         },
@@ -119,7 +119,7 @@ export class ProjectsService {
       await tx.projectMember.create({
         data: {
           projectId: project.id,
-          organizationId,
+          workspaceId,
           userId,
           role: 'DESIGNER',
         },

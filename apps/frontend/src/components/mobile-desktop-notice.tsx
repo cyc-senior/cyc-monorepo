@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Check, Copy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { Tick02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
 
 interface MobileNoticeProps {
   sessionCode?: string | null;
@@ -59,12 +60,12 @@ export function MobileDesktopNotice({ sessionCode, children }: MobileNoticeProps
             >
               {copied ? (
                 <>
-                  <Check className="h-4 w-4" />
+                  <HugeIcon icon={Tick02Icon} size={16} />
                   <span>Copied link</span>
                 </>
               ) : (
                 <>
-                  <Copy className="h-4 w-4" />
+                  <HugeIcon icon={Copy01Icon} size={16} />
                   <span>Copy link</span>
                 </>
               )}

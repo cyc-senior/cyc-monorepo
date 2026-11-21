@@ -18,30 +18,32 @@ model User {
   emailVerified Boolean  @default(false)
   name          String?
   image         String?
+  avatarKey     String?  @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  avatar        UserAvatar?
   accounts      Account[]
   refreshTokens RefreshToken[]
 
-  organizationMemberships   OrganizationMember[]
-  organizationsCreated      Organization[]           @relation("OrganizationCreator")
-  organizationInvitations   OrganizationInvitation[] @relation("OrganizationInvitationInviter")
-  testParticipants          SessionParticipant[]     @relation("SessionParticipantUser")
-  projectMemberships        ProjectMember[]
-  projectsCreated         Project[]              @relation("ProjectCreator")
-  approvedRounds          DesignRound[]          @relation("RoundApprover")
-  approvedVariants        UIVariant[]            @relation("VariantApprover")
-  generationJobs          GenerationJob[]        @relation("JobRequester")
-  storyGenerations        StoryGeneration[]      @relation("StoryGenerationRequester")
-  auditLogs               AuditLog[]             @relation("AuditActor")
-  testSessionsCreated     TestSession[]          @relation("SessionCreator")
-  analysesRequested       FeedbackAnalysis[]     @relation("AnalysisRequester")
-  analysesReviewed        FeedbackAnalysis[]     @relation("AnalysisReviewer")
-  decisions               DesignDecision[]       @relation("DecisionMaker")
-  roundComments           RoundComment[]         @relation("CommentAuthor")
-  roundAcknowledgements   RoundAcknowledgement[]
-  reportsGenerated        Report[]               @relation("ReportAuthor")
+  workspaceMemberships  WorkspaceMember[]
+  workspacesCreated     Workspace[]            @relation("WorkspaceCreator")
+  workspaceInvitations  WorkspaceInvitation[]  @relation("WorkspaceInvitationInviter")
+  testParticipants      SessionParticipant[]   @relation("SessionParticipantUser")
+  projectMemberships    ProjectMember[]
+  projectsCreated       Project[]              @relation("ProjectCreator")
+  approvedRounds        DesignRound[]          @relation("RoundApprover")
+  approvedVariants      UIVariant[]            @relation("VariantApprover")
+  generationJobs        GenerationJob[]        @relation("JobRequester")
+  storyGenerations      StoryGeneration[]      @relation("StoryGenerationRequester")
+  auditLogs             AuditLog[]             @relation("AuditActor")
+  testSessionsCreated   TestSession[]          @relation("SessionCreator")
+  analysesRequested     FeedbackAnalysis[]     @relation("AnalysisRequester")
+  analysesReviewed      FeedbackAnalysis[]     @relation("AnalysisReviewer")
+  decisions             DesignDecision[]       @relation("DecisionMaker")
+  roundComments         RoundComment[]         @relation("CommentAuthor")
+  roundAcknowledgements RoundAcknowledgement[]
+  reportsGenerated      Report[]               @relation("ReportAuthor")
 
   @@map("users")
 }
@@ -81,84 +83,97 @@ model RefreshToken {
 }
 
 // ---------------------------------------------------------------------------
-// Organizations: the tenant boundary above projects
+// Workspaces: the tenant boundary above projects
 // ---------------------------------------------------------------------------
 
-/// Role a user holds in one organization. Decides who may manage the
-/// organization and who may open projects in it; it never grants access to a
+/// Role a user holds in one workspace. Decides who may manage the
+/// workspace and who may open projects in it; it never grants access to a
 /// project by itself (that is `ProjectMember`).
-enum OrganizationRole {
+enum WorkspaceRole {
   ADMIN
   MEMBER
 }
 
-model Organization {
+model Workspace {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdById String?  @db.Uuid
   /// Secret in the public picture URL: an <img> cannot send a bearer token.
-  avatarKey   String?  @unique @default(uuid())
+  /// Null while the workspace has no picture; rotated on every upload.
+  avatarKey   String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdBy   User?                    @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  members     OrganizationMember[]
-  invitations OrganizationInvitation[]
+  createdBy   User?                 @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members     WorkspaceMember[]
+  invitations WorkspaceInvitation[]
   projects    Project[]
-  /// Kept in a separate table so listing organizations never reads image bytes.
-  avatar      OrganizationAvatar?
+  /// Kept in a separate table so listing workspaces never reads image bytes.
+  avatar      WorkspaceAvatar?
 
   @@index([createdById])
-  @@map("organizations")
+  @@map("workspaces")
 }
 
-/// Workspace picture, stored in Postgres as a bytea. One per organization.
-model OrganizationAvatar {
-  organizationId String   @id @db.Uuid
-  contentType    String
-  byteSize       Int
-  data           Bytes
-  updatedAt      DateTime @updatedAt
+model UserAvatar {
+  userId      String   @id @db.Uuid
+  contentType String
+  byteSize    Int
+  data        Bytes
+  updatedAt   DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("organization_avatars")
+  @@map("user_avatars")
+}
+
+/// Workspace picture, stored in Postgres as a bytea. One per workspace.
+model WorkspaceAvatar {
+  workspaceId String   @id @db.Uuid
+  contentType String
+  byteSize    Int
+  data        Bytes
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_avatars")
 }
 
 /// An invitation to an email that does not have an account yet. No email is
 /// sent; the invitee accepts it after signing in.
-model OrganizationInvitation {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
+model WorkspaceInvitation {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
   /// Lower-cased, like User.email.
-  email          String
-  role           OrganizationRole
-  invitedById    String?          @db.Uuid
-  createdAt      DateTime         @default(now())
-  expiresAt      DateTime?
+  email       String
+  role        WorkspaceRole
+  invitedById String?       @db.Uuid
+  createdAt   DateTime      @default(now())
+  expiresAt   DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedBy    User?         @relation("OrganizationInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User?     @relation("WorkspaceInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, email])
+  @@unique([workspaceId, email])
   @@index([email])
-  @@map("organization_invitations")
+  @@map("workspace_invitations")
 }
 
-model OrganizationMember {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
-  userId         String           @db.Uuid
-  role           OrganizationRole
-  joinedAt       DateTime         @default(now())
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole
+  joinedAt    DateTime      @default(now())
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projects     ProjectMember[]
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  ProjectMember[]
 
-  @@unique([organizationId, userId])
+  @@unique([workspaceId, userId])
   @@index([userId])
-  @@map("organization_members")
+  @@map("workspace_members")
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +211,7 @@ enum UiLibrary {
 /// tone, tokens) lives on the project and grounds every generation.
 model Project {
   id              String        @id @default(uuid()) @db.Uuid
-  organizationId  String        @db.Uuid
+  workspaceId     String        @db.Uuid
   name            String
   /// The client the project is for, or the product it designs.
   clientOrProduct String
@@ -208,7 +223,7 @@ model Project {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   createdBy        User?              @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
   designIntent     DesignIntent?
   personas         UserPersona[]
@@ -222,9 +237,9 @@ model Project {
   reports          Report[]
   storyGenerations StoryGeneration[]
 
-  /// Target of the composite foreign key that pins a member to the project's organization.
-  @@unique([id, organizationId])
-  @@index([organizationId])
+  /// Target of the composite foreign key that pins a member to the project's workspace.
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
   @@index([createdById])
   @@map("projects")
 }
@@ -276,7 +291,7 @@ enum PersonaOrigin {
   AI
 }
 
-/// A user persona of the project (Organization → Project → User Persona).
+/// A user persona of the project (Workspace → Project → User Persona).
 model UserPersona {
   id                       String        @id @default(uuid()) @db.Uuid
   projectId                String        @db.Uuid
@@ -300,24 +315,24 @@ model UserPersona {
   @@map("user_personas")
 }
 
-/// A user's role in one project. `organizationId` is repeated on purpose: two
+/// A user's role in one project. `workspaceId` is repeated on purpose: two
 /// composite foreign keys make it impossible, in the database itself, to add
-/// someone who is not a member of the project's organization.
+/// someone who is not a member of the project's workspace.
 model ProjectMember {
-  id             String      @id @default(uuid()) @db.Uuid
-  projectId      String      @db.Uuid
-  organizationId String      @db.Uuid
-  userId         String      @db.Uuid
-  role           ProjectRole
-  joinedAt       DateTime    @default(now())
+  id          String      @id @default(uuid()) @db.Uuid
+  projectId   String      @db.Uuid
+  workspaceId String      @db.Uuid
+  userId      String      @db.Uuid
+  role        ProjectRole
+  joinedAt    DateTime    @default(now())
 
-  project            Project            @relation(fields: [projectId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationMember OrganizationMember @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Restrict)
+  project         Project         @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceMember WorkspaceMember @relation(fields: [workspaceId, userId], references: [workspaceId, userId], onDelete: Restrict)
 
   @@unique([projectId, userId])
   @@index([userId])
-  @@index([organizationId, userId])
+  @@index([workspaceId, userId])
   @@map("project_members")
 }
 

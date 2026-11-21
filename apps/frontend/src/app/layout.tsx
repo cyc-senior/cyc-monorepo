@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   description: "CYC, an interative A/B testing platform for your UI improvement.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"

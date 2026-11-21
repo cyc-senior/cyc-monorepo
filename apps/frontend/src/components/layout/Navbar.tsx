@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, HelpCircle, LogOut } from "lucide-react";
 import { CYCLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +13,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  ArrowDown01Icon,
+  HelpCircleIcon,
+  Logout01Icon,
+} from "@hugeicons/core-free-icons";
 
 export interface NavbarUser {
   name: string;
@@ -111,7 +116,7 @@ export function Navbar({
                   className="flex size-8 items-center justify-center rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
                   aria-label="Help"
                 >
-                  <HelpCircle className="size-4" />
+                  <HugeIcon icon={HelpCircleIcon} size={16} />
                 </button>
 
                 <DropdownMenu>
@@ -129,7 +134,7 @@ export function Navbar({
                       <span className="text-sm font-medium text-foreground hidden sm:inline">
                         {user.name}
                       </span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                      <HugeIcon icon={ArrowDown01Icon} size={16} className="text-muted-foreground transition-transform duration-200" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
@@ -146,7 +151,7 @@ export function Navbar({
                       onClick={onSignOut}
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                     >
-                      <LogOut className="mr-2 h-4 w-4" />
+                      <HugeIcon icon={Logout01Icon} size={16} className="mr-2" />
                       <span>Sign out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>

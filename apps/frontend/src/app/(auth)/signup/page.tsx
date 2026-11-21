@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { Eye, EyeOff, Info, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +16,13 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  ViewIcon,
+  ViewOffSlashIcon,
+  InformationCircleIcon,
+  MailCheckIcon,
+} from "@hugeicons/core-free-icons";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -135,7 +141,7 @@ function SignUpContent() {
       {/* Alert if session code is provided in url */}
       {sessionCode && step === "form" && (
         <Alert variant="info" className="relative">
-          <Info className="h-4 w-4" />
+          <HugeIcon icon={InformationCircleIcon} size={16} />
           <AlertTitle>Joining session {sessionCode}</AlertTitle>
           <AlertDescription>
             After you verify your email, we&apos;ll take you straight to the session.
@@ -221,9 +227,9 @@ function SignUpContent() {
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
+                        <HugeIcon icon={ViewOffSlashIcon} size={16} />
                       ) : (
-                        <Eye className="h-4 w-4" />
+                        <HugeIcon icon={ViewIcon} size={16} />
                       )}
                     </button>
                   </div>
@@ -295,7 +301,7 @@ function SignUpContent() {
           <>
             <CardHeader className="space-y-1 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
-                <MailCheck className="h-6 w-6" />
+                <HugeIcon icon={MailCheckIcon} size={24} />
               </div>
               <CardTitle className="text-2xl font-semibold">
                 Check your email

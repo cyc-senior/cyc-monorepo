@@ -10,7 +10,7 @@ import {
   UpdatePersonaDto,
 } from './dto/persona.dto'
 
-/** User personas of a project (Organization → Project → User Persona). */
+/** User personas of a project (Workspace → Project → User Persona). */
 @Injectable()
 export class PersonasService {
   constructor(private readonly prisma: PrismaService) {}

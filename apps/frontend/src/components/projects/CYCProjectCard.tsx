@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { ProjectWithRole } from "@/types/project";
 import { getInitials } from "@/lib/utils";
-import { Monitor, Smartphone } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { ComputerIcon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 
 export interface ProjectStatusBadgeProps {
   project: ProjectWithRole;
@@ -76,7 +77,10 @@ export function CYCProjectCard({ project }: CYCProjectCardProps) {
       : [];
 
   return (
-    <div className="group bg-card border border-border shadow-xs hover:border-foreground/30 hover:shadow-sm transition-all flex flex-col rounded-[14px] overflow-hidden w-full">
+    <Link
+      href={`/projects/${project.id}`}
+      className="group bg-card border border-border shadow-xs hover:border-foreground/30 hover:shadow-sm transition-all flex flex-col rounded-[14px] overflow-hidden w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       {/* Thumbnail Placeholder:
           Figma annotation: ภาพ A/B ล่าสุด, platform, ชื่อ, คำอธิบาย และสมาชิก ไม่มีภาพจนกว่า AI จะสร้าง A/B ครั้งแรก */}
       <div className="h-[180px] w-full bg-accent/50 relative flex items-center justify-center overflow-hidden border-b border-border/40">
@@ -85,13 +89,13 @@ export function CYCProjectCard({ project }: CYCProjectCardProps) {
           <img
             src={project.thumbnailUrl}
             alt={project.name}
-            className="size-full object-cover"
+            className="size-full object-cover group-hover:scale-105 transition-transform duration-200"
           />
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground/50 text-xs font-medium">
-            <Monitor className="size-4" />
+            <HugeIcon icon={ComputerIcon} size={16} />
             <span>·</span>
-            <Smartphone className="size-4" />
+            <HugeIcon icon={SmartPhone01Icon} size={16} />
           </div>
         )}
       </div>
@@ -103,12 +107,9 @@ export function CYCProjectCard({ project }: CYCProjectCardProps) {
           <p className="text-xs text-muted-foreground font-normal">
             {platformText}
           </p>
-          <Link
-            href={`/projects/${project.id}`}
-            className="text-base font-semibold text-foreground leading-6 hover:underline line-clamp-1"
-          >
+          <h3 className="text-base font-semibold text-foreground leading-6 group-hover:underline line-clamp-1">
             {project.name}
-          </Link>
+          </h3>
           <p className="text-sm text-muted-foreground leading-5 line-clamp-2">
             {project.description || project.clientOrProduct}
           </p>
@@ -132,6 +133,6 @@ export function CYCProjectCard({ project }: CYCProjectCardProps) {
           <ProjectStatusBadge project={project} />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
