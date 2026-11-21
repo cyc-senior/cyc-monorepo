@@ -134,7 +134,7 @@ function ProjectsView() {
 
   return (
     <div className="flex flex-col w-full min-h-[calc(100vh-64px)] bg-background">
-      <main className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-10 flex flex-col gap-6">
+      <main className="w-full p-10 flex flex-col gap-6">
         {/* Page Head (Figma Node 832:18050 / 819:17019) */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex flex-col gap-2">

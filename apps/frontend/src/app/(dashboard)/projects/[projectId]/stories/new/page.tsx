@@ -155,7 +155,7 @@ export default function NewUserStoryPage() {
     : ["Friendly", "Clear", "Helpful"];
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-10 flex flex-col gap-6">
+    <div className="w-full p-10 flex flex-col gap-6">
       {/* Page Header matching Figma Node 815:14269 */}
       <div className="space-y-1.5">
         <h1 className="text-3xl sm:text-4xl font-heading font-medium tracking-tight text-foreground">
