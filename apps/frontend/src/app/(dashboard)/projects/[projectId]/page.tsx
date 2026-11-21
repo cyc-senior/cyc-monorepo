@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Add01Icon,
@@ -114,75 +115,52 @@ export default function ProjectMainLandingPage() {
         </div>
       </div>
 
-      {/* Tabs navigation matching Figma Node 815:11876 / 815:12260 */}
-      <div className="border-b border-border flex items-center gap-6 overflow-x-auto text-sm pt-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab("overview")}
-          className={`pb-2.5 flex items-center gap-2 font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
-            activeTab === "overview"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>Overview</span>
-        </button>
+      {/* Tabs navigation matching Figma Node 815:11876 / 815:12260 using shadcn Tabs */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) =>
+          setActiveTab(val as "overview" | "stories" | "sessions" | "reports")
+        }
+        className="w-full gap-6"
+      >
+        <div className="border-b border-border flex items-center justify-between overflow-x-auto overflow-y-hidden pt-2 scrollbar-none">
+          <TabsList variant="line" className="border-b-0 w-auto">
+            <TabsTrigger value="overview">
+              Overview
+            </TabsTrigger>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("stories")}
-          className={`pb-2.5 flex items-center gap-2 font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
-            activeTab === "stories"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>User stories</span>
-          <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
-            {stories.length}
-          </span>
-        </button>
+            <TabsTrigger value="stories">
+              <span>User stories</span>
+              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
+                {stories.length}
+              </span>
+            </TabsTrigger>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("sessions")}
-          className={`pb-2.5 flex items-center gap-2 font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
-            activeTab === "sessions"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>Test sessions</span>
-          <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
-            {stories.length > 0 ? "3" : "0"}
-          </span>
-        </button>
+            <TabsTrigger value="sessions">
+              <span>Test sessions</span>
+              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
+                {stories.length > 0 ? "3" : "0"}
+              </span>
+            </TabsTrigger>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("reports")}
-          className={`pb-2.5 flex items-center gap-2 font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
-            activeTab === "reports"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>Reports</span>
-          <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
-            {stories.length > 0 ? "1" : "0"}
-          </span>
-        </button>
+            <TabsTrigger value="reports">
+              <span>Reports</span>
+              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
+                {stories.length > 0 ? "1" : "0"}
+              </span>
+            </TabsTrigger>
+          </TabsList>
 
-        <Link
-          href={`/projects/${projectId}/setup/intent`}
-          className="pb-2.5 flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-b-2 border-transparent -mb-px"
-        >
-          <span>Design intent</span>
-        </Link>
-      </div>
+          <Link
+            href={`/projects/${projectId}/setup/intent`}
+            className="pb-2.5 flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-b-2 border-transparent text-sm -mb-px shrink-0"
+          >
+            <span>Design intent</span>
+          </Link>
+        </div>
 
-      {/* Main Content: Screen 14A (Empty state) vs Screen 14 (Project main page) */}
-      {stories.length === 0 ? (
+        <TabsContent value="overview" className="mt-0 outline-hidden">
+          {stories.length === 0 ? (
         /* Screen 14A: No user stories yet (Figma Node 815:11884) */
         <div className="w-full rounded-[14px] bg-[#15095d] text-white py-16 sm:py-20 px-6 sm:px-12 flex flex-col items-center justify-center text-center shadow-xs">
           {/* Folder with plus vector icon matching Figma Node 815:11885 */}
@@ -575,7 +553,27 @@ export default function ProjectMainLandingPage() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </TabsContent>
+
+      <TabsContent value="stories" className="mt-0 outline-hidden">
+        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
+          <p className="text-sm">User stories list view</p>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="sessions" className="mt-0 outline-hidden">
+        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
+          <p className="text-sm">Test sessions list view</p>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="reports" className="mt-0 outline-hidden">
+        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
+          <p className="text-sm">Reports view</p>
+        </div>
+      </TabsContent>
+    </Tabs>
     </div>
   );
 }
