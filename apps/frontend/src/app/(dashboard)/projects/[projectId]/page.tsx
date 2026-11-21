@@ -414,11 +414,26 @@ export default function ProjectMainLandingPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 text-center border rounded-xl border-dashed bg-muted/20 space-y-1.5">
-                      <p className="text-sm font-medium text-foreground">No reports generated yet</p>
-                      <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    <div className="rounded-[12px] bg-[#15095d] text-white p-6 sm:p-8 flex flex-col items-center justify-center text-center shadow-xs">
+                      <div className="mb-3 flex items-center justify-center">
+                        <HugeIcon icon={Analytics01Icon} size={32} className="text-white" />
+                      </div>
+                      <h3 className="text-lg font-heading font-medium tracking-tight text-white">
+                        No reports generated yet
+                      </h3>
+                      <p className="text-xs text-slate-200 mt-1 max-w-sm leading-relaxed">
                         Reports are automatically prepared after participants test your design variants.
                       </p>
+                      <Button
+                        asChild
+                        size="sm"
+                        className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-[8px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-xs shadow-xs cursor-pointer"
+                      >
+                        <Link href={`/projects/${projectId}/reports/generate`}>
+                          <HugeIcon icon={Add01Icon} size={14} />
+                          <span>Generate report</span>
+                        </Link>
+                      </Button>
                     </div>
                   )}
                 </div>
