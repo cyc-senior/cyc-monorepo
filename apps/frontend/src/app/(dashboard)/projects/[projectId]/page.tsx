@@ -199,15 +199,13 @@ export default function ProjectMainLandingPage() {
               </span>
             </TabsTrigger>
 
-            {/* Design intent is aligned alongside other tabs */}
-            <TabsTrigger value="overview" asChild>
-              <Link
-                href={`/projects/${projectId}/setup/intent`}
-                className="pb-2.5 px-0 pt-0 rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground font-medium text-sm transition-colors cursor-pointer"
-              >
-                Design intent
-              </Link>
-            </TabsTrigger>
+            {/* Design intent link styled matching unselected Tab without active indicator */}
+            <Link
+              href={`/projects/${projectId}/setup/intent`}
+              className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-all text-muted-foreground hover:text-foreground cursor-pointer rounded-none border-b-2 border-transparent"
+            >
+              Design intent
+            </Link>
           </TabsList>
         </div>
 
@@ -290,37 +288,69 @@ export default function ProjectMainLandingPage() {
                     return (
                       <Card
                         key={story.id}
-                        className="rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer"
+                        className="rounded-[14px] border border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer bg-card p-0"
                         onClick={() => router.push(`/projects/${projectId}/rounds/new?storyId=${story.id}`)}
                       >
-                        <div className="h-[120px] bg-muted/40 border-b border-border/60 p-4 flex items-center justify-center overflow-hidden relative">
-                          <div className="w-[85%] h-full rounded-t-lg bg-card border border-border/80 shadow-xs p-3 space-y-2 opacity-80 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
-                            <div className="h-2 w-16 bg-muted rounded" />
-                            <div className="space-y-1">
-                              <div className="h-1.5 w-full bg-muted/60 rounded" />
-                              <div className="h-1.5 w-3/4 bg-muted/60 rounded" />
+                        {/* Thumbnail matching Figma Node 924:20997: height 120px, bg #f5f5f5, pt-4 px-4, no bottom padding */}
+                        <div className="h-[120px] bg-[#f5f5f5] dark:bg-muted/30 border-b border-border/60 px-4 pt-4 pb-0 flex items-end justify-center gap-2 overflow-hidden select-none">
+                          {/* Mini Preview Screen A matching Figma Node 924:20998 */}
+                          <div className="flex-1 h-full rounded-t-[6px] bg-card border border-border border-b-0 shadow-2xs p-2 flex flex-col justify-between opacity-90 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[7px] font-semibold text-foreground/80 leading-none">Find a room</span>
+                              <span className="h-1.5 w-4 bg-muted rounded-xs" />
                             </div>
-                            <div className="h-4 w-12 bg-primary/20 rounded self-end" />
+                            <div className="space-y-1 my-auto">
+                              <div className="grid grid-cols-4 gap-0.5">
+                                <div className="h-2 rounded-[2px] bg-muted/60" />
+                                <div className="h-2 rounded-[2px] bg-primary/20" />
+                                <div className="h-2 rounded-[2px] bg-muted/60" />
+                                <div className="h-2 rounded-[2px] bg-emerald-500/20" />
+                              </div>
+                              <div className="grid grid-cols-4 gap-0.5">
+                                <div className="h-2 rounded-[2px] bg-emerald-500/20" />
+                                <div className="h-2 rounded-[2px] bg-muted/60" />
+                                <div className="h-2 rounded-[2px] bg-primary/20" />
+                                <div className="h-2 rounded-[2px] bg-muted/60" />
+                              </div>
+                            </div>
+                            <div className="h-2.5 w-10 bg-primary/30 rounded-xs self-end" />
+                          </div>
+
+                          {/* Mini Preview Screen B matching Figma Node 924:21092 */}
+                          <div className="flex-1 h-full rounded-t-[6px] bg-card border border-border border-b-0 shadow-2xs p-2 flex flex-col justify-between opacity-90 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[7px] font-semibold text-foreground/80 leading-none">Time first</span>
+                              <span className="h-1.5 w-3 bg-muted rounded-xs" />
+                            </div>
+                            <div className="space-y-1 my-auto">
+                              <div className="h-2 w-full bg-muted/50 rounded-xs" />
+                              <div className="h-2 w-3/4 bg-primary/20 rounded-xs" />
+                              <div className="h-2 w-5/6 bg-muted/50 rounded-xs" />
+                            </div>
+                            <div className="h-2.5 w-10 bg-primary/30 rounded-xs self-end" />
                           </div>
                         </div>
 
-                        <div className="p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {storyKey}
-                            </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
-                              {story.status || "DRAFT"}
-                            </span>
+                        {/* Card Content matching Figma Node 924:21135: padding 20px (p-5), space-y-3 */}
+                        <div className="p-5 flex flex-col justify-between flex-1 gap-3">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="rounded-[10px] border border-border px-2 py-0.5 text-xs font-medium text-foreground">
+                                {storyKey}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
+                                {story.status || "DRAFT"}
+                              </span>
+                            </div>
+                            <h3 className="text-base font-semibold text-foreground line-clamp-2 leading-snug">
+                              {story.title}
+                            </h3>
+                            {story.problemStatement && (
+                              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                {story.problemStatement}
+                              </p>
+                            )}
                           </div>
-                          <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
-                            {story.title}
-                          </h3>
-                          {story.problemStatement && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                              {story.problemStatement}
-                            </p>
-                          )}
                         </div>
                       </Card>
                     );
