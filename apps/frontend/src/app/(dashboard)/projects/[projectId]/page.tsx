@@ -16,6 +16,8 @@ import {
   Tick02Icon,
   AiMagicIcon,
   ViewIcon,
+  UserGroupIcon,
+  Analytics01Icon,
 } from "@hugeicons/core-free-icons";
 import {
   getProjectById,
@@ -536,15 +538,30 @@ export default function ProjectMainLandingPage() {
         </TabsContent>
 
         <TabsContent value="sessions" className="mt-0 outline-hidden">
-          <div className="space-y-4">
-            <h2 className="text-xl font-heading font-medium text-foreground">
-              Test Sessions ({sessions.length})
-            </h2>
-            {sessions.length === 0 ? (
-              <div className="rounded-[14px] border border-border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">No test sessions created yet for this project.</p>
+          {sessions.length === 0 ? (
+            <div className="w-full rounded-[14px] bg-[#15095d] text-white py-16 sm:py-20 px-6 sm:px-12 flex flex-col items-center justify-center text-center shadow-xs">
+              <div className="mb-6 flex items-center justify-center">
+                <HugeIcon icon={UserGroupIcon} size={40} className="text-white" />
               </div>
-            ) : (
+              <h2 className="text-2xl sm:text-3xl font-heading font-medium tracking-tight text-white">
+                No test sessions yet
+              </h2>
+              <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
+                Test sessions let real users test your design variants. Start a design round and invite testers to collect actionable feedback.
+              </p>
+              <Link
+                href={`/projects/${projectId}/stories/new`}
+                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+              >
+                <HugeIcon icon={Add01Icon} size={16} />
+                <span>New user story</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h2 className="text-xl font-heading font-medium text-foreground">
+                Test Sessions ({sessions.length})
+              </h2>
               <div className="space-y-2">
                 {sessions.map((sess) => (
                   <div
@@ -558,20 +575,35 @@ export default function ProjectMainLandingPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="reports" className="mt-0 outline-hidden">
-          <div className="space-y-4">
-            <h2 className="text-xl font-heading font-medium text-foreground">
-              Stakeholder Reports ({reports.length})
-            </h2>
-            {reports.length === 0 ? (
-              <div className="rounded-[14px] border border-border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">No stakeholder reports generated yet.</p>
+          {reports.length === 0 ? (
+            <div className="w-full rounded-[14px] bg-[#15095d] text-white py-16 sm:py-20 px-6 sm:px-12 flex flex-col items-center justify-center text-center shadow-xs">
+              <div className="mb-6 flex items-center justify-center">
+                <HugeIcon icon={Analytics01Icon} size={40} className="text-white" />
               </div>
-            ) : (
+              <h2 className="text-2xl sm:text-3xl font-heading font-medium tracking-tight text-white">
+                No stakeholder reports yet
+              </h2>
+              <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
+                Stakeholder reports summarize findings for Clients, Developers, and PMs after test sessions complete.
+              </p>
+              <Link
+                href={`/projects/${projectId}/stories/new`}
+                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+              >
+                <HugeIcon icon={Add01Icon} size={16} />
+                <span>New user story</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h2 className="text-xl font-heading font-medium text-foreground">
+                Stakeholder Reports ({reports.length})
+              </h2>
               <div className="space-y-2">
                 {reports.map((rep) => (
                   <div
@@ -585,8 +617,8 @@ export default function ProjectMainLandingPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
