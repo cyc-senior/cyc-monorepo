@@ -3,26 +3,20 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Smartphone,
-  Monitor,
-  AlertCircle,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  Tick01Icon,
+  Alert02Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Add01Icon,
+  Cancel01Icon,
+} from "@hugeicons/core-free-icons";
 import {
   createUserStory,
   listPersonas,
@@ -45,11 +39,17 @@ export default function NewUserStoryPage() {
   const [problemStatement, setProblemStatement] = React.useState("");
   const [successMetric, setSuccessMetric] = React.useState("");
 
-  // Personas & Devices
+  // Personas & Devices & Screen Scope
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
   const [selectedPersonaIds, setSelectedPersonaIds] = React.useState<string[]>([]);
   const [devices, setDevices] = React.useState<string[]>(["DESKTOP", "MOBILE"]);
-  const [screenScope, setScreenScope] = React.useState("");
+  const [screensList, setScreensList] = React.useState<string[]>([
+    "Find a room",
+    "Room details",
+    "Booking confirmed",
+  ]);
+  const [newScreenInput, setNewScreenInput] = React.useState("");
+  const [isAddingScreen, setIsAddingScreen] = React.useState(false);
 
   // Intent preview
   const [intent, setIntent] = React.useState<DesignIntentDetail | null>(null);
@@ -90,6 +90,20 @@ export default function NewUserStoryPage() {
     );
   };
 
+  const handleAddScreen = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = newScreenInput.trim();
+    if (val && !screensList.includes(val)) {
+      setScreensList((prev) => [...prev, val]);
+      setNewScreenInput("");
+      setIsAddingScreen(false);
+    }
+  };
+
+  const handleRemoveScreen = (screen: string) => {
+    setScreensList((prev) => prev.filter((s) => s !== screen));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role.trim() || !want.trim() || !benefit.trim()) {
@@ -112,9 +126,7 @@ export default function NewUserStoryPage() {
         problemStatement: problemStatement.trim(),
         successMetric: successMetric.trim() || undefined,
         personaIds: selectedPersonaIds,
-        screenScope: screenScope
-          ? screenScope.split(",").map((s) => s.trim()).filter(Boolean)
-          : undefined,
+        screenScope: screensList.length > 0 ? screensList : undefined,
         devices,
       });
 
@@ -130,231 +142,408 @@ export default function NewUserStoryPage() {
     }
   };
 
+  // Color swatches from design intent
+  const intentColors = [
+    intent?.primaryColor,
+    intent?.secondaryColor,
+    intent?.accentColor,
+  ].filter(Boolean) as string[];
+
+  // Tone of voice tags
+  const toneTags = intent?.toneOfVoice
+    ? intent.toneOfVoice.split(",").map((t) => t.trim()).filter(Boolean)
+    : ["Friendly", "Clear", "Helpful"];
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+    <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-10 flex flex-col gap-6">
+      {/* Page Header matching Figma Node 815:14269 */}
+      <div className="space-y-1.5">
+        <h1 className="text-3xl sm:text-4xl font-heading font-medium tracking-tight text-foreground">
           User story & problem statement
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <p className="text-base text-muted-foreground leading-relaxed">
           One user story is one design cycle. AI turns this into a structured prompt you review next.
         </p>
       </div>
 
       {error && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Validation Error</AlertTitle>
+          <HugeIcon icon={Alert02Icon} size={16} />
+          <AlertTitle>Validation error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* User Story Formula */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">User Story</CardTitle>
-            </div>
-            <CardDescription>
-              State the user, their objective, and the ultimate value.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="story-role">As a…</Label>
-              <Input
-                id="story-role"
-                placeholder="e.g. student planning a group study session"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Left Column matching Figma Node 815:14274 */}
+          <div className="flex-1 space-y-6 w-full">
+            {/* Card 1: User story matching Figma Node 815:14275 */}
+            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-4">
+              <h2 className="text-xl font-heading font-medium text-foreground">
+                User story
+              </h2>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="story-want">I want to…</Label>
-              <Input
-                id="story-want"
-                placeholder="e.g. see which rooms are free at the time I need"
-                value={want}
-                onChange={(e) => setWant(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="story-benefit">So that…</Label>
-              <Input
-                id="story-benefit"
-                placeholder="e.g. I can book one without checking every room"
-                value={benefit}
-                onChange={(e) => setBenefit(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Problem Statement & Success Measure */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Problem & Metric</CardTitle>
-            <CardDescription>
-              Why are users dropping off, and what proves the new design won?
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="problem-statement">Problem statement</Label>
-              <Textarea
-                id="problem-statement"
-                rows={3}
-                placeholder="e.g. 4 in 10 students leave before finishing because they have to open each room one by one to see schedule availability."
-                value={problemStatement}
-                onChange={(e) => setProblemStatement(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="success-metric">Success measure</Label>
-              <Input
-                id="success-metric"
-                placeholder="e.g. Book a room for a set time in under 60 seconds without help"
-                value={successMetric}
-                onChange={(e) => setSuccessMetric(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Scope: Personas & Devices */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Scope & Targeting</CardTitle>
-            <CardDescription>
-              Select target persona and testing devices. AI builds A and B for each device you pick.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Personas */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Target Persona</Label>
-              {personas.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No personas found in design intent.{" "}
-                  <Link
-                    href={`/projects/${projectId}/setup/intent`}
-                    className="underline hover:text-foreground"
-                  >
-                    Add persona
-                  </Link>
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {personas.map((p) => {
-                    const isSelected = selectedPersonaIds.includes(p.id);
-                    return (
-                      <Button
-                        key={p.id}
-                        type="button"
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => togglePersona(p.id)}
-                        className="rounded-full text-xs"
-                      >
-                        {p.name} ({p.role})
-                      </Button>
-                    );
-                  })}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="story-role" className="text-sm font-medium text-foreground">
+                    As a…
+                  </Label>
+                  <Input
+                    id="story-role"
+                    placeholder="student planning a group study session"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="rounded-[10px]"
+                  />
                 </div>
-              )}
-            </div>
 
-            {/* Devices */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Devices in scope</Label>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant={devices.includes("DESKTOP") ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleDevice("DESKTOP")}
-                  className="gap-2"
-                >
-                  <Monitor className="h-4 w-4" />
-                  <span>Desktop</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={devices.includes("MOBILE") ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleDevice("MOBILE")}
-                  className="gap-2"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  <span>Mobile</span>
-                </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="story-want" className="text-sm font-medium text-foreground">
+                    I want to…
+                  </Label>
+                  <Input
+                    id="story-want"
+                    placeholder="see which rooms are free at the time I need"
+                    value={want}
+                    onChange={(e) => setWant(e.target.value)}
+                    className="rounded-[10px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="story-benefit" className="text-sm font-medium text-foreground">
+                    So that…
+                  </Label>
+                  <Input
+                    id="story-benefit"
+                    placeholder="I can book one without checking every room"
+                    value={benefit}
+                    onChange={(e) => setBenefit(e.target.value)}
+                    className="rounded-[10px]"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Screen Scope */}
-            <div className="space-y-1.5">
-              <Label htmlFor="screen-scope">Screens in scope (comma-separated)</Label>
-              <Input
-                id="screen-scope"
-                placeholder="e.g. Find a room, Room details, Booking confirmed"
-                value={screenScope}
-                onChange={(e) => setScreenScope(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+            {/* Card 2: Problem matching Figma Node 815:14276 */}
+            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-4">
+              <h2 className="text-xl font-heading font-medium text-foreground">
+                Problem
+              </h2>
 
-        {/* Design Intent Summary Card */}
-        {intent && (
-          <div className="rounded-xl border bg-muted/30 p-4 text-xs space-y-2 text-muted-foreground">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground">
-                Inherited from Design Intent
-              </span>
-              <Link
-                href={`/projects/${projectId}/setup/intent`}
-                className="underline hover:text-foreground"
-              >
-                Edit intent
-              </Link>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 pt-1">
-              {intent.brandColorPrimary && (
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="h-3.5 w-3.5 rounded-full border"
-                    style={{ backgroundColor: intent.brandColorPrimary }}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="problem-statement" className="text-sm font-medium text-foreground">
+                    Problem statement
+                  </Label>
+                  <Textarea
+                    id="problem-statement"
+                    rows={3}
+                    placeholder="4 in 10 students who start a booking leave before they finish. They open each room one by one to see when it is free, and give up after the third or fourth room."
+                    value={problemStatement}
+                    onChange={(e) => setProblemStatement(e.target.value)}
+                    className="rounded-[10px]"
                   />
-                  <span>Primary: {intent.brandColorPrimary}</span>
                 </div>
-              )}
-              {intent.voiceTone && (
-                <div>
-                  <span className="font-medium">Tone:</span> {intent.voiceTone}
+
+                <div className="space-y-2">
+                  <Label htmlFor="success-metric" className="text-sm font-medium text-foreground">
+                    Success measure
+                  </Label>
+                  <Input
+                    id="success-metric"
+                    placeholder="Book a room for a set time in under 60 seconds without help"
+                    value={successMetric}
+                    onChange={(e) => setSuccessMetric(e.target.value)}
+                    className="rounded-[10px]"
+                  />
                 </div>
-              )}
+              </div>
+            </div>
+
+            {/* Card 3: Scope matching Figma Node 815:14277 */}
+            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-5">
+              <h2 className="text-xl font-heading font-medium text-foreground">
+                Scope
+              </h2>
+
+              {/* Persona section matching Figma Node 815:14303 */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Persona
+                </Label>
+                {personas.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No personas defined in design intent.{" "}
+                    <Link
+                      href={`/projects/${projectId}/setup/intent`}
+                      className="underline hover:text-foreground"
+                    >
+                      Add persona
+                    </Link>
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {personas.map((p) => {
+                      const isSelected = selectedPersonaIds.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => togglePersona(p.id)}
+                          className={`rounded-[10px] px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-[#ecfccb] text-[#4d7c0f] border border-transparent shadow-2xs"
+                              : "border border-border text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {p.name}{p.age ? `, ${p.age}` : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Screens in scope section matching Figma Node 815:14308 */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Screens in scope
+                </Label>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {screensList.map((screen) => (
+                    <span
+                      key={screen}
+                      className="rounded-[10px] bg-muted px-2.5 py-1 text-xs font-medium text-foreground flex items-center gap-1.5"
+                    >
+                      <span>{screen}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveScreen(screen)}
+                        className="text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        <HugeIcon icon={Cancel01Icon} size={12} />
+                      </button>
+                    </span>
+                  ))}
+
+                  {isAddingScreen ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="text"
+                        placeholder="Screen name"
+                        value={newScreenInput}
+                        onChange={(e) => setNewScreenInput(e.target.value)}
+                        className="h-7 text-xs w-36 rounded-[8px]"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddScreen(e);
+                          } else if (e.key === "Escape") {
+                            setIsAddingScreen(false);
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleAddScreen}
+                        className="h-7 px-2 text-xs rounded-[8px]"
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsAddingScreen(false)}
+                        className="h-7 px-1.5 text-xs rounded-[8px]"
+                      >
+                        <HugeIcon icon={Cancel01Icon} size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAddingScreen(true)}
+                      className="h-7 px-2.5 text-xs font-medium gap-1 text-foreground hover:bg-muted rounded-[10px] cursor-pointer"
+                    >
+                      <HugeIcon icon={Add01Icon} size={14} />
+                      <span>Add</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Devices in scope section matching Figma Node 815:14315 */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Devices
+                </Label>
+                <div className="flex items-center gap-5 pt-1">
+                  {/* Desktop Checkbox */}
+                  <button
+                    type="button"
+                    onClick={() => toggleDevice("DESKTOP")}
+                    className="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer select-none"
+                  >
+                    <span
+                      className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
+                        devices.includes("DESKTOP")
+                          ? "bg-[#ecfccb] border-[#9ae600] text-[#497d00]"
+                          : "border-border bg-card"
+                      }`}
+                    >
+                      {devices.includes("DESKTOP") && (
+                        <HugeIcon icon={Tick01Icon} size={12} />
+                      )}
+                    </span>
+                    <span>Desktop</span>
+                  </button>
+
+                  {/* Mobile Checkbox */}
+                  <button
+                    type="button"
+                    onClick={() => toggleDevice("MOBILE")}
+                    className="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer select-none"
+                  >
+                    <span
+                      className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
+                        devices.includes("MOBILE")
+                          ? "bg-[#ecfccb] border-[#9ae600] text-[#497d00]"
+                          : "border-border bg-card"
+                      }`}
+                    >
+                      {devices.includes("MOBILE") && (
+                        <HugeIcon icon={Tick01Icon} size={12} />
+                      )}
+                    </span>
+                    <span>Mobile</span>
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  AI builds A and B for each device you pick.
+                </p>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-4 border-t">
-          <Button type="button" variant="outline" asChild>
+          {/* Right Column matching Figma Node 815:14278 */}
+          <div className="w-full lg:w-[400px] shrink-0 space-y-4 lg:sticky lg:top-6 self-start">
+            {/* Card 1: Tips for a better A/B matching Figma Node 815:14279 */}
+            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-3">
+              <h3 className="font-heading font-medium text-xl text-foreground">
+                Tips for a better A/B
+              </h3>
+              <div className="space-y-2.5 text-sm text-muted-foreground">
+                <p>• Describe one problem, not a feature list.</p>
+                <p>• Use numbers you already have (drop-off, time).</p>
+                <p>• Name the screens so AI keeps the scope small.</p>
+              </div>
+            </div>
+
+            {/* Card 2: From design intent matching Figma Node 815:14280 */}
+            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs space-y-4">
+              <h3 className="font-heading font-medium text-xl text-foreground">
+                From design intent
+              </h3>
+
+              <div className="space-y-3.5">
+                {/* Design system */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground block">
+                    Design system
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-[10px] border border-border px-2 py-0.5 text-xs font-medium text-foreground">
+                      {intent?.designSystem === "MUI" ? "MUI" : "shadcn"}
+                    </span>
+                    <span className="rounded-[10px] border border-border px-2 py-0.5 text-xs font-medium text-foreground">
+                      {intent?.designStandards?.[0] || "WCAG 2.2 AA"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Brand colours */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground block">
+                    Brand colours
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {(intentColors.length > 0
+                      ? intentColors
+                      : ["#F2652A", "#FFB81C", "#1E1E1E"]
+                    ).map((col, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-[6px] border border-border px-2 py-0.5 flex items-center gap-1.5 text-xs font-mono uppercase bg-card"
+                      >
+                        <span
+                          className="h-3 w-3 rounded-[3px] border border-border/50 block shrink-0"
+                          style={{ backgroundColor: col }}
+                        />
+                        <span>{col}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tone of voice */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground block">
+                    Tone of voice
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {toneTags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-[10px] bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                asChild
+                className="w-full rounded-[10px] h-8 text-xs font-medium border-border cursor-pointer hover:bg-muted"
+              >
+                <Link href={`/projects/${projectId}/setup/intent`}>
+                  <span>Edit design intent</span>
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Navigation matching Figma Node 815:14281 */}
+        <div className="flex items-center justify-between pt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="ghost"
+            asChild
+            className="rounded-[10px] h-8 px-3 font-medium text-sm text-foreground hover:bg-muted cursor-pointer"
+          >
             <Link href={`/projects/${projectId}`}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <HugeIcon icon={ArrowLeft01Icon} size={16} />
               <span>Back</span>
             </Link>
           </Button>
 
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="gap-2 rounded-[10px] h-8 px-4 font-medium text-sm bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] cursor-pointer shadow-2xs"
+          >
             <span>{isSubmitting ? "Drafting..." : "Draft structured prompt"}</span>
-            <ArrowRight className="h-4 w-4" />
+            <HugeIcon icon={ArrowRight01Icon} size={16} />
           </Button>
         </div>
       </form>
