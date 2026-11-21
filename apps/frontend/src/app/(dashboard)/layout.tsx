@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
+import { BreadcrumbProvider } from "@/contexts/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
@@ -108,7 +109,9 @@ export default function DashboardLayout({
 
   return (
     <WorkspaceProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <BreadcrumbProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </BreadcrumbProvider>
     </WorkspaceProvider>
   );
 }
