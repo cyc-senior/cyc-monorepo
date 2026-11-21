@@ -547,21 +547,35 @@ export default function ProjectMainLandingPage() {
                 No test sessions yet
               </h2>
               <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
-                Test sessions let real users test your design variants. Start a design round and invite testers to collect actionable feedback.
+                Test sessions let real users test your design variants. Once your design round has approved variants, create a test session and invite testers.
               </p>
-              <Link
-                href={`/projects/${projectId}/stories/new`}
-                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+              <Button
+                asChild
+                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm transition-all shadow-xs cursor-pointer"
               >
-                <HugeIcon icon={Add01Icon} size={16} />
-                <span>New user story</span>
-              </Link>
+                <Link href={`/projects/${projectId}/sessions/new`}>
+                  <HugeIcon icon={Add01Icon} size={16} />
+                  <span>New test session</span>
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              <h2 className="text-xl font-heading font-medium text-foreground">
-                Test Sessions ({sessions.length})
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-heading font-medium text-foreground">
+                  Test Sessions ({sessions.length})
+                </h2>
+                <Button
+                  asChild
+                  size="sm"
+                  className="rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm cursor-pointer"
+                >
+                  <Link href={`/projects/${projectId}/sessions/new`}>
+                    <HugeIcon icon={Add01Icon} size={16} />
+                    <span>New test session</span>
+                  </Link>
+                </Button>
+              </div>
               <div className="space-y-2">
                 {sessions.map((sess) => (
                   <div
@@ -589,21 +603,35 @@ export default function ProjectMainLandingPage() {
                 No stakeholder reports yet
               </h2>
               <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
-                Stakeholder reports summarize findings for Clients, Developers, and PMs after test sessions complete.
+                Stakeholder reports synthesize findings for Clients, Developers, and Project Managers from test round evaluations.
               </p>
-              <Link
-                href={`/projects/${projectId}/stories/new`}
-                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+              <Button
+                asChild
+                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm transition-all shadow-xs cursor-pointer"
               >
-                <HugeIcon icon={Add01Icon} size={16} />
-                <span>New user story</span>
-              </Link>
+                <Link href={`/projects/${projectId}/reports/generate`}>
+                  <HugeIcon icon={Add01Icon} size={16} />
+                  <span>Generate report</span>
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              <h2 className="text-xl font-heading font-medium text-foreground">
-                Stakeholder Reports ({reports.length})
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-heading font-medium text-foreground">
+                  Stakeholder Reports ({reports.length})
+                </h2>
+                <Button
+                  asChild
+                  size="sm"
+                  className="rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm cursor-pointer"
+                >
+                  <Link href={`/projects/${projectId}/reports/generate`}>
+                    <HugeIcon icon={Add01Icon} size={16} />
+                    <span>Generate report</span>
+                  </Link>
+                </Button>
+              </div>
               <div className="space-y-2">
                 {reports.map((rep) => (
                   <div
