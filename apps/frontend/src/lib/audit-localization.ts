@@ -4,6 +4,7 @@ export interface LocalizedAuditItem {
   title: string;
   subtitle?: string;
   badge: string;
+  iconType: "alert" | "tick" | "ai" | "view" | "generic";
 }
 
 /**
@@ -35,17 +36,20 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Project created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Project",
+        iconType: "tick",
       };
     case "Project.update":
       return {
         title: "Project settings updated",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Project",
+        iconType: "tick",
       };
     case "Project.delete":
       return {
         title: "Project deleted",
         badge: "Project",
+        iconType: "alert",
       };
 
     // Project Members
@@ -54,17 +58,20 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Team member invited",
         subtitle: (body.email as string) || undefined,
         badge: "Team",
+        iconType: "tick",
       };
     case "ProjectMember.update":
       return {
         title: "Team member role changed",
         subtitle: (body.role as string) ? `Role: ${body.role}` : undefined,
         badge: "Team",
+        iconType: "tick",
       };
     case "ProjectMember.delete":
       return {
         title: "Team member removed",
         badge: "Team",
+        iconType: "alert",
       };
 
     // Design Intent
@@ -74,6 +81,7 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Design intent updated",
         subtitle: body.statement ? `"${body.statement}"` : undefined,
         badge: "Design intent",
+        iconType: "tick",
       };
 
     // Personas
@@ -82,17 +90,20 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Persona created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Persona",
+        iconType: "tick",
       };
     case "UserPersona.update":
       return {
         title: "Persona updated",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Persona",
+        iconType: "tick",
       };
     case "UserPersona.delete":
       return {
         title: "Persona deleted",
         badge: "Persona",
+        iconType: "alert",
       };
 
     // User Stories
@@ -100,30 +111,35 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
       return {
         title: "User story created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-        badge: "User story",
+        badge: "US",
+        iconType: "tick",
       };
     case "UserStory.update":
       return {
         title: "User story updated",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-        badge: "User story",
+        badge: "US",
+        iconType: "tick",
       };
     case "UserStory.delete":
       return {
         title: "User story removed",
-        badge: "User story",
+        badge: "US",
+        iconType: "alert",
       };
 
     // Story Generations
     case "StoryGeneration.create":
       return {
         title: "AI story generation started",
-        badge: "AI Generation",
+        badge: "AI",
+        iconType: "ai",
       };
     case "StoryGeneration.cancel":
       return {
         title: "AI story generation cancelled",
-        badge: "AI Generation",
+        badge: "AI",
+        iconType: "alert",
       };
 
     // Design Rounds
@@ -132,33 +148,39 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Design round started",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Round",
+        iconType: "tick",
       };
     case "DesignRound.update":
       return {
         title: "Design round updated",
         badge: "Round",
+        iconType: "tick",
       };
     case "DesignRound.approve":
       return {
         title: "Design round approved",
         badge: "Round",
+        iconType: "tick",
       };
     case "DesignRound.iterate":
       return {
         title: "Design iteration started",
         badge: "Iteration",
+        iconType: "ai",
       };
 
     // AI Generation Jobs
     case "GenerationJob.create":
       return {
         title: "AI design generation queued",
-        badge: "AI Generation",
+        badge: "AI",
+        iconType: "ai",
       };
     case "GenerationJob.cancel":
       return {
         title: "AI design generation cancelled",
-        badge: "AI Generation",
+        badge: "AI",
+        iconType: "alert",
       };
 
     // UI Variants
@@ -167,21 +189,25 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Design variant created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Variant",
+        iconType: "ai",
       };
     case "UIVariant.update":
       return {
         title: "Design variant updated",
         badge: "Variant",
+        iconType: "tick",
       };
     case "UIVariant.approve":
       return {
         title: "Design variant approved",
         badge: "Variant",
+        iconType: "tick",
       };
     case "UIVariant.delete":
       return {
         title: "Design variant removed",
         badge: "Variant",
+        iconType: "alert",
       };
 
     // Test Sessions
@@ -189,57 +215,68 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
       return {
         title: "Test session created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.update":
       return {
         title: "Test session updated",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.activate":
       return {
         title: "Test session activated",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.end":
       return {
         title: "Test session completed",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.cancel":
       return {
         title: "Test session cancelled",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "alert",
       };
     case "TestSession.add_task":
       return {
         title: "Task added to test session",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.update_task":
       return {
         title: "Task updated in test session",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "tick",
       };
     case "TestSession.remove_task":
       return {
         title: "Task removed from test session",
-        badge: "Test session",
+        badge: "Session",
+        iconType: "alert",
       };
     case "TestSession.invite":
       return {
         title: "Tester invited",
         badge: "Testers",
+        iconType: "tick",
       };
     case "TestSession.reissue_invitation":
       return {
         title: "Tester invitation resent",
         badge: "Testers",
+        iconType: "tick",
       };
     case "TestSession.revoke":
       return {
         title: "Tester invitation revoked",
         badge: "Testers",
+        iconType: "alert",
       };
 
     // Feedback Themes & Analysis
@@ -248,64 +285,76 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Feedback theme discovered",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Feedback",
+        iconType: "alert",
       };
     case "FeedbackTheme.merge":
       return {
         title: "Feedback themes merged",
         badge: "Feedback",
+        iconType: "tick",
       };
     case "FeedbackTheme.split":
       return {
         title: "Feedback theme split",
         badge: "Feedback",
+        iconType: "tick",
       };
     case "FeedbackTheme.select":
       return {
         title: "Feedback theme prioritized",
         badge: "Feedback",
+        iconType: "tick",
       };
     case "FeedbackTheme.deselect":
       return {
         title: "Feedback theme deprioritized",
         badge: "Feedback",
+        iconType: "tick",
       };
     case "FeedbackTheme.wont_fix":
       return {
         title: "Feedback theme marked won't fix",
         badge: "Feedback",
+        iconType: "alert",
       };
 
     case "FeedbackAnalysis.create":
       return {
         title: "Feedback analysis started",
         badge: "Feedback",
+        iconType: "ai",
       };
     case "FeedbackAnalysis.approve":
       return {
         title: "Feedback analysis approved",
         badge: "Feedback",
+        iconType: "tick",
       };
     case "FeedbackAnalysis.reject":
       return {
         title: "Feedback analysis rejected",
         badge: "Feedback",
+        iconType: "alert",
       };
     case "FeedbackAnalysis.cancel":
       return {
         title: "Feedback analysis cancelled",
         badge: "Feedback",
+        iconType: "alert",
       };
 
     // Stakeholder Collaboration & Reports
     case "SharedRound.acknowledge":
       return {
         title: "Stakeholder acknowledged round",
-        badge: "Stakeholders",
+        badge: "Review",
+        iconType: "view",
       };
     case "SharedRound.comment":
       return {
         title: "Stakeholder commented on round",
-        badge: "Stakeholders",
+        badge: "Review",
+        iconType: "view",
       };
 
     case "Report.create":
@@ -313,6 +362,7 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Stakeholder report generated",
         subtitle: (body.audience as string) ? `${body.audience} report` : undefined,
         badge: "Report",
+        iconType: "tick",
       };
 
     // Workspace
@@ -321,11 +371,13 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
         title: "Workspace created",
         subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
         badge: "Workspace",
+        iconType: "tick",
       };
     case "Workspace.update":
       return {
         title: "Workspace updated",
         badge: "Workspace",
+        iconType: "tick",
       };
 
     // Generic Fallback
@@ -350,11 +402,13 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
           title: `${humanEntity} ${pastVerb}`,
           subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
           badge: humanEntity,
+          iconType: verb === "delete" || verb === "cancel" ? "alert" : "tick",
         };
       }
       return {
         title: log.action,
         badge: log.entityType || "Activity",
+        iconType: "generic",
       };
     }
   }

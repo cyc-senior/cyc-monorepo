@@ -445,34 +445,51 @@ export default function ProjectMainLandingPage() {
                   </h2>
 
                   {auditLogs.length > 0 ? (
-                    <div className="space-y-2">
-                      {auditLogs.slice(0, 5).map((log) => {
-                        const { title, subtitle, badge } = localizeAuditLog(log);
+                    <div className="space-y-1">
+                      {auditLogs.slice(0, 4).map((log, idx) => {
+                        const { title, subtitle, badge, iconType } = localizeAuditLog(log);
                         const relativeTime = formatRelativeTime(log.createdAt);
+                        const isFirst = idx === 0;
+
+                        // Type icon styles matching Figma Node I815:12297;182:2081;928:21217 / 21246 / 21269 / 21292
+                        let iconBg = "bg-[#f5f5f5] dark:bg-muted";
+                        let iconEl = <HugeIcon icon={ViewIcon} size={16} className="text-muted-foreground" />;
+
+                        if (iconType === "alert") {
+                          iconBg = "bg-card border border-border/50";
+                          iconEl = <HugeIcon icon={Alert02Icon} size={16} className="text-[#ff8a3d]" />;
+                        } else if (iconType === "tick") {
+                          iconBg = "bg-[#ecfcca] dark:bg-emerald-950/60";
+                          iconEl = <HugeIcon icon={Tick02Icon} size={16} className="text-[#497d00] dark:text-emerald-400" />;
+                        } else if (iconType === "ai") {
+                          iconBg = "bg-[#f3f4ff] dark:bg-muted";
+                          iconEl = <HugeIcon icon={AiMagicIcon} size={16} className="text-[#35328d] dark:text-indigo-300" />;
+                        }
 
                         return (
                           <div
                             key={log.id}
-                            className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3 border border-border/40"
+                            className={`h-[60px] px-2.5 py-2 rounded-[10px] flex items-center justify-between gap-3 transition-colors ${
+                              isFirst ? "bg-[#f3f4ff] dark:bg-muted/40" : "hover:bg-muted/30"
+                            }`}
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="h-8 w-8 rounded-lg bg-card flex items-center justify-center shrink-0 border border-border/50">
-                                <HugeIcon icon={Tick02Icon} size={16} className="text-primary" />
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* 32x32 Type Icon container matching Figma */}
+                              <div
+                                className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}
+                              >
+                                {iconEl}
                               </div>
+
                               <div className="min-w-0 space-y-0.5">
-                                <p className="text-sm font-medium text-foreground truncate">
-                                  {title}
+                                <p className="text-sm font-normal text-foreground truncate">
+                                  {subtitle || title}
                                 </p>
-                                {subtitle && (
-                                  <p className="text-xs text-muted-foreground truncate max-w-sm">
-                                    {subtitle}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
-                                  <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono bg-muted/40">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono leading-none">
                                     {badge}
                                   </span>
-                                  <span>{relativeTime}</span>
+                                  <span className="text-xs text-muted-foreground">{relativeTime}</span>
                                 </div>
                               </div>
                             </div>
