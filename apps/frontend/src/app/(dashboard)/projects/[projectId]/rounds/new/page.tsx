@@ -51,15 +51,15 @@ export default function ReviewStructuredPromptPage() {
   const [isEditingMustUse, setIsEditingMustUse] = React.useState(false);
 
   const [comparisonQuestion, setComparisonQuestion] = React.useState(
-    "Which design makes it faster to find a free room?"
+    "Which design makes it easier to achieve the user's goal?"
   );
-  const [designAName, setDesignAName] = React.useState("Timetable first");
+  const [designAName, setDesignAName] = React.useState("Direct flow");
   const [designADesc, setDesignADesc] = React.useState(
-    "A timetable of rooms by hour. Click a free slot to book it."
+    "All essential inputs on a single view for speed."
   );
-  const [designBName, setDesignBName] = React.useState("Time first");
+  const [designBName, setDesignBName] = React.useState("Guided step-by-step");
   const [designBDesc, setDesignBDesc] = React.useState(
-    "Choose a date and time first, then pick from the rooms that are free."
+    "A staged flow prioritizing clarity and guidance."
   );
   const [isEditingDiff, setIsEditingDiff] = React.useState(false);
 
@@ -81,32 +81,41 @@ export default function ReviewStructuredPromptPage() {
         setIntent(intentData);
         setPersonas(personaList);
 
-        // Populate prompt texts
+        // Populate prompt texts from actual user story
         const defaultGoal =
-          storyData.successMetric ||
-          `Let a student book a group study room for a set time in under 60 seconds.`;
+          storyData.acceptanceCriteria ||
+          storyData.title ||
+          "Complete the primary user workflow successfully.";
         setGoalText(defaultGoal);
 
         const targetPersona = personaList[0];
         const defaultPersona = targetPersona
           ? `${targetPersona.name}${targetPersona.age ? `, ${targetPersona.age}` : ""}. ${
-              targetPersona.shortDescription ||
-              "Plans group work on her laptop, needs a room for 4 people, has never used the booking page."
+              targetPersona.shortDescription || ""
             }`
-          : `Mint, 20. Plans group work on her laptop, needs a room for 4 people, has never used the booking page.`;
+          : storyData.description
+          ? storyData.description.split("\n")[0]
+          : "Target end user for this project.";
         setPersonaText(defaultPersona);
 
         const defaultProblem =
           storyData.problemStatement ||
-          "4 in 10 leave mid-booking because they have to open each room to see when it is free.";
+          "Users need a more efficient way to accomplish this task.";
         setProblemText(defaultProblem);
 
         const ds = intentData?.designSystem === "MUI" ? "Material UI" : "shadcn";
         const standard = intentData?.designStandards?.[0] || "WCAG 2.2 AA";
         const color = intentData?.primaryColor || "#F2652A";
         setMustUseText(
-          `Use ${ds} components only and meet ${standard}. Use ${color} for primary actions. Keep copy plain and friendly, and show the room and time before confirming.`
+          `Use ${ds} components only and meet ${standard}. Use ${color} for primary actions. Keep copy plain and friendly, and provide clear user feedback.`
         );
+
+        // Populate comparison based on story
+        setComparisonQuestion(`Which design makes it easier to ${storyData.title.slice(0, 80)}?`);
+        setDesignAName("Direct flow");
+        setDesignADesc("Streamlined single-page workflow minimizing steps.");
+        setDesignBName("Guided flow");
+        setDesignBDesc("Structured multi-step workflow with contextual guidance.");
       } catch (err) {
         console.error("Failed to load prompt review data:", err);
       } finally {
