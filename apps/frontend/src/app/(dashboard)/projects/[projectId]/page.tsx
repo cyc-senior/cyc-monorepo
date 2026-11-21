@@ -30,6 +30,133 @@ import {
   AuditLogItem,
 } from "@/lib/project-client";
 
+function formatAuditAction(log: AuditLogItem): { title: string; subtitle?: string } {
+  const body = (log.changes?.body as Record<string, unknown>) || {};
+  const nameOrTitle = (body.title || body.name || body.email) as string | undefined;
+
+  switch (log.action) {
+    case "UserStory.create":
+      return {
+        title: "User story created",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "UserStory.update":
+      return {
+        title: "User story updated",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "UserStory.delete":
+      return { title: "User story removed" };
+
+    case "UserPersona.create":
+      return {
+        title: "Persona created",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "UserPersona.update":
+      return {
+        title: "Persona updated",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "UserPersona.delete":
+      return { title: "Persona removed" };
+
+    case "DesignIntent.update":
+      return {
+        title: "Design intent updated",
+        subtitle: body.statement ? `"${body.statement}"` : undefined,
+      };
+
+    case "Project.create":
+      return {
+        title: "Project created",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "Project.update":
+      return {
+        title: "Project settings updated",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+
+    case "ProjectMember.create":
+      return {
+        title: "Team member invited",
+        subtitle: (body.email as string) || undefined,
+      };
+    case "ProjectMember.update":
+      return {
+        title: "Member role updated",
+        subtitle: (body.role as string) || undefined,
+      };
+    case "ProjectMember.delete":
+      return { title: "Member removed" };
+
+    case "DesignRound.create":
+      return {
+        title: "Design round started",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "DesignRound.approve":
+      return { title: "Design round approved" };
+
+    case "GenerationJob.create":
+      return { title: "AI design generation triggered" };
+
+    case "UIVariant.create":
+      return { title: "Design variant generated" };
+
+    case "TestSession.create":
+      return {
+        title: "Test session created",
+        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+      };
+    case "TestSession.update":
+      return { title: "Test session updated" };
+
+    case "Report.create":
+      return {
+        title: "Stakeholder report generated",
+        subtitle: (body.audience as string) ? `${body.audience} report` : undefined,
+      };
+
+    default: {
+      const parts = log.action.split(".");
+      if (parts.length === 2) {
+        const verb = parts[1];
+        const pastVerb =
+          verb === "create"
+            ? "created"
+            : verb === "update"
+            ? "updated"
+            : verb === "delete"
+            ? "removed"
+            : verb;
+        const name = parts[0].replace(/([A-Z])/g, " $1").trim();
+        return {
+          title: `${name} ${pastVerb}`,
+          subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
+        };
+      }
+      return { title: log.action };
+    }
+  }
+}
+
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} h ago`;
+  if (diffDays < 7) return `${diffDays} d ago`;
+  return date.toLocaleDateString();
+}
+
 export default function ProjectMainLandingPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -383,29 +510,39 @@ export default function ProjectMainLandingPage() {
 
                   {auditLogs.length > 0 ? (
                     <div className="space-y-2">
-                      {auditLogs.slice(0, 5).map((log) => (
-                        <div
-                          key={log.id}
-                          className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3 border border-border/40"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 rounded-lg bg-card flex items-center justify-center shrink-0 border border-border/50">
-                              <HugeIcon icon={Tick02Icon} size={16} className="text-primary" />
-                            </div>
-                            <div className="min-w-0 space-y-0.5">
-                              <p className="text-sm text-foreground truncate">
-                                {log.action}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
-                                  {log.entityType}
-                                </span>
-                                <span>{new Date(log.createdAt).toLocaleDateString()}</span>
+                      {auditLogs.slice(0, 5).map((log) => {
+                        const { title, subtitle } = formatAuditAction(log);
+                        const relativeTime = formatRelativeTime(log.createdAt);
+
+                        return (
+                          <div
+                            key={log.id}
+                            className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3 border border-border/40"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-8 w-8 rounded-lg bg-card flex items-center justify-center shrink-0 border border-border/50">
+                                <HugeIcon icon={Tick02Icon} size={16} className="text-primary" />
+                              </div>
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {title}
+                                </p>
+                                {subtitle && (
+                                  <p className="text-xs text-muted-foreground truncate max-w-sm">
+                                    {subtitle}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
+                                  <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono bg-muted/40">
+                                    {log.entityType}
+                                  </span>
+                                  <span>{relativeTime}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="p-8 text-center border rounded-xl border-dashed bg-muted/20 space-y-1.5">

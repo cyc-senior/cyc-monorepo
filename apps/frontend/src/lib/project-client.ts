@@ -357,6 +357,10 @@ export interface AuditLogItem {
   entityType: string;
   entityId: string;
   actorId: string | null;
+  changes?: {
+    body?: Record<string, unknown>;
+    [key: string]: unknown;
+  } | null;
   createdAt: string;
 }
 
