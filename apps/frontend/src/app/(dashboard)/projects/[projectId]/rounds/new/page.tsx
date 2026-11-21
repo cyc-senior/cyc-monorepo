@@ -25,7 +25,7 @@ import {
   PersonaItem,
 } from "@/lib/project-client";
 
-export default function ReviewStructuredPromptPage() {
+function ReviewStructuredPromptContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -518,5 +518,19 @@ export default function ReviewStructuredPromptPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function ReviewStructuredPromptPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-12 text-center text-muted-foreground">
+          Loading prompt review...
+        </div>
+      }
+    >
+      <ReviewStructuredPromptContent />
+    </React.Suspense>
   );
 }

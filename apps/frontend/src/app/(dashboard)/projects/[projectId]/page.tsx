@@ -87,7 +87,7 @@ function getActivityButton(log: AuditLogItem, projectId: string) {
   return null;
 }
 
-export default function ProjectMainLandingPage() {
+function ProjectMainLandingView() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1067,5 +1067,19 @@ export default function ProjectMainLandingPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ProjectMainLandingPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-12 text-center text-muted-foreground">
+          Loading project...
+        </div>
+      }
+    >
+      <ProjectMainLandingView />
+    </React.Suspense>
   );
 }
