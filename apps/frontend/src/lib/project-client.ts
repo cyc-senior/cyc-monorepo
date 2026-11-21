@@ -114,40 +114,45 @@ export interface ProjectMemberItem {
 export interface UserStoryItem {
   id: string;
   projectId: string;
+  title: string;
+  description?: string | null;
+  acceptanceCriteria?: string | null;
+  problemStatement?: string | null;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Client parsed / display helpers
   storyKey?: string;
-  role: string;
-  want: string;
-  benefit: string;
-  problemStatement?: string;
+  role?: string;
+  want?: string;
+  benefit?: string;
   successMetric?: string;
   personaIds?: string[];
   screenScope?: string[];
   devices?: string[];
-  createdAt: string;
 }
 
 export interface CreateUserStoryPayload {
-  role: string;
-  want: string;
-  benefit: string;
-  problemStatement?: string;
-  successMetric?: string;
-  personaIds?: string[];
-  screenScope?: string[];
-  devices?: string[];
+  title: string;
+  description?: string | null;
+  acceptanceCriteria?: string | null;
+  problemStatement?: string | null;
+  status?: "DRAFT" | "READY" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
 }
 
 export interface DesignRoundItem {
   id: string;
   projectId: string;
   roundNumber?: number;
-  hypothesis?: string;
+  title?: string | null;
+  parentRoundId?: string | null;
+  status?: string;
   createdAt: string;
 }
 
 export interface CreateDesignRoundPayload {
-  storyId?: string;
-  hypothesis?: string;
+  title?: string | null;
+  parentRoundId?: string | null;
 }
 
 export interface GenerationJobItem {
@@ -159,6 +164,12 @@ export interface GenerationJobItem {
 
 export interface StartGenerationJobPayload {
   prompt: string;
+  variantCount?: number;
+  storyIds?: string[];
+  personaIds?: string[];
+  synthesizePersona?: boolean;
+  baseVariantId?: string;
+  idempotencyKey?: string;
 }
 
 /** Project API calls */

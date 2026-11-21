@@ -125,14 +125,18 @@ export default function ReviewStructuredPromptPage() {
 
     try {
       // 1. Create a Design Round for this User Story
+      const roundTitle = story?.title
+        ? `Design Round: ${story.title.length > 50 ? story.title.slice(0, 47) + "..." : story.title}`
+        : "Design Round";
       const round = await createDesignRound(projectId, {
-        storyId,
-        hypothesis: comparisonQuestion,
+        title: roundTitle,
       });
 
-      // 2. Start the AI Generation Job with the reviewed structured prompt
+      // 2. Start the AI Generation Job with the reviewed structured prompt and story linkage
       await startGenerationJob(projectId, round.id, {
         prompt: `Goal: ${goalText}. User: ${personaText}. Problem: ${problemText}. Constraints: ${mustUseText}. Variant A: ${designAName} (${designADesc}). Variant B: ${designBName} (${designBDesc}). Evaluation: ${comparisonQuestion}.`,
+        storyIds: [storyId],
+        personaIds: personas.slice(0, 5).map((p) => p.id),
       });
 
       // Redirect to project main page (Screen 14)

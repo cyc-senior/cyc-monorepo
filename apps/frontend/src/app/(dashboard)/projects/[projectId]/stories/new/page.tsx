@@ -119,15 +119,21 @@ export default function NewUserStoryPage() {
     setIsSubmitting(true);
 
     try {
+      const storyTitle = `As a ${role.trim()}, I want to ${want.trim()}, so that ${benefit.trim()}`;
+      const descriptionParts = [
+        `Role: ${role.trim()}`,
+        `Goal: ${want.trim()}`,
+        `Benefit: ${benefit.trim()}`,
+        selectedPersonaIds.length > 0 ? `Target Personas: ${selectedPersonaIds.join(", ")}` : "",
+        devices.length > 0 ? `Devices: ${devices.join(", ")}` : "",
+        screensList.length > 0 ? `Screens: ${screensList.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
       const created = await createUserStory(projectId, {
-        role: role.trim(),
-        want: want.trim(),
-        benefit: benefit.trim(),
+        title: storyTitle.length > 200 ? storyTitle.slice(0, 197) + "..." : storyTitle,
+        description: descriptionParts,
         problemStatement: problemStatement.trim(),
-        successMetric: successMetric.trim() || undefined,
-        personaIds: selectedPersonaIds,
-        screenScope: screensList.length > 0 ? screensList : undefined,
-        devices,
+        acceptanceCriteria: successMetric.trim() || undefined,
       });
 
       // Proceed to Screen 16: Review structured prompt
