@@ -6,6 +6,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Add01Icon,
@@ -48,6 +56,40 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+function getActivityButton(log: AuditLogItem, projectId: string) {
+  if (log.action.startsWith("FeedbackTheme") || log.action.includes("cancel") || log.action.includes("reject")) {
+    return {
+      label: "Step in",
+      href: `/projects/${projectId}?tab=sessions`,
+    };
+  }
+  if (log.entityType === "UserStory") {
+    return {
+      label: "View",
+      href: `/projects/${projectId}?tab=stories`,
+    };
+  }
+  if (log.entityType === "TestSession") {
+    return {
+      label: "View",
+      href: `/projects/${projectId}?tab=sessions`,
+    };
+  }
+  if (log.entityType === "Report") {
+    return {
+      label: "View",
+      href: `/projects/${projectId}?tab=reports`,
+    };
+  }
+  if (log.entityType === "DesignIntent") {
+    return {
+      label: "View",
+      href: `/projects/${projectId}/intent`,
+    };
+  }
+  return null;
+}
+
 export default function ProjectMainLandingPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -81,7 +123,14 @@ export default function ProjectMainLandingPage() {
   const [sessions, setSessions] = React.useState<TestSessionItem[]>([]);
   const [reports, setReports] = React.useState<ReportItem[]>([]);
   const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>([]);
+  const [selectedActivity, setSelectedActivity] = React.useState<AuditLogItem | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  const latestAuditLogs = React.useMemo(() => {
+    return [...auditLogs]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 4);
+  }, [auditLogs]);
 
   React.useEffect(() => {
     async function loadData() {
@@ -444,12 +493,13 @@ export default function ProjectMainLandingPage() {
                     Activity
                   </h2>
 
-                  {auditLogs.length > 0 ? (
+                  {latestAuditLogs.length > 0 ? (
                     <div className="space-y-1">
-                      {auditLogs.slice(0, 4).map((log, idx) => {
-                        const { title, subtitle, badge, iconType } = localizeAuditLog(log);
+                      {latestAuditLogs.map((log, idx) => {
+                        const { title, badge, iconType } = localizeAuditLog(log);
                         const relativeTime = formatRelativeTime(log.createdAt);
                         const isFirst = idx === 0;
+                        const actionBtn = getActivityButton(log, projectId);
 
                         // Type icon styles matching Figma Node I815:12297;182:2081;928:21217 / 21246 / 21269 / 21292
                         let iconBg = "bg-[#f5f5f5] dark:bg-muted";
@@ -469,7 +519,8 @@ export default function ProjectMainLandingPage() {
                         return (
                           <div
                             key={log.id}
-                            className={`h-[60px] px-2.5 py-2 rounded-[10px] flex items-center justify-between gap-3 transition-colors ${
+                            onClick={() => setSelectedActivity(log)}
+                            className={`h-[60px] px-2.5 py-2 rounded-[10px] flex items-center justify-between gap-3 transition-colors cursor-pointer ${
                               isFirst ? "bg-[#f3f4ff] dark:bg-muted/40" : "hover:bg-muted/30"
                             }`}
                           >
@@ -483,7 +534,7 @@ export default function ProjectMainLandingPage() {
 
                               <div className="min-w-0 space-y-0.5">
                                 <p className="text-sm font-normal text-foreground truncate">
-                                  {subtitle || title}
+                                  {title}
                                 </p>
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                   <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono leading-none">
@@ -493,6 +544,21 @@ export default function ProjectMainLandingPage() {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Contextual button matching Figma Node 815:12297 (button executes own behavior, does not trigger card modal) */}
+                            {actionBtn && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2.5 text-xs font-medium rounded-[10px] shrink-0 border-border/80 bg-background hover:bg-muted/50 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(actionBtn.href);
+                                }}
+                              >
+                                {actionBtn.label}
+                              </Button>
+                            )}
                           </div>
                         );
                       })}
@@ -681,6 +747,99 @@ export default function ProjectMainLandingPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Activity Details Dialog */}
+      <Dialog open={!!selectedActivity} onOpenChange={(open) => !open && setSelectedActivity(null)}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          {selectedActivity && (() => {
+            const { title, subtitle, badge, iconType } = localizeAuditLog(selectedActivity);
+            const changesBody = (selectedActivity.changes?.body as Record<string, unknown>) || {};
+            const fullDate = new Date(selectedActivity.createdAt).toLocaleString(undefined, {
+              dateStyle: "medium",
+              timeStyle: "medium",
+            });
+            const actionBtn = getActivityButton(selectedActivity, projectId);
+
+            return (
+              <>
+                <DialogHeader className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono leading-none bg-muted/40">
+                      {badge}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{fullDate}</span>
+                  </div>
+                  <DialogTitle className="text-lg font-heading">{title}</DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground font-mono">
+                    ID: {selectedActivity.id}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3.5 py-2 text-sm">
+                  {subtitle && (
+                    <div className="rounded-lg bg-muted/30 p-3 border border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Target / Title</p>
+                      <p className="font-medium text-foreground text-sm">{subtitle}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-2.5 rounded-lg border border-border/60 bg-card">
+                      <span className="text-[11px] text-muted-foreground block mb-0.5">Action Code</span>
+                      <span className="font-mono text-xs font-medium text-foreground">{selectedActivity.action}</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-border/60 bg-card">
+                      <span className="text-[11px] text-muted-foreground block mb-0.5">Entity Type</span>
+                      <span className="text-xs font-medium text-foreground">{selectedActivity.entityType}</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-border/60 bg-card col-span-2">
+                      <span className="text-[11px] text-muted-foreground block mb-0.5">Entity ID</span>
+                      <span className="font-mono text-xs text-foreground truncate block">{selectedActivity.entityId || "N/A"}</span>
+                    </div>
+                  </div>
+
+                  {Object.keys(changesBody).length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Payload Details</span>
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-3 max-h-48 overflow-y-auto space-y-2 text-xs">
+                        {Object.entries(changesBody).map(([key, val]) => (
+                          <div key={key} className="flex flex-col gap-0.5 border-b border-border/30 last:border-0 pb-1.5 last:pb-0">
+                            <span className="font-mono font-medium text-muted-foreground">{key}:</span>
+                            <span className="text-foreground whitespace-pre-wrap font-sans">
+                              {typeof val === "object" && val !== null ? JSON.stringify(val, null, 2) : String(val)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="flex items-center justify-between sm:justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedActivity(null)}
+                  >
+                    Close
+                  </Button>
+                  {actionBtn && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSelectedActivity(null);
+                        router.push(actionBtn.href);
+                      }}
+                    >
+                      {actionBtn.label}
+                    </Button>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
