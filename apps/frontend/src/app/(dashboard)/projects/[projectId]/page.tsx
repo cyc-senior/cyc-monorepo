@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,32 +20,67 @@ import {
 import {
   getProjectById,
   listUserStories,
+  listTestSessions,
+  listReports,
+  listAuditLogs,
   ProjectDetails,
   UserStoryItem,
+  TestSessionItem,
+  ReportItem,
+  AuditLogItem,
 } from "@/lib/project-client";
 
 export default function ProjectMainLandingPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const projectId = params.projectId as string;
 
+  // Active tab synchronized with URL query parameter ?tab=...
+  const tabFromUrl = searchParams.get("tab");
+  const validTabs = ["overview", "stories", "sessions", "reports"] as const;
+  type TabType = (typeof validTabs)[number];
+
+  const activeTab: TabType = (
+    validTabs.includes(tabFromUrl as TabType) ? tabFromUrl : "overview"
+  ) as TabType;
+
+  const setActiveTab = (tab: TabType) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      sp.delete("tab");
+    } else {
+      sp.set("tab", tab);
+    }
+    const query = sp.toString();
+    router.replace(query ? `/projects/${projectId}?${query}` : `/projects/${projectId}`, {
+      scroll: false,
+    });
+  };
+
   const [project, setProject] = React.useState<ProjectDetails | null>(null);
   const [stories, setStories] = React.useState<UserStoryItem[]>([]);
+  const [sessions, setSessions] = React.useState<TestSessionItem[]>([]);
+  const [reports, setReports] = React.useState<ReportItem[]>([]);
+  const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState<
-    "overview" | "stories" | "sessions" | "reports"
-  >("overview");
 
   React.useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [proj, userStories] = await Promise.all([
+        const [proj, userStories, testSessions, reportItems, logs] = await Promise.all([
           getProjectById(projectId),
           listUserStories(projectId).catch(() => []),
+          listTestSessions(projectId).catch(() => []),
+          listReports(projectId).catch(() => []),
+          listAuditLogs(projectId).catch(() => []),
         ]);
         setProject(proj);
         setStories(userStories);
+        setSessions(testSessions);
+        setReports(reportItems);
+        setAuditLogs(logs);
       } catch (err) {
         console.error("Failed to load project:", err);
       } finally {
@@ -76,6 +111,8 @@ export default function ProjectMainLandingPage() {
     );
   }
 
+  const latestReport = reports.length > 0 ? reports[0] : null;
+
   return (
     <div className="w-full p-10 flex flex-col gap-6">
       {/* Page Header matching Figma Node 815:11865 (14A) & 815:12248 (14) */}
@@ -101,29 +138,25 @@ export default function ProjectMainLandingPage() {
             </Link>
           </Button>
 
-          {stories.length > 0 && (
-            <Button
-              asChild
-              className="gap-1.5 rounded-[10px] h-8 px-3.5 font-medium text-sm bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] cursor-pointer shadow-2xs"
-            >
-              <Link href={`/projects/${projectId}/stories/new`}>
-                <HugeIcon icon={Add01Icon} size={16} />
-                <span>New user story</span>
-              </Link>
-            </Button>
-          )}
+          <Button
+            asChild
+            className="rounded-[10px] h-8 px-3.5 bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm transition-colors cursor-pointer"
+          >
+            <Link href={`/projects/${projectId}/stories/new`}>
+              <HugeIcon icon={Add01Icon} size={16} />
+              <span>New user story</span>
+            </Link>
+          </Button>
         </div>
       </div>
 
-      {/* Tabs navigation matching Figma Node 815:11876 / 815:12260 using shadcn Tabs */}
+      {/* Tabs Navigation matching Figma Node 815:11876 / 815:12260 */}
       <Tabs
         value={activeTab}
-        onValueChange={(val) =>
-          setActiveTab(val as "overview" | "stories" | "sessions" | "reports")
-        }
+        onValueChange={(val) => setActiveTab(val as TabType)}
         className="w-full gap-6"
       >
-        <div className="border-b border-border flex items-center justify-between overflow-x-auto overflow-y-hidden pt-2 scrollbar-none">
+        <div className="border-b border-border flex items-center overflow-x-auto overflow-y-hidden pt-2 scrollbar-none">
           <TabsList variant="line" className="border-b-0 w-auto">
             <TabsTrigger value="overview">
               Overview
@@ -139,441 +172,367 @@ export default function ProjectMainLandingPage() {
             <TabsTrigger value="sessions">
               <span>Test sessions</span>
               <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
-                {stories.length > 0 ? "3" : "0"}
+                {sessions.length}
               </span>
             </TabsTrigger>
 
             <TabsTrigger value="reports">
               <span>Reports</span>
               <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs font-normal">
-                {stories.length > 0 ? "1" : "0"}
+                {reports.length}
               </span>
             </TabsTrigger>
-          </TabsList>
 
-          <Link
-            href={`/projects/${projectId}/setup/intent`}
-            className="pb-2.5 flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-b-2 border-transparent text-sm -mb-px shrink-0"
-          >
-            <span>Design intent</span>
-          </Link>
+            {/* Design intent is aligned alongside other tabs */}
+            <TabsTrigger value="overview" asChild>
+              <Link
+                href={`/projects/${projectId}/setup/intent`}
+                className="pb-2.5 px-0 pt-0 rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground font-medium text-sm transition-colors cursor-pointer"
+              >
+                Design intent
+              </Link>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="overview" className="mt-0 outline-hidden">
           {stories.length === 0 ? (
-        /* Screen 14A: No user stories yet (Figma Node 815:11884) */
-        <div className="w-full rounded-[14px] bg-[#15095d] text-white py-16 sm:py-20 px-6 sm:px-12 flex flex-col items-center justify-center text-center shadow-xs">
-          {/* Folder with plus vector icon matching Figma Node 815:11885 */}
-          <div className="mb-6 flex items-center justify-center">
-            <svg
-              width="40"
-              height="40"
-              viewBox="0 0 40 40"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="text-white"
-            >
-              <path
-                d="M3.33 13.33V8.33C3.33 6.49 4.82 5 6.67 5H15.42C16.3 5 17.15 5.35 17.77 5.98L20.55 8.76C21.18 9.38 22.02 9.74 22.91 9.74H33.33C35.18 9.74 36.67 11.23 36.67 13.07V20"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M3.33 15C3.33 13.16 4.82 11.67 6.67 11.67H33.33C35.18 11.67 36.67 13.16 36.67 15V31.67C36.67 33.51 35.18 35 33.33 35H6.67C4.82 35 3.33 33.51 3.33 31.67V15Z"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M26.67 25H33.33M30 21.67V28.33"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+            /* Screen 14A: No user stories yet (Figma Node 815:11884) */
+            <div className="w-full rounded-[14px] bg-[#15095d] text-white py-16 sm:py-20 px-6 sm:px-12 flex flex-col items-center justify-center text-center shadow-xs">
+              <div className="mb-6 flex items-center justify-center">
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 40 40"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-white"
+                >
+                  <path
+                    d="M3.33 13.33V8.33C3.33 6.49 4.82 5 6.67 5H15.42C16.3 5 17.15 5.35 17.77 5.98L20.55 8.76C21.18 9.38 22.02 9.74 22.91 9.74H33.33C35.18 9.74 36.67 11.23 36.67 13.07V20"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M3.33 15C3.33 13.16 4.82 11.67 6.67 11.67H33.33C35.18 11.67 36.67 13.16 36.67 15V31.67C36.67 33.51 35.18 35 33.33 35H6.67C4.82 35 3.33 33.51 3.33 31.67V15Z"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M26.67 25H33.33M30 21.67V28.33"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
 
-          <h2 className="text-2xl sm:text-3xl font-heading font-medium tracking-tight text-white">
-            No user stories yet
-          </h2>
+              <h2 className="text-2xl sm:text-3xl font-heading font-medium tracking-tight text-white">
+                No user stories yet
+              </h2>
 
-          <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
-            Add a user story to start. AI builds an A and a B, testers try both, and you get a report.
-          </p>
+              <p className="text-base text-slate-200 mt-2 max-w-xl mx-auto leading-relaxed">
+                Add a user story to start. AI builds an A and a B, testers try both, and you get a report.
+              </p>
 
-          <Link
-            href={`/projects/${projectId}/stories/new`}
-            className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
-          >
-            <HugeIcon icon={Add01Icon} size={16} />
-            <span>New user story</span>
-          </Link>
-        </div>
-      ) : (
-        /* Screen 14: Project main page with stories (Figma Node 815:12229) */
-        <div className="space-y-8">
-          {/* Section 1: User Stories Gallery matching Figma Node 815:12267 */}
+              <Link
+                href={`/projects/${projectId}/stories/new`}
+                className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-[#9ae600] text-[#35530e] font-medium text-sm hover:bg-[#8ee000] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+              >
+                <HugeIcon icon={Add01Icon} size={16} />
+                <span>New user story</span>
+              </Link>
+            </div>
+          ) : (
+            /* Screen 14: Project main page with stories (Figma Node 815:12229) */
+            <div className="space-y-8">
+              {/* Section 1: User Stories Gallery matching Figma Node 815:12267 */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-heading font-medium text-foreground">
+                    User stories
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveTab("stories")}
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    <span>View all</span>
+                  </Button>
+                </div>
+
+                {/* Gallery grid matching Figma Node 924:20995 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {stories.map((story, idx) => {
+                    const storyKey = story.storyKey || `US${idx + 1}`;
+
+                    return (
+                      <Card
+                        key={story.id}
+                        className="rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer"
+                        onClick={() => router.push(`/projects/${projectId}/rounds/new?storyId=${story.id}`)}
+                      >
+                        <div className="h-[120px] bg-muted/40 border-b border-border/60 p-4 flex items-center justify-center overflow-hidden relative">
+                          <div className="w-[85%] h-full rounded-t-lg bg-card border border-border/80 shadow-xs p-3 space-y-2 opacity-80 group-hover:opacity-100 transition-opacity flex flex-col justify-between">
+                            <div className="h-2 w-16 bg-muted rounded" />
+                            <div className="space-y-1">
+                              <div className="h-1.5 w-full bg-muted/60 rounded" />
+                              <div className="h-1.5 w-3/4 bg-muted/60 rounded" />
+                            </div>
+                            <div className="h-4 w-12 bg-primary/20 rounded self-end" />
+                          </div>
+                        </div>
+
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {storyKey}
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
+                              {story.status || "DRAFT"}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+                            {story.title}
+                          </h3>
+                          {story.problemStatement && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                              {story.problemStatement}
+                            </p>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 2: Two-column grid matching Figma Node 815:12290 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Latest report */}
+                <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs flex flex-col justify-between space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-heading font-medium text-foreground">
+                      Latest report
+                    </h2>
+                    {reports.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setActiveTab("reports")}
+                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        View all
+                      </Button>
+                    )}
+                  </div>
+
+                  {latestReport ? (
+                    <div className="space-y-4">
+                      <div className="rounded-xl bg-[#15095d] text-white p-4 flex items-center gap-4 shadow-sm">
+                        <div className="w-14 h-14 rounded-lg bg-white/10 border border-white/20 flex flex-col justify-center items-center shrink-0 p-1 text-[8px] text-slate-200">
+                          <span className="font-semibold text-white">Report</span>
+                          <div className="w-8 h-1 bg-[#ff8a3d] rounded mt-1" />
+                        </div>
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-[#251f73] text-white text-[10px] px-2 py-0.5 font-mono">
+                              {latestReport.audience}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-white truncate">
+                            {latestReport.summary || "Stakeholder Report"}
+                          </h4>
+                          <p className="text-xs text-[#cbd1fa]">
+                            {new Date(latestReport.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end pt-1 border-t border-border/50">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveTab("reports")}
+                          className="rounded-[10px] h-8 px-2.5 text-xs font-medium border-border cursor-pointer hover:bg-muted"
+                        >
+                          Open reports
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center border rounded-xl border-dashed bg-muted/20 space-y-1.5">
+                      <p className="text-sm font-medium text-foreground">No reports generated yet</p>
+                      <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                        Reports are automatically prepared after participants test your design variants.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Activity matching Figma Node 815:12297 */}
+                <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs flex flex-col justify-between space-y-4">
+                  <h2 className="text-xl font-heading font-medium text-foreground">
+                    Activity
+                  </h2>
+
+                  {auditLogs.length > 0 ? (
+                    <div className="space-y-2">
+                      {auditLogs.slice(0, 5).map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3 border border-border/40"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-8 w-8 rounded-lg bg-card flex items-center justify-center shrink-0 border border-border/50">
+                              <HugeIcon icon={Tick02Icon} size={16} className="text-primary" />
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="text-sm text-foreground truncate">
+                                {log.action}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
+                                  {log.entityType}
+                                </span>
+                                <span>{new Date(log.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center border rounded-xl border-dashed bg-muted/20 space-y-1.5">
+                      <p className="text-sm font-medium text-foreground">No recent activity</p>
+                      <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                        Actions and test interactions in this project will appear here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="stories" className="mt-0 outline-hidden">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-heading font-medium text-foreground">
-                User stories
+                All User Stories ({stories.length})
               </h2>
               <Button
-                variant="ghost"
-                size="sm"
                 asChild
-                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                size="sm"
+                className="rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm"
               >
-                <Link href={`/projects/${projectId}/stories`}>
-                  <span>View all</span>
+                <Link href={`/projects/${projectId}/stories/new`}>
+                  <HugeIcon icon={Add01Icon} size={16} />
+                  <span>New story</span>
                 </Link>
               </Button>
             </div>
 
-            {/* Gallery grid matching Figma Node 924:20995 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {stories.map((story, idx) => {
-                const storyKey = story.storyKey || `US${idx + 1}`;
-                const isFirst = idx === 0;
-                const isSecond = idx === 1;
-
-                return (
+            {stories.length === 0 ? (
+              <div className="rounded-[14px] border border-border bg-card p-12 text-center text-muted-foreground">
+                <p className="text-sm">No user stories created yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {stories.map((story, idx) => (
                   <Card
                     key={story.id}
-                    className="rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer"
+                    className="p-5 rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs flex flex-col justify-between gap-3 cursor-pointer"
                     onClick={() => router.push(`/projects/${projectId}/rounds/new?storyId=${story.id}`)}
                   >
-                    {/* Thumbnail matching Figma Node 924:20997 / 924:21158 / 924:21174 */}
-                    <div className="h-[120px] bg-muted/40 border-b border-border/60 p-4 flex items-center justify-center overflow-hidden relative">
-                      {isFirst ? (
-                        <div className="flex items-center gap-2 w-full h-full justify-center opacity-90">
-                          {/* Mini Design A preview */}
-                          <div className="w-[140px] h-[90px] rounded-md border border-border bg-card p-2 flex flex-col justify-between shadow-2xs text-[8px] leading-tight select-none">
-                            <span className="font-medium text-foreground text-[9px] truncate">Design A</span>
-                            <div className="grid grid-cols-4 gap-1 py-1">
-                              <span className="bg-muted rounded h-3 flex items-center justify-center text-[7px] text-muted-foreground">10:00</span>
-                              <span className="bg-[#e2f3e5] rounded h-3 flex items-center justify-center text-[7px] text-[#2e7d32]">Free</span>
-                              <span className="bg-muted rounded h-3 flex items-center justify-center text-[7px] text-muted-foreground">12:00</span>
-                              <span className="bg-[#ffedd5] text-[#c2410c] rounded h-3 flex items-center justify-center text-[7px]">Pick</span>
-                            </div>
-                            <span className="text-[7px] text-muted-foreground">4 seats · Room 3</span>
-                          </div>
-
-                          {/* Mini Design B preview */}
-                          <div className="w-[140px] h-[90px] rounded-md border border-border bg-card p-2 flex flex-col justify-between shadow-2xs text-[8px] leading-tight select-none">
-                            <span className="font-medium text-foreground text-[9px] truncate">Design B</span>
-                            <div className="space-y-1">
-                              <div className="h-3 bg-muted rounded px-1 flex items-center justify-between text-[7px]">
-                                <span>Tomorrow</span>
-                                <span className="text-muted-foreground">4 ppl</span>
-                              </div>
-                              <div className="h-3 border border-[#ff8a3d] text-[#ff8a3d] rounded px-1 flex items-center justify-between text-[7px]">
-                                <span>13:00–15:00</span>
-                                <span>Selected</span>
-                              </div>
-                            </div>
-                            <span className="text-[7px] text-muted-foreground">Room 2 · 6 seats</span>
-                          </div>
-                        </div>
-                      ) : isSecond ? (
-                        <div className="text-center text-muted-foreground text-xs font-normal">
-                          No designs yet
-                        </div>
-                      ) : (
-                        <div className="w-[160px] h-[90px] rounded-md border border-border bg-card p-2 flex flex-col justify-between shadow-2xs text-[8px] select-none">
-                          <span className="font-medium text-foreground text-[9px]">Sign in preview</span>
-                          <div className="space-y-1">
-                            <div className="h-2.5 bg-muted rounded w-full" />
-                            <div className="h-2.5 bg-muted rounded w-full" />
-                            <div className="h-3 bg-[#f2652a] rounded w-full" />
-                          </div>
-                          <span className="text-[7px] text-muted-foreground">Student ID & Password</span>
-                        </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {story.storyKey || `US${idx + 1}`}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
+                          {story.status || "DRAFT"}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2">
+                        {story.title}
+                      </h3>
+                      {story.problemStatement && (
+                        <p className="text-xs text-muted-foreground line-clamp-3">
+                          {story.problemStatement}
+                        </p>
                       )}
                     </div>
-
-                    {/* Card Body matching Figma Node 924:21135 */}
-                    <div className="p-5 flex flex-col justify-between flex-1 gap-3">
-                      <div>
-                        {/* Meta row */}
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="rounded-[10px] border border-border px-2 py-0.5 text-xs font-mono font-medium text-foreground">
-                            {storyKey}
-                          </span>
-
-                          {isFirst ? (
-                            <span className="rounded-[10px] bg-[#ffedd5] text-[#c2410c] px-2 py-0.5 text-xs font-medium">
-                              T3 needs you
-                            </span>
-                          ) : isSecond ? (
-                            <span className="rounded-[10px] bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">
-                              Prompt & context
-                            </span>
-                          ) : (
-                            <span className="rounded-[10px] bg-[#ecfccb] text-[#4d7c0f] px-2 py-0.5 text-xs font-medium">
-                              Report published
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-base font-semibold text-foreground line-clamp-2 leading-snug">
-                          {story.want || "Untitled user story"}
-                        </h3>
-                      </div>
-
-                      {/* Footer row matching Figma Node 924:21144 */}
-                      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-                        <div className="flex items-center gap-2">
-                          {/* Testers Avatars */}
-                          <div className="flex items-center -space-x-1.5">
-                            <span className="h-5 w-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-foreground">
-                              T1
-                            </span>
-                            <span className="h-5 w-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-foreground">
-                              T2
-                            </span>
-                            <span className="h-5 w-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-foreground">
-                              T3
-                            </span>
-                            <span className="h-5 w-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground">
-                              +2
-                            </span>
-                          </div>
-                          <span className="text-xs">
-                            {isFirst ? "4 testing, 1 done" : isSecond ? "No testers yet" : "5 finished"}
-                          </span>
-                        </div>
-
-                        <span className="text-xs shrink-0">
-                          {isFirst ? "20 min ago" : isSecond ? "Yesterday" : "20 Oct"}
-                        </span>
-                      </div>
-                    </div>
+                    <Button variant="outline" size="sm" className="w-full text-xs">
+                      Draft structured prompt
+                    </Button>
                   </Card>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
+        </TabsContent>
 
-          {/* Section 2: Bottom Row (Latest Report & Activity) matching Figma Node 815:12294 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Latest Report matching Figma Node 815:12296 */}
-            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs flex flex-col justify-between space-y-4">
-              <h2 className="text-xl font-heading font-medium text-foreground">
-                Latest report
-              </h2>
-
-              {/* Report Hero Card matching Figma Node 928:21116 */}
-              <div className="rounded-xl bg-[#15095d] text-white p-4 flex items-center gap-4 shadow-sm">
-                <div className="w-14 h-14 rounded-lg bg-white/10 border border-white/20 flex flex-col justify-center items-center shrink-0 p-1 text-[8px] text-slate-200">
-                  <span className="font-semibold text-white">Sign-in</span>
-                  <div className="w-8 h-1 bg-[#ff8a3d] rounded mt-1" />
-                </div>
-
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-[#251f73] text-white text-[10px] px-2 py-0.5 font-mono">
-                      US0
-                    </span>
-                    <span className="rounded-full bg-[#9ae600] text-[#35530e] text-[10px] px-2 py-0.5 font-medium">
-                      Final UI
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-semibold text-white truncate">
-                    Sign in with a student account
-                  </h4>
-                  <p className="text-xs text-[#cbd1fa]">
-                    Published 20 Oct
-                  </p>
-                </div>
+        <TabsContent value="sessions" className="mt-0 outline-hidden">
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-medium text-foreground">
+              Test Sessions ({sessions.length})
+            </h2>
+            {sessions.length === 0 ? (
+              <div className="rounded-[14px] border border-border bg-card p-12 text-center text-muted-foreground">
+                <p className="text-sm">No test sessions created yet for this project.</p>
               </div>
-
-              {/* Stats Row matching Figma Node 928:21146 */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-[10px] border border-border p-3 space-y-0.5">
-                  <span className="font-heading font-medium text-xl text-[#15095d] dark:text-indigo-300 block">
-                    5
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    Testers
-                  </span>
-                </div>
-
-                <div className="rounded-[10px] border border-border p-3 space-y-0.5">
-                  <span className="font-heading font-medium text-xl text-[#15095d] dark:text-indigo-300 block">
-                    5
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    Rounds each
-                  </span>
-                </div>
-
-                <div className="rounded-[10px] border border-border p-3 space-y-0.5">
-                  <span className="font-heading font-medium text-xl text-[#15095d] dark:text-indigo-300 block">
-                    38
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    Comments
-                  </span>
-                </div>
-              </div>
-
-              {/* Role Reports Row matching Figma Node 928:21166 */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="rounded-lg bg-[#f3f4ff] dark:bg-muted text-[#15095d] dark:text-foreground px-2.5 py-1 text-xs font-medium flex items-center gap-1.5">
-                    <HugeIcon icon={Briefcase01Icon} size={14} />
-                    <span>Client</span>
-                  </span>
-                  <span className="rounded-lg bg-[#f3f4ff] dark:bg-muted text-[#15095d] dark:text-foreground px-2.5 py-1 text-xs font-medium flex items-center gap-1.5">
-                    <HugeIcon icon={CodeIcon} size={14} />
-                    <span>Developer</span>
-                  </span>
-                  <span className="rounded-lg bg-[#f3f4ff] dark:bg-muted text-[#15095d] dark:text-foreground px-2.5 py-1 text-xs font-medium flex items-center gap-1.5">
-                    <HugeIcon icon={Task01Icon} size={14} />
-                    <span>PM</span>
-                  </span>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="rounded-[10px] h-8 px-2.5 text-xs font-medium border-border cursor-pointer hover:bg-muted shrink-0"
-                >
-                  <Link href={`/projects/${projectId}/reports`}>
-                    <span>Open reports</span>
-                  </Link>
-                </Button>
-              </div>
-            </div>
-
-            {/* Right Column: Activity matching Figma Node 815:12297 */}
-            <div className="rounded-[14px] border border-border bg-card p-6 shadow-xs flex flex-col justify-between space-y-3">
-              <h2 className="text-xl font-heading font-medium text-foreground">
-                Activity
-              </h2>
-
-              <div className="space-y-1">
-                {/* Activity Item 1 */}
-                <div className="p-2.5 rounded-[10px] bg-[#f3f4ff] dark:bg-muted/40 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-card flex items-center justify-center shrink-0 border border-border/50">
-                      <HugeIcon icon={Alert02Icon} size={16} className="text-[#ff8a3d]" />
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm text-foreground truncate">
-                        T3&apos;s feedback goes up and down
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
-                          US1
-                        </span>
-                        <span>20 min ago</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="h-7 px-2.5 text-xs rounded-[8px] bg-card border-border shrink-0 cursor-pointer"
+            ) : (
+              <div className="space-y-2">
+                {sessions.map((sess) => (
+                  <div
+                    key={sess.id}
+                    className="p-4 rounded-xl border border-border bg-card flex items-center justify-between"
                   >
-                    <Link href={`/projects/${projectId}/rounds/new?storyId=1`}>
-                      <span>Step in</span>
-                    </Link>
-                  </Button>
-                </div>
-
-                {/* Activity Item 2 */}
-                <div className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[#ecfcca] flex items-center justify-center shrink-0">
-                      <HugeIcon icon={Tick02Icon} size={16} className="text-[#497d00]" />
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm text-foreground truncate">
-                        T1 finished 5 of 5 rounds
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
-                          US1
-                        </span>
-                        <span>1 h ago</span>
-                      </div>
+                    <div>
+                      <h4 className="text-sm font-medium">{sess.name || "Test Session"}</h4>
+                      <p className="text-xs text-muted-foreground">Status: {sess.status}</p>
                     </div>
                   </div>
-                </div>
-
-                {/* Activity Item 3 */}
-                <div className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[#f3f4ff] dark:bg-muted flex items-center justify-center shrink-0">
-                      <HugeIcon icon={AiMagicIcon} size={16} className="text-[#35328d] dark:text-indigo-300" />
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm text-foreground truncate">
-                        AI made A v2
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
-                          US1
-                        </span>
-                        <span>3 h ago</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Activity Item 4 */}
-                <div className="p-2.5 rounded-[10px] hover:bg-muted/30 transition flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <HugeIcon icon={ViewIcon} size={16} className="text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm text-foreground truncate">
-                        Ploy K. acknowledged the report
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-[6px] border border-border px-1 py-0.2 text-[10px] font-mono">
-                          US0
-                        </span>
-                        <span>2 d ago</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
-        </div>
-        )}
-      </TabsContent>
+        </TabsContent>
 
-      <TabsContent value="stories" className="mt-0 outline-hidden">
-        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
-          <p className="text-sm">User stories list view</p>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="sessions" className="mt-0 outline-hidden">
-        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
-          <p className="text-sm">Test sessions list view</p>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="reports" className="mt-0 outline-hidden">
-        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-muted-foreground">
-          <p className="text-sm">Reports view</p>
-        </div>
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="reports" className="mt-0 outline-hidden">
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-medium text-foreground">
+              Stakeholder Reports ({reports.length})
+            </h2>
+            {reports.length === 0 ? (
+              <div className="rounded-[14px] border border-border bg-card p-12 text-center text-muted-foreground">
+                <p className="text-sm">No stakeholder reports generated yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {reports.map((rep) => (
+                  <div
+                    key={rep.id}
+                    className="p-4 rounded-xl border border-border bg-card flex items-center justify-between"
+                  >
+                    <div>
+                      <h4 className="text-sm font-medium">{rep.audience} Report</h4>
+                      <p className="text-xs text-muted-foreground">{rep.summary || "Summary"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

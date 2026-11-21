@@ -330,3 +330,57 @@ export async function startGenerationJob(
     }
   );
 }
+
+/** Test Sessions, Reports, Audit Logs API calls */
+export interface TestSessionItem {
+  id: string;
+  projectId: string;
+  roundId: string;
+  name?: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface ReportItem {
+  id: string;
+  projectId: string;
+  roundId?: string | null;
+  audience: string;
+  summary?: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  projectId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  actorId: string | null;
+  createdAt: string;
+}
+
+export async function listTestSessions(
+  projectId: string
+): Promise<TestSessionItem[]> {
+  const res = await apiFetch<TestSessionItem[] | { data: TestSessionItem[] }>(
+    `/projects/${projectId}/test-sessions`
+  );
+  return Array.isArray(res) ? res : res.data || [];
+}
+
+export async function listReports(projectId: string): Promise<ReportItem[]> {
+  const res = await apiFetch<ReportItem[] | { data: ReportItem[] }>(
+    `/projects/${projectId}/reports`
+  );
+  return Array.isArray(res) ? res : res.data || [];
+}
+
+export async function listAuditLogs(
+  projectId: string
+): Promise<AuditLogItem[]> {
+  const res = await apiFetch<AuditLogItem[] | { data: AuditLogItem[] }>(
+    `/projects/${projectId}/audit-logs`
+  );
+  return Array.isArray(res) ? res : res.data || [];
+}
