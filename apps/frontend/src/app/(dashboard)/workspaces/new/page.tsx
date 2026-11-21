@@ -19,8 +19,8 @@ import {
   Cancel01Icon,
   InformationCircleIcon,
   AlertCircleIcon,
+  Loading03Icon,
 } from "@hugeicons/core-free-icons";
-import { Loader2 } from "lucide-react";
 
 export default function CreateWorkspaceScreen8Page() {
   const router = useRouter();
@@ -299,7 +299,7 @@ export default function CreateWorkspaceScreen8Page() {
             <Button type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <HugeIcon icon={Loading03Icon} size={16} className="animate-spin" />
                   <span>Creating...</span>
                 </>
               ) : (

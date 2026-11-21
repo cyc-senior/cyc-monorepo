@@ -7,7 +7,8 @@ import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
-import { Loader2 } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
 import type { Workspace } from "@/types/workspace";
 
 function InnerShell({ children }: { children: React.ReactNode }) {
@@ -76,7 +77,7 @@ export function DashboardShell({
   if (isLoading && !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <HugeIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
       </div>
     );
   }

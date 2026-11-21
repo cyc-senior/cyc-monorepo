@@ -15,7 +15,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Info } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  AlertCircleIcon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
 
 // Mock session resolver
 function getSessionDetails(code: string) {
@@ -130,7 +134,7 @@ function SignInContent() {
       {/* Alert Error when Google sign-in fails or cancelled */}
       {showGoogleError && (
         <Alert variant="destructive" className="relative">
-          <AlertCircle className="h-4 w-4" />
+          <HugeIcon icon={AlertCircleIcon} size={16} />
           <AlertTitle>Couldn&apos;t sign you in with Google</AlertTitle>
           <AlertDescription>
             The sign-in was cancelled or didn&apos;t finish. Try again, or use your email.
@@ -141,7 +145,7 @@ function SignInContent() {
       {/* Alert Info when session code provided */}
       {session && (
         <Alert variant="info" className="relative">
-          <Info className="h-4 w-4" />
+          <HugeIcon icon={InformationCircleIcon} size={16} />
           <AlertTitle>Joining session {session.code}</AlertTitle>
           <AlertDescription>{session.title}</AlertDescription>
         </Alert>

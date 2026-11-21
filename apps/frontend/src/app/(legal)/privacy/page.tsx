@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 
 export default function PrivacyPage() {
   return (
@@ -22,7 +23,7 @@ export default function PrivacyPage() {
             href="/signin"
             className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium hover:underline"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <HugeIcon icon={ArrowLeft02Icon} size={14} />
             Back to sign in
           </Link>
         </div>

@@ -14,8 +14,8 @@ import {
   Building03Icon,
   AlertCircleIcon,
   Ticket01Icon,
+  Loading03Icon,
 } from "@hugeicons/core-free-icons";
-import { Loader2 } from "lucide-react";
 
 export default function FirstRunScreen6Page() {
   const router = useRouter();
@@ -137,7 +137,7 @@ export default function FirstRunScreen6Page() {
             >
               {isJoining ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  <HugeIcon icon={Loading03Icon} size={14} className="mr-2 animate-spin" />
                   <span>Joining...</span>
                 </>
               ) : (

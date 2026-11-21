@@ -3,14 +3,6 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  UserPlus,
-  Trash2,
-  Info,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +32,15 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StepProgress } from "@/components/wizard/StepProgress";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  ArrowLeft02Icon,
+  CheckmarkCircle02Icon,
+  AlertCircleIcon,
+  UserAdd01Icon,
+  Delete02Icon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
 import {
   listProjectMembers,
   addProjectMember,
@@ -178,7 +179,7 @@ export default function TeamAndRolesStep3Page() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary" />
+            <HugeIcon icon={UserAdd01Icon} size={20} className="text-primary" />
             <CardTitle className="text-lg">Invite team member</CardTitle>
           </div>
           <CardDescription>
@@ -189,14 +190,14 @@ export default function TeamAndRolesStep3Page() {
           <form onSubmit={handleInvite} className="space-y-4" noValidate>
             {inviteError && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+                <HugeIcon icon={AlertCircleIcon} size={16} />
                 <AlertDescription>{inviteError}</AlertDescription>
               </Alert>
             )}
 
             {inviteSuccess && (
               <Alert className="border-emerald-500/50 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <HugeIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-600" />
                 <AlertDescription>
                   Team member added to project successfully!
                 </AlertDescription>
@@ -245,7 +246,7 @@ export default function TeamAndRolesStep3Page() {
                 disabled={isInviting}
                 className="gap-2 cursor-pointer"
               >
-                <UserPlus className="h-4 w-4" />
+                <HugeIcon icon={UserAdd01Icon} size={16} />
                 <span>{isInviting ? "Adding..." : "Add to project"}</span>
               </Button>
             </div>
@@ -356,7 +357,7 @@ export default function TeamAndRolesStep3Page() {
                             onClick={() => handleRemoveMember(member.id)}
                             className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <HugeIcon icon={Delete02Icon} size={16} />
                           </Button>
                         )}
                       </TableCell>
@@ -371,7 +372,7 @@ export default function TeamAndRolesStep3Page() {
 
       {/* Testers note banner (Figma Screen 13 Node 491:5743) */}
       <div className="flex items-start gap-3 rounded-xl border border-border/80 bg-muted/40 p-4">
-        <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+        <HugeIcon icon={InformationCircleIcon} size={20} className="text-muted-foreground shrink-0 mt-0.5" />
         <div className="space-y-0.5 text-xs text-muted-foreground leading-relaxed">
           <p className="font-medium text-foreground">Need to invite testers?</p>
           <p>
@@ -390,7 +391,7 @@ export default function TeamAndRolesStep3Page() {
           className="gap-2 cursor-pointer"
         >
           <Link href={`/projects/${projectId}/setup/intent`}>
-            <ArrowLeft className="h-4 w-4" />
+            <HugeIcon icon={ArrowLeft02Icon} size={16} />
             <span>Back</span>
           </Link>
         </Button>
@@ -400,7 +401,7 @@ export default function TeamAndRolesStep3Page() {
           onClick={handleFinish}
           className="gap-2 font-medium hover:bg-primary-hover cursor-pointer"
         >
-          <CheckCircle2 className="h-4 w-4" />
+          <HugeIcon icon={CheckmarkCircle02Icon} size={16} />
           <span>Finish setup</span>
         </Button>
       </div>

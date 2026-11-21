@@ -13,8 +13,8 @@ import {
   InformationCircleIcon,
   AlertCircleIcon,
   CheckmarkCircle02Icon,
+  Loading03Icon,
 } from "@hugeicons/core-free-icons";
-import { Loader2 } from "lucide-react";
 import { Workspace } from "@/types/workspace";
 import {
   updateWorkspace,
@@ -363,7 +363,7 @@ function WorkspaceSettingsContent({
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
                     <span>Saving...</span>
                   </>
                 ) : (

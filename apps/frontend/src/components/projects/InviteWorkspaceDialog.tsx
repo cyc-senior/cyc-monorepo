@@ -13,8 +13,8 @@ import {
   InformationCircleIcon,
   AlertCircleIcon,
   CheckmarkCircle02Icon,
+  Loading03Icon,
 } from "@hugeicons/core-free-icons";
-import { Loader2 } from "lucide-react";
 import { inviteWorkspaceMember } from "@/services/workspace.service";
 
 export interface InviteWorkspaceDialogProps {
@@ -248,7 +248,7 @@ export function InviteWorkspaceDialog({
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
                     <span>Sending...</span>
                   </>
                 ) : (
