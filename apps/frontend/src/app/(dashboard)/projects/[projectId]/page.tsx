@@ -76,7 +76,7 @@ export default function ProjectMainLandingPage() {
   }
 
   return (
-    <div className="w-full px-10 flex flex-col gap-6">
+    <div className="w-full p-10 flex flex-col gap-6">
       {/* Page Header matching Figma Node 815:11865 (14A) & 815:12248 (14) */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="space-y-1.5 max-w-3xl">
