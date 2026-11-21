@@ -68,12 +68,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       <Suspense fallback={null}>
         <WorkspaceRedirectGuard />
         <DashboardSidebarWrapper collapsed={sidebarCollapsed} />
       </Suspense>
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Suspense
           fallback={<div className="h-14 border-b bg-background shrink-0" />}
         >
