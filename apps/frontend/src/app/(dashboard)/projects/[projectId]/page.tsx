@@ -17,9 +17,6 @@ import {
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Add01Icon,
-  Briefcase01Icon,
-  CodeIcon,
-  Task01Icon,
   Alert02Icon,
   Tick02Icon,
   AiMagicIcon,
@@ -794,7 +791,7 @@ export default function ProjectMainLandingPage() {
                             Statement
                           </span>
                           <p className="text-sm font-medium text-foreground italic">
-                            "{String(changesBody.statement)}"
+                            &ldquo;{String(changesBody.statement)}&rdquo;
                           </p>
                         </div>
                       ) : null}

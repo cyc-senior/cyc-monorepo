@@ -24,26 +24,40 @@ const BreadcrumbContext = createContext<BreadcrumbContextType>({
 export function BreadcrumbProvider({ children }: { children: React.ReactNode }) {
   const [customSegments, setCustomSegments] = useState<BreadcrumbSegment[] | null>(null);
   const [project, setProject] = useState<ProjectDetails | null>(null);
+  const [prevPathname, setPrevPathname] = useState("");
   const pathname = usePathname();
 
-  // Reset custom breadcrumbs when path changes
-  useEffect(() => {
+  const match = pathname.match(/\/projects\/([a-zA-Z0-9-]+)/);
+  const projectId = match && match[1] !== "new" ? match[1] : null;
+
+  // Adjust state during render when pathname changes (official React pattern avoiding effect setState)
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setCustomSegments(null);
-  }, [pathname]);
+    if (!projectId) {
+      setProject(null);
+    }
+  }
 
   // Extract projectId if in path and fetch project name for auto breadcrumbs
   useEffect(() => {
-    const match = pathname.match(/\/projects\/([a-zA-Z0-9-]+)/);
-    const projectId = match ? match[1] : null;
-
-    if (projectId && projectId !== "new") {
-      getProjectById(projectId)
-        .then((p) => setProject(p))
-        .catch(() => setProject(null));
-    } else {
-      setProject(null);
+    if (!projectId) {
+      return;
     }
-  }, [pathname]);
+
+    let active = true;
+    getProjectById(projectId)
+      .then((p) => {
+        if (active) setProject(p);
+      })
+      .catch(() => {
+        if (active) setProject(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
 
   return (
     <BreadcrumbContext.Provider
