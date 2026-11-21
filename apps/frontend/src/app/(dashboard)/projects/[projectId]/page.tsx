@@ -29,118 +29,7 @@ import {
   ReportItem,
   AuditLogItem,
 } from "@/lib/project-client";
-
-function formatAuditAction(log: AuditLogItem): { title: string; subtitle?: string } {
-  const body = (log.changes?.body as Record<string, unknown>) || {};
-  const nameOrTitle = (body.title || body.name || body.email) as string | undefined;
-
-  switch (log.action) {
-    case "UserStory.create":
-      return {
-        title: "User story created",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "UserStory.update":
-      return {
-        title: "User story updated",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "UserStory.delete":
-      return { title: "User story removed" };
-
-    case "UserPersona.create":
-      return {
-        title: "Persona created",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "UserPersona.update":
-      return {
-        title: "Persona updated",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "UserPersona.delete":
-      return { title: "Persona removed" };
-
-    case "DesignIntent.update":
-      return {
-        title: "Design intent updated",
-        subtitle: body.statement ? `"${body.statement}"` : undefined,
-      };
-
-    case "Project.create":
-      return {
-        title: "Project created",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "Project.update":
-      return {
-        title: "Project settings updated",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-
-    case "ProjectMember.create":
-      return {
-        title: "Team member invited",
-        subtitle: (body.email as string) || undefined,
-      };
-    case "ProjectMember.update":
-      return {
-        title: "Member role updated",
-        subtitle: (body.role as string) || undefined,
-      };
-    case "ProjectMember.delete":
-      return { title: "Member removed" };
-
-    case "DesignRound.create":
-      return {
-        title: "Design round started",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "DesignRound.approve":
-      return { title: "Design round approved" };
-
-    case "GenerationJob.create":
-      return { title: "AI design generation triggered" };
-
-    case "UIVariant.create":
-      return { title: "Design variant generated" };
-
-    case "TestSession.create":
-      return {
-        title: "Test session created",
-        subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-      };
-    case "TestSession.update":
-      return { title: "Test session updated" };
-
-    case "Report.create":
-      return {
-        title: "Stakeholder report generated",
-        subtitle: (body.audience as string) ? `${body.audience} report` : undefined,
-      };
-
-    default: {
-      const parts = log.action.split(".");
-      if (parts.length === 2) {
-        const verb = parts[1];
-        const pastVerb =
-          verb === "create"
-            ? "created"
-            : verb === "update"
-            ? "updated"
-            : verb === "delete"
-            ? "removed"
-            : verb;
-        const name = parts[0].replace(/([A-Z])/g, " $1").trim();
-        return {
-          title: `${name} ${pastVerb}`,
-          subtitle: nameOrTitle ? `"${nameOrTitle}"` : undefined,
-        };
-      }
-      return { title: log.action };
-    }
-  }
-}
+import { localizeAuditLog } from "@/lib/audit-localization";
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -511,7 +400,7 @@ export default function ProjectMainLandingPage() {
                   {auditLogs.length > 0 ? (
                     <div className="space-y-2">
                       {auditLogs.slice(0, 5).map((log) => {
-                        const { title, subtitle } = formatAuditAction(log);
+                        const { title, subtitle, badge } = localizeAuditLog(log);
                         const relativeTime = formatRelativeTime(log.createdAt);
 
                         return (
@@ -534,7 +423,7 @@ export default function ProjectMainLandingPage() {
                                 )}
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
                                   <span className="rounded-[6px] border border-border px-1.5 py-0.5 text-[10px] font-mono bg-muted/40">
-                                    {log.entityType}
+                                    {badge}
                                   </span>
                                   <span>{relativeTime}</span>
                                 </div>
