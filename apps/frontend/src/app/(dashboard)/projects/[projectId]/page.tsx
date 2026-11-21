@@ -752,13 +752,22 @@ export default function ProjectMainLandingPage() {
       <Dialog open={!!selectedActivity} onOpenChange={(open) => !open && setSelectedActivity(null)}>
         <DialogContent className="max-w-md sm:max-w-lg">
           {selectedActivity && (() => {
-            const { title, subtitle, badge, iconType } = localizeAuditLog(selectedActivity);
+            const { title, subtitle, badge } = localizeAuditLog(selectedActivity);
             const changesBody = (selectedActivity.changes?.body as Record<string, unknown>) || {};
             const fullDate = new Date(selectedActivity.createdAt).toLocaleString(undefined, {
               dateStyle: "medium",
-              timeStyle: "medium",
+              timeStyle: "short",
             });
             const actionBtn = getActivityButton(selectedActivity, projectId);
+
+            const isHexColor = (val: unknown): val is string =>
+              typeof val === "string" && /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(val);
+
+            const formatFieldLabel = (key: string): string =>
+              key
+                .replace(/([A-Z])/g, " $1")
+                .replace(/^./, (str) => str.toUpperCase())
+                .trim();
 
             return (
               <>
@@ -770,52 +779,272 @@ export default function ProjectMainLandingPage() {
                     <span className="text-xs text-muted-foreground">{fullDate}</span>
                   </div>
                   <DialogTitle className="text-lg font-heading">{title}</DialogTitle>
-                  <DialogDescription className="text-xs text-muted-foreground font-mono">
-                    ID: {selectedActivity.id}
+                  <DialogDescription className="text-xs text-muted-foreground">
+                    Activity details and recorded updates
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-3.5 py-2 text-sm">
-                  {subtitle && (
-                    <div className="rounded-lg bg-muted/30 p-3 border border-border/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Target / Title</p>
-                      <p className="font-medium text-foreground text-sm">{subtitle}</p>
-                    </div>
-                  )}
+                <div className="space-y-3.5 py-1 text-sm max-h-[60vh] overflow-y-auto pr-1">
+                  {/* Entity-specific formatted views */}
+                  {selectedActivity.entityType === "DesignIntent" ? (
+                    <div className="space-y-3">
+                      {changesBody.statement ? (
+                        <div className="p-3.5 rounded-xl bg-muted/30 border border-border/40">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                            Statement
+                          </span>
+                          <p className="text-sm font-medium text-foreground italic">
+                            "{String(changesBody.statement)}"
+                          </p>
+                        </div>
+                      ) : null}
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="p-2.5 rounded-lg border border-border/60 bg-card">
-                      <span className="text-[11px] text-muted-foreground block mb-0.5">Action Code</span>
-                      <span className="font-mono text-xs font-medium text-foreground">{selectedActivity.action}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg border border-border/60 bg-card">
-                      <span className="text-[11px] text-muted-foreground block mb-0.5">Entity Type</span>
-                      <span className="text-xs font-medium text-foreground">{selectedActivity.entityType}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg border border-border/60 bg-card col-span-2">
-                      <span className="text-[11px] text-muted-foreground block mb-0.5">Entity ID</span>
-                      <span className="font-mono text-xs text-foreground truncate block">{selectedActivity.entityId || "N/A"}</span>
-                    </div>
-                  </div>
+                      {/* Color Palette */}
+                      {Boolean(changesBody.primaryColor || changesBody.secondaryColor || changesBody.accentColor) ? (
+                        <div className="p-3.5 rounded-xl border border-border/50 bg-card space-y-2">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block">
+                            Color Palette
+                          </span>
+                          <div className="flex flex-wrap items-center gap-4 pt-0.5">
+                            {isHexColor(changesBody.primaryColor) ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-6 w-6 rounded-full border border-border shadow-xs shrink-0"
+                                  style={{ backgroundColor: changesBody.primaryColor }}
+                                />
+                                <div>
+                                  <span className="text-[10px] text-muted-foreground block">Primary</span>
+                                  <span className="text-xs font-mono font-medium text-foreground">
+                                    {changesBody.primaryColor}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+                            {isHexColor(changesBody.secondaryColor) ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-6 w-6 rounded-full border border-border shadow-xs shrink-0"
+                                  style={{ backgroundColor: changesBody.secondaryColor }}
+                                />
+                                <div>
+                                  <span className="text-[10px] text-muted-foreground block">Secondary</span>
+                                  <span className="text-xs font-mono font-medium text-foreground">
+                                    {changesBody.secondaryColor}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+                            {isHexColor(changesBody.accentColor) ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-6 w-6 rounded-full border border-border shadow-xs shrink-0"
+                                  style={{ backgroundColor: changesBody.accentColor }}
+                                />
+                                <div>
+                                  <span className="text-[10px] text-muted-foreground block">Accent</span>
+                                  <span className="text-xs font-mono font-medium text-foreground">
+                                    {changesBody.accentColor}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
 
-                  {Object.keys(changesBody).length > 0 && (
-                    <div className="space-y-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">Payload Details</span>
-                      <div className="rounded-lg border border-border/60 bg-muted/20 p-3 max-h-48 overflow-y-auto space-y-2 text-xs">
-                        {Object.entries(changesBody).map(([key, val]) => (
-                          <div key={key} className="flex flex-col gap-0.5 border-b border-border/30 last:border-0 pb-1.5 last:pb-0">
-                            <span className="font-mono font-medium text-muted-foreground">{key}:</span>
-                            <span className="text-foreground whitespace-pre-wrap font-sans">
-                              {typeof val === "object" && val !== null ? JSON.stringify(val, null, 2) : String(val)}
+                      {/* Design System, Tone, Standards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {changesBody.designSystem ? (
+                          <div className="p-2.5 rounded-xl border border-border/50 bg-card">
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">Design System</span>
+                            <span className="text-xs font-medium text-foreground capitalize">
+                              {String(changesBody.designSystem)}
                             </span>
                           </div>
-                        ))}
+                        ) : null}
+                        {changesBody.toneOfVoice ? (
+                          <div className="p-2.5 rounded-xl border border-border/50 bg-card">
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">Tone of Voice</span>
+                            <span className="text-xs font-medium text-foreground">
+                              {String(changesBody.toneOfVoice)}
+                            </span>
+                          </div>
+                        ) : null}
+                        {changesBody.designStandards ? (
+                          <div className="p-2.5 rounded-xl border border-border/50 bg-card">
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">Standard</span>
+                            <span className="text-xs font-medium text-foreground">
+                              {Array.isArray(changesBody.designStandards)
+                                ? changesBody.designStandards.join(", ")
+                                : String(changesBody.designStandards)}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
+
+                      {changesBody.brandGuidelines ? (
+                        <div className="p-3 rounded-xl border border-border/50 bg-card space-y-1">
+                          <span className="text-[11px] text-muted-foreground block">Brand Guidelines</span>
+                          <p className="text-xs text-foreground whitespace-pre-wrap">
+                            {String(changesBody.brandGuidelines)}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : selectedActivity.entityType === "UserStory" ? (
+                    <div className="space-y-3">
+                      {Boolean(changesBody.title || subtitle) ? (
+                        <div className="p-3.5 rounded-xl bg-muted/30 border border-border/40">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                            User Story
+                          </span>
+                          <p className="text-sm font-medium text-foreground">
+                            {String(changesBody.title || subtitle)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {changesBody.problemStatement ? (
+                        <div className="p-3 rounded-xl border border-border/50 bg-card space-y-1">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Problem Statement</span>
+                          <p className="text-xs text-foreground whitespace-pre-wrap">
+                            {String(changesBody.problemStatement)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {changesBody.acceptanceCriteria ? (
+                        <div className="p-3 rounded-xl border border-border/50 bg-card space-y-1">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Acceptance Criteria</span>
+                          <p className="text-xs text-foreground whitespace-pre-wrap">
+                            {String(changesBody.acceptanceCriteria)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {changesBody.description && !changesBody.problemStatement ? (
+                        <div className="p-3 rounded-xl border border-border/50 bg-card space-y-1">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Description</span>
+                          <p className="text-xs text-foreground whitespace-pre-wrap">
+                            {String(changesBody.description)}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : selectedActivity.entityType === "UserPersona" ? (
+                    <div className="space-y-3">
+                      {Boolean(changesBody.name || subtitle) ? (
+                        <div className="p-3.5 rounded-xl bg-muted/30 border border-border/40">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                            Persona Name
+                          </span>
+                          <p className="text-sm font-medium text-foreground">
+                            {String(changesBody.name || subtitle)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {changesBody.role ? (
+                          <div className="p-2.5 rounded-xl border border-border/50 bg-card">
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">Role</span>
+                            <span className="text-xs font-medium text-foreground">{String(changesBody.role)}</span>
+                          </div>
+                        ) : null}
+                        {changesBody.archetype ? (
+                          <div className="p-2.5 rounded-xl border border-border/50 bg-card">
+                            <span className="text-[11px] text-muted-foreground block mb-0.5">Archetype</span>
+                            <span className="text-xs font-medium text-foreground">{String(changesBody.archetype)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {changesBody.goals ? (
+                        <div className="p-3 rounded-xl border border-border/50 bg-card space-y-1">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Goals</span>
+                          <p className="text-xs text-foreground">
+                            {Array.isArray(changesBody.goals) ? changesBody.goals.join(", ") : String(changesBody.goals)}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {subtitle && (
+                        <div className="p-3.5 rounded-xl bg-muted/30 border border-border/40">
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                            Target
+                          </span>
+                          <p className="text-sm font-medium text-foreground">{subtitle}</p>
+                        </div>
+                      )}
+
+                      {Object.keys(changesBody).length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {Object.entries(changesBody).map(([key, val]) => {
+                            if (["id", "projectId", "createdAt", "updatedAt"].includes(key)) return null;
+                            const label = formatFieldLabel(key);
+                            const isColor = isHexColor(val);
+                            const isArr = Array.isArray(val);
+
+                            return (
+                              <div key={key} className="p-2.5 rounded-xl border border-border/50 bg-card">
+                                <span className="text-[11px] text-muted-foreground block mb-1">{label}</span>
+                                {isColor ? (
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-4 w-4 rounded-full border border-border shadow-2xs"
+                                      style={{ backgroundColor: val }}
+                                    />
+                                    <span className="text-xs font-mono font-medium">{val}</span>
+                                  </div>
+                                ) : isArr ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {val.map((item, i) => (
+                                      <span
+                                        key={i}
+                                        className="px-1.5 py-0.5 rounded-[6px] border border-border bg-muted/40 text-[10px] font-mono"
+                                      >
+                                        {String(item)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs font-medium text-foreground break-words">
+                                    {typeof val === "object" && val !== null ? JSON.stringify(val) : String(val)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  {/* Subtle technical metadata collapsed by default */}
+                  <details className="pt-2 border-t border-border/40 text-xs text-muted-foreground">
+                    <summary className="text-[11px] font-mono cursor-pointer hover:text-foreground transition-colors select-none py-1">
+                      Developer metadata
+                    </summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2 pt-1 font-mono text-[10px]">
+                      <div className="p-2 rounded-lg bg-muted/30 border border-border/40">
+                        <span className="text-muted-foreground block text-[9px]">ACTION</span>
+                        <span className="text-foreground">{selectedActivity.action}</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-muted/30 border border-border/40">
+                        <span className="text-muted-foreground block text-[9px]">ENTITY TYPE</span>
+                        <span className="text-foreground">{selectedActivity.entityType}</span>
+                      </div>
+                      <div className="p-2 rounded-lg bg-muted/30 border border-border/40 col-span-2">
+                        <span className="text-muted-foreground block text-[9px]">ENTITY ID</span>
+                        <span className="text-foreground truncate block">{selectedActivity.entityId || "N/A"}</span>
+                      </div>
+                    </div>
+                  </details>
                 </div>
 
-                <DialogFooter className="flex items-center justify-between sm:justify-between">
+                <DialogFooter className="flex items-center justify-between sm:justify-between pt-2">
                   <Button
                     variant="outline"
                     size="sm"
