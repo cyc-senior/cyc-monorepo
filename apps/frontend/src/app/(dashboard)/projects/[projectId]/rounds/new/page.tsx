@@ -34,6 +34,7 @@ import {
   DesignIntentDetail,
   PersonaItem,
 } from "@/lib/project-client";
+import { API_URL, getAccessToken, refreshAccessToken } from "@/lib/api-client";
 
 function ReviewStructuredPromptContent() {
   const params = useParams();
@@ -126,15 +127,35 @@ function ReviewStructuredPromptContent() {
         );
 
         // Start SSE stream from backend to draft prompt
-        const sseUrl = `/api/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
+        const sseUrl = `${API_URL}/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
           personaIdToUse ? `&personaId=${personaIdToUse}` : ""
         }`;
 
         try {
-          const res = await fetch(sseUrl, {
+          let token = getAccessToken();
+          let res = await fetch(sseUrl, {
             signal: abortController.signal,
-            headers: { Accept: "text/event-stream" },
+            headers: {
+              Accept: "text/event-stream",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            credentials: "include",
           });
+
+          if (res.status === 401) {
+            const refreshed = await refreshAccessToken();
+            if (refreshed) {
+              token = getAccessToken();
+              res = await fetch(sseUrl, {
+                signal: abortController.signal,
+                headers: {
+                  Accept: "text/event-stream",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                credentials: "include",
+              });
+            }
+          }
 
           if (!res.ok || !res.body) {
             // Non-blocking fallback
