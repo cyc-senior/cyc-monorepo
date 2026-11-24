@@ -37,6 +37,22 @@ import {
   PersonaItem,
 } from "@/lib/project-client";
 import { API_URL, getAccessToken, refreshAccessToken } from "@/lib/api-client";
+import { readSseStream, sseErrorMessage } from "@/lib/sse";
+
+/** One progress frame of `GET .../rounds/draft-prompt/events`. */
+interface DraftPromptEvent {
+  status?: string;
+  stage?: string;
+  thought?: string;
+  prompt?: {
+    goal?: string;
+    problem?: string;
+    mustUse?: string;
+    comparisonQuestion?: string;
+    variantA?: { name?: string; description?: string };
+    variantB?: { name?: string; description?: string };
+  };
+}
 
 function ReviewStructuredPromptContent() {
   const params = useParams();
@@ -142,53 +158,43 @@ function ReviewStructuredPromptContent() {
             return;
           }
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder("utf-8");
-          let buffer = "";
+          // The backend reports a failure as an `event: error` frame whose
+          // data is the plain error message (not JSON): surface it.
+          const outcome: { drafted: boolean; error: string | null } = {
+            drafted: false,
+            error: null,
+          };
+          await readSseStream(res.body, (event) => {
+            if (event.type === "error") {
+              outcome.error = sseErrorMessage(event.data, "Drafting the prompt failed.");
+              return false;
+            }
+            const parsed = event.data as DraftPromptEvent;
+            if (!parsed || typeof parsed !== "object") return;
+            if (parsed.status) setBackendStatus(parsed.status);
+            if (parsed.thought) setThoughtText(parsed.thought);
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            if (parsed.prompt) {
+              const p = parsed.prompt;
+              if (p.goal) setGoalText(p.goal);
+              if (p.problem) setProblemText(p.problem);
+              if (p.mustUse) setMustUseText(p.mustUse);
+              if (p.comparisonQuestion) setComparisonQuestion(p.comparisonQuestion);
+              if (p.variantA?.name) setDesignAName(p.variantA.name);
+              if (p.variantA?.description) setDesignADesc(p.variantA.description);
+              if (p.variantB?.name) setDesignBName(p.variantB.name);
+              if (p.variantB?.description) setDesignBDesc(p.variantB.description);
+              outcome.drafted = true;
+              setIsLoading(false);
+              setBackendStatus(null);
+            }
+          });
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n\n");
-            buffer = lines.pop() || "";
-
-            for (const chunk of lines) {
-              const dataLine = chunk
-                .split("\n")
-                .find((line) => line.startsWith("data:"));
-              if (!dataLine) continue;
-
-              const payloadStr = dataLine.replace(/^data:\s*/, "").trim();
-              if (!payloadStr) continue;
-
-              try {
-                const parsed = JSON.parse(payloadStr);
-                if (parsed.status) {
-                  setBackendStatus(parsed.status);
-                }
-                if (parsed.thought) {
-                  setThoughtText(parsed.thought);
-                }
-
-                if (parsed.prompt) {
-                  const p = parsed.prompt;
-                  if (p.goal) setGoalText(p.goal);
-                  if (p.problem) setProblemText(p.problem);
-                  if (p.mustUse) setMustUseText(p.mustUse);
-                  if (p.comparisonQuestion) setComparisonQuestion(p.comparisonQuestion);
-                  if (p.variantA?.name) setDesignAName(p.variantA.name);
-                  if (p.variantA?.description) setDesignADesc(p.variantA.description);
-                  if (p.variantB?.name) setDesignBName(p.variantB.name);
-                  if (p.variantB?.description) setDesignBDesc(p.variantB.description);
-
-                  setIsLoading(false);
-                  setBackendStatus(null);
-                }
-              } catch (parseErr) {
-                console.error("Failed to parse SSE payload", parseErr);
-              }
+          if (!abortController.signal.aborted && !isCancelled) {
+            if (outcome.error) {
+              setError(outcome.error);
+            } else if (!outcome.drafted) {
+              setError("Drafting ended before the prompt was ready. Try again.");
             }
           }
         } catch (fetchErr: unknown) {
@@ -272,8 +278,20 @@ function ReviewStructuredPromptContent() {
     }
   };
 
+  // Generating from a blank prompt wastes a round and an LLM job.
+  const promptComplete = [
+    goalText,
+    problemText,
+    mustUseText,
+    comparisonQuestion,
+    designAName,
+    designADesc,
+    designBName,
+    designBDesc,
+  ].every((value) => value.trim().length > 0);
+
   const handleApproveAndGenerate = async () => {
-    if (!storyId) return;
+    if (!storyId || !promptComplete) return;
     setError(null);
     setIsGenerating(true);
 
@@ -737,7 +755,12 @@ function ReviewStructuredPromptContent() {
 
         <Button
           onClick={handleApproveAndGenerate}
-          disabled={isGenerating || isLoading}
+          disabled={isGenerating || isLoading || !promptComplete}
+          title={
+            !isLoading && !promptComplete
+              ? "Fill in every field of the prompt before generating."
+              : undefined
+          }
           className="gap-2 rounded-[10px] h-8 px-4 font-medium text-sm bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] cursor-pointer shadow-2xs"
         >
           <HugeIcon icon={SparklesIcon} size={16} />
