@@ -7,10 +7,12 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Observable } from 'rxjs'
+import { z } from 'zod'
 
 import { recordDecision } from '../../common/decisions'
 import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
+import { llmJsonSchema } from '../../common/json-schema'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { LlmClient } from '../generation/llm.client'
@@ -22,19 +24,69 @@ import {
 } from './dto/design-round.dto'
 import { createNextRound } from './round-state'
 
-export interface DraftPromptResult {
-  goal: string
-  problem: string
-  mustUse: string
-  comparisonQuestion: string
-  variantA: {
-    name: string
-    description: string
+const text = (max: number, description: string) =>
+  z.string().trim().min(1).max(max).describe(description)
+
+const variantSchema = (description: string) =>
+  z
+    .object({
+      name: text(120, 'Short name of the variant'),
+      description: text(2000, description),
+    })
+    .strict()
+
+/** What the model must answer when drafting a structured prompt. */
+const draftPromptSchema = z
+  .object({
+    goal: text(2000, 'A clear, concise user goal to achieve in the interface'),
+    problem: text(2000, 'The core user problem or friction being addressed'),
+    mustUse: text(
+      2000,
+      'Design system, accessibility standards, brand colors, and guidelines',
+    ),
+    comparisonQuestion: text(
+      500,
+      'The evaluation question testers answer when comparing Variant A vs Variant B',
+    ),
+    variantA: variantSchema(
+      'One clear design thesis or UX strategy for Variant A',
+    ),
+    variantB: variantSchema(
+      'A distinct, contrasting UX strategy for Variant B',
+    ),
+  })
+  .strict()
+
+export type DraftPromptResult = z.infer<typeof draftPromptSchema>
+
+const DRAFT_PROMPT_JSON_SCHEMA = llmJsonSchema(draftPromptSchema)
+
+/**
+ * Validates the model's answer. Throws a message fit to show the designer
+ * when it was cut off, is not JSON, or misses a field.
+ */
+export function parseDraftPrompt(
+  content: string,
+  finishReason: string | null,
+): DraftPromptResult {
+  if (finishReason === 'length') {
+    throw new Error('The drafted prompt was cut off by the model. Try again.')
   }
-  variantB: {
-    name: string
-    description: string
+  let json: unknown
+  try {
+    json = JSON.parse(content)
+  } catch {
+    throw new Error('The model did not return a valid prompt. Try again.')
   }
+  const parsed = draftPromptSchema.safeParse(json)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new Error(
+      `The drafted prompt was incomplete (${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid'}). Try again.`,
+    )
+  }
+
+  return parsed.data
 }
 
 @Injectable()
@@ -309,73 +361,12 @@ export class RoundsService {
             return
           }
 
-          const promptSchema = {
-            type: 'object',
-            properties: {
-              goal: {
-                type: 'string',
-                description:
-                  'A clear, concise user goal to achieve in the interface',
-              },
-              problem: {
-                type: 'string',
-                description:
-                  'The core user problem or friction being addressed',
-              },
-              mustUse: {
-                type: 'string',
-                description:
-                  'Design system, accessibility standards, brand colors, and guidelines',
-              },
-              comparisonQuestion: {
-                type: 'string',
-                description:
-                  'The evaluation question testers answer when comparing Variant A vs Variant B',
-              },
-              variantA: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string', description: 'Name of Variant A' },
-                  description: {
-                    type: 'string',
-                    description:
-                      'One clear design thesis or UX strategy for Variant A',
-                  },
-                },
-                required: ['name', 'description'],
-                additionalProperties: false,
-              },
-              variantB: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string', description: 'Name of Variant B' },
-                  description: {
-                    type: 'string',
-                    description:
-                      'A distinct, contrasting UX strategy for Variant B',
-                  },
-                },
-                required: ['name', 'description'],
-                additionalProperties: false,
-              },
-            },
-            required: [
-              'goal',
-              'problem',
-              'mustUse',
-              'comparisonQuestion',
-              'variantA',
-              'variantB',
-            ],
-            additionalProperties: false,
-          }
-
           let lastSent = 0
           const THROTTLE_MS = 400
 
           const completion = await this.llm.structured({
             schemaName: 'StructuredPromptReview',
-            schema: promptSchema,
+            schema: DRAFT_PROMPT_JSON_SCHEMA,
             signal: abortController.signal,
             model: this.llm.analysisModel,
             messages: [
@@ -452,7 +443,10 @@ export class RoundsService {
             },
           })
 
-          const parsed = JSON.parse(completion.content) as DraftPromptResult
+          const parsed = parseDraftPrompt(
+            completion.content,
+            completion.finishReason,
+          )
           subscriber.next({
             data: {
               status: 'Drafting complete',
