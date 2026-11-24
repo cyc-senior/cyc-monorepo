@@ -77,24 +77,21 @@ function ReviewStructuredPromptContent() {
     "Drafting your prompt with AI..."
   );
   const [thoughtText, setThoughtText] = React.useState<string>("");
-  const [retryCount, setRetryCount] = React.useState(0);
 
-  const inFlightDraftRef = React.useRef<string | null>(null);
-
-  const handleRetry = () => {
-    inFlightDraftRef.current = null;
-    setError(null);
-    setRetryCount((prev) => prev + 1);
-  };
+  const retryRef = React.useRef<() => void>(() => {});
 
   React.useEffect(() => {
     let isCancelled = false;
-    const abortController = new AbortController();
+    let abortController = new AbortController();
 
     async function loadData() {
-      if (!storyId || inFlightDraftRef.current === `${projectId}:${storyId}:${retryCount}`) return;
-      inFlightDraftRef.current = `${projectId}:${storyId}:${retryCount}`;
+      if (!storyId || !projectId) return;
+
+      abortController.abort();
+      abortController = new AbortController();
+
       setIsLoading(true);
+      setError(null);
       setBackendStatus("Drafting your prompt with AI...");
 
       try {
@@ -104,7 +101,7 @@ function ReviewStructuredPromptContent() {
           listPersonas(projectId).catch(() => []),
         ]);
 
-        if (isCancelled) return;
+        if (isCancelled || abortController.signal.aborted) return;
 
         setStory(storyData);
         setIntent(intentData);
@@ -200,13 +197,13 @@ function ReviewStructuredPromptContent() {
             setError(msg);
           }
         } finally {
-          if (!isCancelled) {
+          if (!isCancelled && !abortController.signal.aborted) {
             setIsLoading(false);
             setBackendStatus(null);
           }
         }
       } catch (err: unknown) {
-        if (!isCancelled) {
+        if (!isCancelled && !abortController.signal.aborted) {
           const msg = (err as Error).message || "Failed to load project details for prompt drafting.";
           setError(msg);
           setIsLoading(false);
@@ -215,16 +212,23 @@ function ReviewStructuredPromptContent() {
       }
     }
 
+    retryRef.current = () => {
+      void loadData();
+    };
+
     if (projectId && storyId) {
-      loadData();
+      void loadData();
     }
 
     return () => {
       isCancelled = true;
-      inFlightDraftRef.current = null;
       abortController.abort();
     };
-  }, [projectId, storyId, retryCount]);
+  }, [projectId, storyId]);
+
+  const handleRetry = () => {
+    retryRef.current();
+  };
 
   const handleSaveGoal = async () => {
     if (!isEditingGoal) {
