@@ -12,6 +12,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import { Trace, TraceLine, TraceIcon, TraceTitle } from "@/components/ui/trace";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import { useJobStream } from "@/components/generation/use-job-stream";
 import {
@@ -133,20 +134,6 @@ function progressSteps(
           : "todo",
   });
   return steps;
-}
-
-function StepIcon({ state }: { state: StepState }) {
-  if (state === "done") {
-    return <HugeIcon icon={Tick02Icon} size={20} className="text-primary-text" />;
-  }
-  if (state === "active") {
-    return (
-      <span className="flex size-5 shrink-0 items-center justify-center">
-        <HugeIcon icon={Loading02Icon} size={16} className="animate-spin text-foreground" />
-      </span>
-    );
-  }
-  return <HugeIcon icon={CircleIcon} size={20} className="text-muted-foreground" />;
 }
 
 function VariantCard({
@@ -365,23 +352,33 @@ function GeneratingContent() {
           <h2 className="font-heading text-xl font-medium leading-7 text-foreground">
             Progress
           </h2>
-          <ol className="flex flex-col">
-            {steps.map((step) => (
-              <li key={step.key} className="flex items-center gap-2.5 py-2">
-                <StepIcon state={step.state} />
-                <span
-                  className={cn(
-                    "text-sm leading-5",
-                    step.state === "todo"
-                      ? "text-muted-foreground"
-                      : "font-medium text-card-foreground"
-                  )}
-                >
-                  {step.label}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <Trace>
+            {steps.map((step) => {
+              const traceStatus =
+                step.state === "done"
+                  ? "finished"
+                  : step.state === "active"
+                    ? "running"
+                    : "pending";
+
+              return (
+                <TraceLine key={step.key} status={traceStatus}>
+                  <TraceIcon>
+                    {step.state === "done" && (
+                      <HugeIcon icon={Tick02Icon} size={18} className="text-primary-text" />
+                    )}
+                    {step.state === "active" && (
+                      <HugeIcon icon={Loading02Icon} size={16} className="animate-spin text-foreground" />
+                    )}
+                    {step.state === "todo" && (
+                      <HugeIcon icon={CircleIcon} size={16} className="text-muted-foreground" />
+                    )}
+                  </TraceIcon>
+                  <TraceTitle>{step.label}</TraceTitle>
+                </TraceLine>
+              );
+            })}
+          </Trace>
         </section>
 
         {ended ? (
