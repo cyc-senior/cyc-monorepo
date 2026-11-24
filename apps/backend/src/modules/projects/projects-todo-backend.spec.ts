@@ -10,7 +10,7 @@ describe('project frontend TODO support', () => {
             role: 'DESIGNER',
             project: {
               id: '11111111-1111-4111-8111-111111111111',
-              organizationId: '22222222-2222-4222-8222-222222222222',
+              workspaceId: '22222222-2222-4222-8222-222222222222',
               name: 'KMUTT Library',
               clientOrProduct: 'KMUTT Library',
               description: null,
@@ -86,7 +86,7 @@ describe('project frontend TODO support', () => {
   it('creates a project without platforms (the database default applies)', async () => {
     const created = {
       id: '11111111-1111-4111-8111-111111111111',
-      organizationId: '22222222-2222-4222-8222-222222222222',
+      workspaceId: '22222222-2222-4222-8222-222222222222',
       name: 'New project',
       clientOrProduct: 'Client',
       description: null,

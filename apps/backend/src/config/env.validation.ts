@@ -131,16 +131,29 @@ export class EnvironmentVariables {
   @Min(1000)
   LLM_MAX_TOKENS: number = 16_000
 
-  /** Turn off the model's reasoning phase (vLLM `enable_thinking: false`): much faster for structured output. */
+  /**
+   * Turn off the model's reasoning phase (vLLM `enable_thinking: false`):
+   * much faster and cheaper for structured output. Off by default, so the
+   * generation trace can show the model's live reasoning.
+   */
   @EnvBoolean()
   @IsBoolean()
-  LLM_DISABLE_THINKING: boolean = true
+  LLM_DISABLE_THINKING: boolean = false
 
   /** How many times the model may repair a design that fails the UI kit or WCAG checks. */
   @IsInt()
   @Min(0)
   @Max(5)
   DESIGN_REPAIR_ATTEMPTS: number = 2
+
+  /**
+   * When a design still fails after its repairs, start it over this many
+   * times (a fresh attempt told what failed) before the design is given up.
+   */
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  DESIGN_VARIANT_RESTARTS: number = 1
 
   /**
    * Namespace of the job queues in Redis. Environments sharing a Redis (or a

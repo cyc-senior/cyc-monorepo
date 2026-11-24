@@ -37,7 +37,7 @@ export class SessionLookupService {
               select: {
                 name: true,
                 platforms: true,
-                organization: { select: { name: true } },
+                workspace: { select: { name: true } },
               },
             },
             tasks: {
@@ -58,7 +58,7 @@ export class SessionLookupService {
 
     return {
       code: displayInviteCode(code),
-      workspaceName: session.project.organization.name,
+      workspaceName: session.project.workspace.name,
       projectName: session.project.name,
       taskName: session.tasks[0]?.title ?? session.title,
       platform: PLATFORM_LABELS[platform],

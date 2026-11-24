@@ -60,7 +60,7 @@ export function ABTestingPreview({
               className="size-6 rounded-full border border-border/70 bg-muted"
             />
           ))}
-          <span className="flex size-6 items-center justify-center rounded-full border border-border/70 bg-muted text-xs font-medium text-muted-foreground">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border/70 bg-muted text-xs font-medium text-muted-foreground">
             {extraTestersCount}
           </span>
         </div>

@@ -288,7 +288,19 @@ function cleanCss(html: string): string {
  * `allow-scripts`, no `allow-same-origin`); this is defence in depth.
  */
 export function sanitizeDesignHtml(raw: string): string {
-  const cleaned = cleanCss(sanitizeHtml(raw, OPTIONS)).trim()
+  const cleaned = cleanCss(sanitizeHtml(quoteSelfClosing(raw), OPTIONS)).trim()
 
   return `<!DOCTYPE html>\n${cleaned}`
+}
+
+/**
+ * Models sometimes leave the last attribute unquoted before a self-closing
+ * slash (`<rect rx=2/>`); HTML parses that as `rx="2/"`, which breaks SVG
+ * geometry. The value is quoted so the slash closes the tag instead.
+ */
+export function quoteSelfClosing(html: string): string {
+  return html.replace(
+    /(<[a-z][\w:-]*\b[^<>]*?\s[\w:-]+=)([^\s"'=<>`/]+)\/>/gi,
+    '$1"$2"/>',
+  )
 }

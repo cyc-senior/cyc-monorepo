@@ -11,6 +11,7 @@ import { inProject } from '../../common/scopes'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { checkHtml } from '../design/html/check-html'
+import { accessibilityStandard } from '../generation/design-prompts'
 import {
   CreateUIVariantDto,
   UIVariantDto,
@@ -68,6 +69,7 @@ export class UIVariantsService {
     const { storyIds, html, ...fields } = dto
     const checked = this.checked(html, context)
     await this.assertStoriesInProject(projectId, storyIds)
+    await this.assertParentInRound(roundId, dto.parentVariantId)
 
     const variant = await this.prisma.uIVariant.create({
       data: {
@@ -235,6 +237,7 @@ export class UIVariantsService {
     return {
       platforms: project.platforms,
       designSystem: intent?.designSystem ?? 'SHADCN',
+      standard: accessibilityStandard(intent?.designStandards),
       brandColors: [
         intent?.primaryColor,
         intent?.secondaryColor,
@@ -266,6 +269,25 @@ export class UIVariantsService {
     return {
       html: check.html,
       accessibility: check.report as unknown as Prisma.InputJsonObject,
+    }
+  }
+
+  /** A parent must be a variant of the same round. */
+  private async assertParentInRound(
+    roundId: string,
+    parentVariantId: string | undefined,
+  ): Promise<void> {
+    if (!parentVariantId) {
+      return
+    }
+    const parent = await this.prisma.uIVariant.findFirst({
+      where: { id: parentVariantId, roundId },
+      select: { id: true },
+    })
+    if (!parent) {
+      throw new BadRequestException(
+        'parentVariantId must be a variant of this round.',
+      )
     }
   }
 

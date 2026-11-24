@@ -4,13 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { createProject } from "@/services/project.service";
-import { DashboardBreadcrumb } from "@/components/dashboard/DashboardBreadcrumb";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  AlertCircleIcon,
+  Tick02Icon,
+  Loading03Icon,
+} from "@hugeicons/core-free-icons";
 
 export default function CreateProjectPage() {
   const router = useRouter();
-  const { currentWorkspace, workspaces, setCurrentWorkspace, isLoading } =
-    useWorkspace();
+  const { currentWorkspace, isLoading } = useWorkspace();
 
   const [name, setName] = useState("");
   const [clientOrProduct, setClientOrProduct] = useState("");
@@ -83,15 +87,15 @@ export default function CreateProjectPage() {
         throw new Error("No active workspace selected.");
       }
 
-      await createProject(currentWorkspace.id, {
+      const created = await createProject(currentWorkspace.id, {
         name: trimmedName,
         clientOrProduct: trimmedClient,
         description: description.trim() || undefined,
         platforms: ["DESKTOP", "MOBILE"],
       });
 
-      // Proceed to projects list or next step
-      router.push("/projects");
+      // Proceed to Step 2: Design intent
+      router.push(`/projects/${created.id}/setup/intent`);
     } catch (err: unknown) {
       console.error("Failed to create project:", err);
       setSubmitError(
@@ -105,24 +109,17 @@ export default function CreateProjectPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <HugeIcon icon={Loading03Icon} size={32} className="animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col flex-1 w-full bg-background min-h-[calc(100vh-4rem)]">
-      {/* Breadcrumb Header */}
-      <DashboardBreadcrumb
-        workspaces={workspaces}
-        currentWorkspace={currentWorkspace}
-        onSelectWorkspace={setCurrentWorkspace}
-        currentPage="New project"
-      />
 
       {/* Main Content Area (Figma Node 491:5322 - 11 · Create project (Hi-fi)) */}
       <main className="flex-1 w-full">
-        <div className="w-full max-w-[1360px] mx-auto px-6 sm:px-10 lg:px-20 py-8 sm:py-10 flex flex-col gap-8">
+        <div className="w-full p-10 flex flex-col gap-8">
           {/* 1. Step Progress Bar (3 segments of 96px, 4px height) */}
           <div className="flex gap-1 items-start" aria-label="Step 1 of 3">
             <div className="bg-primary h-1 w-24 rounded-xs shrink-0" />
@@ -147,7 +144,7 @@ export default function CreateProjectPage() {
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8 w-full">
             {submitError && (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
-                <AlertCircle className="size-4 shrink-0" />
+                <HugeIcon icon={AlertCircleIcon} size={16} className="shrink-0" />
                 <span>{submitError}</span>
               </div>
             )}
@@ -170,7 +167,7 @@ export default function CreateProjectPage() {
                       htmlFor="project-name"
                       className="text-sm font-medium leading-5 text-foreground cursor-pointer"
                     >
-                      Project name
+                      Project name <span className="text-destructive">*</span>
                     </label>
                     <input
                       id="project-name"
@@ -188,7 +185,7 @@ export default function CreateProjectPage() {
                     />
                     {errors.name && (
                       <p role="alert" className="text-xs text-destructive flex items-center gap-1 mt-0.5">
-                        <AlertCircle className="size-3.5 shrink-0" />
+                        <HugeIcon icon={AlertCircleIcon} size={14} className="shrink-0" />
                         <span>{errors.name}</span>
                       </p>
                     )}
@@ -200,7 +197,7 @@ export default function CreateProjectPage() {
                       htmlFor="client-or-product"
                       className="text-sm font-medium leading-5 text-foreground cursor-pointer"
                     >
-                      Client or product
+                      Client or product <span className="text-destructive">*</span>
                     </label>
                     <input
                       id="client-or-product"
@@ -221,7 +218,7 @@ export default function CreateProjectPage() {
                     />
                     {errors.clientOrProduct && (
                       <p role="alert" className="text-xs text-destructive flex items-center gap-1 mt-0.5">
-                        <AlertCircle className="size-3.5 shrink-0" />
+                        <HugeIcon icon={AlertCircleIcon} size={14} className="shrink-0" />
                         <span>{errors.clientOrProduct}</span>
                       </p>
                     )}
@@ -235,14 +232,14 @@ export default function CreateProjectPage() {
                     >
                       Description
                     </label>
-                    <textarea
+                    <Textarea
                       ref={textareaRef}
                       id="project-description"
                       placeholder="Help students book a group study room on the library website without checking every room."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       style={{ maxHeight: `${maxTextareaHeight}px` }}
-                      className="h-16 min-h-[64px] w-full rounded-[10px] border border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors resize-y"
+                      className="h-16 min-h-[64px] w-full rounded-[10px] border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors resize-none"
                     />
                   </div>
                 </div>
@@ -261,8 +258,8 @@ export default function CreateProjectPage() {
                   <div className="flex flex-col w-full">
                     {/* Item 1: Project description (Ticked) */}
                     <div className="flex items-center gap-2.5 py-2 w-full">
-                      <div className="size-5 shrink-0 flex items-center justify-center text-primary">
-                        <Check className="size-4 text-primary" strokeWidth={2.5} />
+                      <div className="size-5 shrink-0 flex items-center justify-center text-[#497d00]">
+                        <HugeIcon icon={Tick02Icon} size={18} className="text-[#497d00]" />
                       </div>
                       <span className="text-sm font-medium text-foreground">
                         Project description
@@ -354,7 +351,7 @@ export default function CreateProjectPage() {
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
                     <span>Saving...</span>
                   </>
                 ) : (

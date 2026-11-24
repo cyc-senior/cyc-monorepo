@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger'
 import {
   IsEnum,
   IsOptional,
@@ -21,9 +26,31 @@ export class CreateDesignRoundDto {
   @IsOptional()
   @IsUUID()
   parentRoundId?: string | null
+
+  /** The user story of the project this round designs. */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  storyId?: string | null
 }
 
-export class UpdateDesignRoundDto extends PartialType(CreateDesignRoundDto) {
+/** Query of `GET .../rounds/draft-prompt/events`. */
+export class DraftPromptQueryDto {
+  /** The user story of the project to draft the prompt for. */
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  storyId: string
+
+  /** A persona of the project to draft for (default: the first one). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  personaId?: string
+}
+
+export class UpdateDesignRoundDto extends PartialType(
+  OmitType(CreateDesignRoundDto, ['storyId'] as const),
+) {
   /** Cannot be set to APPROVED (use the approve endpoint). */
   @ApiPropertyOptional({
     enum: DesignRoundStatus,
@@ -58,6 +85,10 @@ export class DesignRoundDto {
 
   @ApiProperty({ format: 'uuid' })
   parentRoundId: string | null
+
+  /** The user story this round designs. */
+  @ApiProperty({ format: 'uuid' })
+  storyId: string | null
 
   @ApiProperty({ enum: DesignRoundStatus, enumName: 'DesignRoundStatus' })
   status: DesignRoundStatus

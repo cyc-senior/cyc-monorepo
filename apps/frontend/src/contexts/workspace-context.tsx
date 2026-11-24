@@ -10,9 +10,9 @@ import React, {
 } from "react";
 import { useAuth } from "./auth-context";
 import { listWorkspaces } from "@/services/workspace.service";
-import type { OrganizationRole, Workspace } from "@/types/workspace";
+import type { WorkspaceRole, Workspace } from "@/types/workspace";
 
-export type { OrganizationRole, Workspace };
+export type { WorkspaceRole, Workspace };
 
 interface WorkspaceContextType {
   workspaces: Workspace[];
@@ -46,13 +46,19 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
   undefined
 );
 
-export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+export function WorkspaceProvider({
+  initialWorkspaces = [],
+  children,
+}: {
+  initialWorkspaces?: Workspace[];
+  children: React.ReactNode;
+}) {
   const { user } = useAuth();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
-    null
+    initialWorkspaces.length > 0 ? initialWorkspaces[0] : null
   );
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(initialWorkspaces.length === 0);
 
   const refreshWorkspaces = useCallback(async (): Promise<Workspace[]> => {
     if (!user) {
@@ -81,7 +87,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
       return list;
     } catch (err) {
-      console.error("Failed to fetch workspaces from GET /organizations:", err);
+      console.error("Failed to fetch workspaces from GET /workspaces:", err);
       setWorkspaces([]);
       setCurrentWorkspace(null);
       return [];
@@ -127,7 +133,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           return list[0];
         });
       } catch (err) {
-        console.error("Failed to fetch workspaces from GET /organizations:", err);
+        console.error("Failed to fetch workspaces from GET /workspaces:", err);
         if (isMounted) {
           setWorkspaces([]);
           setCurrentWorkspace(null);

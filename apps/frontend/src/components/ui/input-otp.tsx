@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { OTPInput, OTPInputContext } from "input-otp"
-import { MinusIcon } from "lucide-react"
+import { HugeIcon } from "@/components/ui/huge-icon"
+import { MinusSignIcon } from "@hugeicons/core-free-icons"
 
 function InputOTP({
   className,
@@ -68,7 +69,7 @@ function InputOTPSlot({
 function InputOTPSeparator({ ...props }: React.ComponentProps<"div">) {
   return (
     <div data-slot="input-otp-separator" role="separator" {...props}>
-      <MinusIcon />
+      <HugeIcon icon={MinusSignIcon} size={16} />
     </div>
   )
 }

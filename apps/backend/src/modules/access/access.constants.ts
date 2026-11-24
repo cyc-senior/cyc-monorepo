@@ -1,2 +1,2 @@
 export const PERMISSION_KEY = 'requiredPermission'
-export const ORG_PERMISSION_KEY = 'requiredOrgPermission'
+export const WORKSPACE_PERMISSION_KEY = 'requiredWorkspacePermission'

@@ -10,6 +10,7 @@ import { GenerationEvents } from './generation-events.service'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmClient } from './llm.client'
 import { PersonaSynthesizer } from './persona-synthesizer'
+import { PromptDrafter } from './prompt-drafter'
 
 /**
  * LLM design generation (persona artifact + high-fidelity HTML) on BullMQ: the producer ({@link GenerationQueue}),
@@ -35,10 +36,11 @@ import { PersonaSynthesizer } from './persona-synthesizer'
     LlmClient,
     DesignGenerator,
     PersonaSynthesizer,
+    PromptDrafter,
     DesignGenerationProcessor,
     GenerationQueue,
     GenerationEvents,
   ],
-  exports: [GenerationQueue, GenerationEvents, LlmClient],
+  exports: [GenerationQueue, GenerationEvents, LlmClient, PromptDrafter],
 })
 export class GenerationModule {}

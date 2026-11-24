@@ -89,23 +89,23 @@ export class AuditInterceptor implements NestInterceptor {
     const projectId = creatingProject ? entityId : request.access?.projectId
     const role = creatingProject
       ? 'DESIGNER'
-      : (request.access?.role ?? request.orgAccess?.role)
-    const organizationId =
-      request.access?.organizationId ?? request.orgAccess?.organizationId
-    if (!projectId && !organizationId) {
+      : (request.access?.role ?? request.workspaceAccess?.role)
+    const workspaceId =
+      request.access?.workspaceId ?? request.workspaceAccess?.workspaceId
+    if (!projectId && !workspaceId) {
       return
     }
 
     this.logger.log(
       logEvent(`${entityType}.${verb}`, {
         id: entityId,
-        organization: organizationId,
+        workspace: workspaceId,
         project: projectId,
         actor: request.user.id,
         role,
       }),
     )
-    // The audit log is per project: organization-level changes are logged only.
+    // The audit log is per project: workspace-level changes are logged only.
     if (!projectId) {
       return
     }

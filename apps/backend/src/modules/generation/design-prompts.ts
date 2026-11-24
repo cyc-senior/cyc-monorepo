@@ -1,5 +1,6 @@
 import { Platform, UiLibrary } from '../../generated/prisma/client'
 import { HtmlIssue } from '../design/html/check-html'
+import { stripUiKit, uiKitReference } from '../design/html/ui-kits'
 import { LlmMessage } from './llm.client'
 
 /** Version tag of the snapshot below; jobs with another shape are not run. */
@@ -70,26 +71,32 @@ export interface GenerationInput {
   }>
 }
 
-const DESIGN_SYSTEMS: Record<UiLibrary, string> = {
-  SHADCN: `shadcn/ui look (Radix + Tailwind conventions, written as plain CSS):
-- Font: "Inter", system-ui, sans-serif. Base size 14–16px, line-height 1.5.
-- Neutral surfaces (white / #FAFAFA, borders #E4E4E7), 1px borders, radius 0.5rem (cards 0.75rem), subtle shadows only on overlays.
-- Components: Button (default/secondary/outline/ghost/destructive, 36–40px high), Input/Select/Textarea with a visible label above, Card (header/content/footer), Badge, Tabs, Separator, Avatar, Alert, Table, Dialog/Sheet look when needed.
-- Spacing on a 4px grid; generous whitespace; clear focus ring (2px outline offset 2px).`,
-  MUI: `Material Design 3 / MUI look (written as plain CSS):
-- Font: "Roboto", system-ui, sans-serif. Type scale: display/headline/title/body/label.
-- Surfaces with elevation (soft shadows), radius 4–12px, 8px spacing grid.
-- Components: contained/outlined/text Buttons (36–40px, uppercase optional), filled or outlined TextFields with floating-style labels kept visible, Cards, Chips, App bar, Navigation drawer / bottom navigation on mobile, Lists, Dialogs, Snackbars look when needed.
-- Visible focus states; states for hover/active/disabled.`,
-}
-
 const PLATFORM_LAYOUT: Record<Platform, string> = {
   DESKTOP: 'desktop (design at 1440px wide, content max-width ~1200px)',
   TABLET: 'tablet (768–1024px)',
   MOBILE: 'mobile (390px wide, touch targets ≥ 44px)',
 }
 
-export function systemPrompt(designSystem: UiLibrary): string {
+/** The accessibility standard of the design intent (first listed), e.g. "WCAG 2.2 AA". */
+export function accessibilityStandard(standards: string[] | undefined): string {
+  return standards?.find((s) => /wcag/i.test(s)) ?? 'WCAG 2.1 AA'
+}
+
+/** Contrast minimums of a standard: AAA needs 7:1 (4.5:1 large), AA 4.5:1 (3:1). */
+export function contrastMinimums(standard: string): {
+  normal: number
+  large: number
+} {
+  return /\bAAA\b/i.test(standard)
+    ? { normal: 7, large: 4.5 }
+    : { normal: 4.5, large: 3 }
+}
+
+export function systemPrompt(
+  designSystem: UiLibrary,
+  standard = 'WCAG 2.1 AA',
+): string {
+  const contrast = contrastMinimums(standard)
   return `You are a senior product designer who designs in code. You produce ONE high-fidelity, production-quality screen as a complete, self-contained HTML document that a developer and a usability tester will look at as the real product.
 
 Output: only the JSON object required by the schema: "title" (the page title), "rationale" (how the design serves the intent, personas and request; 2–5 sentences) and "html" (the whole document).
@@ -100,16 +107,19 @@ HTML rules (the document is rendered in a sandboxed iframe without JavaScript):
 - No external resources except Google Fonts (<link rel="stylesheet" href="https://fonts.googleapis.com/...">). No external images: draw illustrations, icons and logos with inline <svg> or CSS, or use solid/gradient placeholders.
 - Realistic content in the tone of voice: real-looking names, numbers and copy, never lorem ipsum.
 - Responsive layout with CSS media queries for every target platform listed.
-- Use CSS custom properties for the brand colors (--color-primary, --color-secondary, --color-accent) and use them.
+- Brand colors are already defined as CSS variables: var(--brand-primary), var(--brand-secondary), var(--brand-accent). On a brand-colored background use the matching text color var(--brand-…-foreground). For brand-colored TEXT on a light background (links, prices, highlights) use var(--brand-primary-text) / var(--brand-secondary-text) / var(--brand-accent-text): the brand hue darkened until it is readable. Never use the raw brand color as text. The kit's primary color is the brand primary. Use these variables; do not redefine them.
 
-Design system:
-${DESIGN_SYSTEMS[designSystem]}
+Design system — use its components, do not imitate them:
+${uiKitReference(designSystem)}
+- Every button, link-styled-as-button, input, select, textarea, checkbox, card, badge, alert, tab and table must be built from the kit markup above. Pick variants and sizes from the kit instead of writing your own colors, borders, radii or shadows for them.
+- Your <style> is only for page layout and sections: grid/flex, spacing, widths, max-widths, section backgrounds (with the brand or kit variables), and media queries. Never write CSS rules for the kit's components or classes.
 
-Accessibility (WCAG 2.1 AA):
+Accessibility (${standard}, the project's standard):
 - Semantic landmarks: <header>, <nav>, <main>, <footer>. Exactly one <h1>; headings in order without skipping levels.
 - Every <img> has alt (alt="" if decorative); a meaningful <svg> has role="img" and aria-label; decorative svg has aria-hidden="true".
 - Every input, select and textarea has a visible <label for="id">. Buttons and links have descriptive text (no "click here"); actions are <button>, navigation is <a href>.
-- Text contrast at least 4.5:1 (3:1 for ≥ 24px or ≥ 18.66px bold), including text on brand-colored backgrounds: pick white or near-black text accordingly. Visible focus indicators.`
+- Text contrast at least ${contrast.normal}:1 (${contrast.large}:1 for ≥ 24px or ≥ 18.66px bold), including text on brand-colored backgrounds: use the matching var(--brand-…-foreground) or white / near-black accordingly. Never put muted grey text on a colored background. Visible focus indicators.
+- Touch targets at least 24×24px (44×44px on mobile).`
 }
 
 /** The design prompt template: every part of the project context, in a fixed order. */
@@ -120,6 +130,8 @@ export function userPrompt(
     index: number
     total: number
     previous: Array<{ title: string; rationale: string }>
+    /** Problems an earlier attempt at this design could not fix. */
+    avoid?: string[]
   },
 ): string {
   const { project, intent } = input
@@ -184,10 +196,17 @@ export function userPrompt(
       'Existing design to refine (keep everything the request does not change; return the full revised document)',
       [
         input.baseDesign &&
-          [`"${input.baseDesign.name}":`, input.baseDesign.html].join('\n'),
+          [
+            `"${input.baseDesign.name}":`,
+            stripUiKit(input.baseDesign.html),
+          ].join('\n'),
       ],
     ),
     ...section('Designer request', [input.prompt]),
+    ...section(
+      'An earlier attempt at this design failed these checks: avoid them from the start',
+      (variant.avoid ?? []).map((issue) => `- ${issue}`),
+    ),
     ...section('Alternative', [
       `This is design alternative ${variant.index} of ${variant.total}.`,
       variant.previous.length > 0 &&
@@ -208,10 +227,17 @@ export function asConversation(
     index: number
     total: number
     previous: Array<{ title: string; rationale: string }>
+    avoid?: string[]
   },
 ): LlmMessage[] {
   return [
-    { role: 'system', content: systemPrompt(input.intent.designSystem) },
+    {
+      role: 'system',
+      content: systemPrompt(
+        input.intent.designSystem,
+        accessibilityStandard(input.intent.designStandards),
+      ),
+    },
     { role: 'user', content: userPrompt(input, personas, variant) },
   ]
 }

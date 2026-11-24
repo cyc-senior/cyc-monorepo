@@ -9,6 +9,7 @@ import { EnvironmentVariables } from '../../config/env.validation'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AccessService } from '../access/access.service'
+import { AuditService } from '../audit/audit.service'
 import { can, Permission } from '../access/permissions'
 import { DesignGenerator, VariantResult } from './design-generator.service'
 import {
@@ -20,6 +21,8 @@ import {
   DESIGN_GENERATION_QUEUE,
   DesignGenerationJobData,
   GenerationProgress,
+  STORED_THOUGHT_CHARS,
+  thoughtTail,
 } from './generation.constants'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmNotConfiguredError } from './llm-not-configured.error'
@@ -36,12 +39,13 @@ interface PersonaArtifact {
   id: string
   persona: PersonaInput
   usage: { promptTokens: number; completionTokens: number }
+  thought?: string
 }
 
 /** While generating, check this often whether the job was cancelled. */
 const CANCEL_POLL_MS = 3_000
 /** Streamed progress is relayed at most this often. */
-const PROGRESS_THROTTLE_MS = 1_000
+const PROGRESS_THROTTLE_MS = 500
 const VARIANT_LABELS = 'ABCDEFGH'
 
 /**
@@ -59,6 +63,7 @@ export class DesignGenerationProcessor
   implements OnApplicationBootstrap, OnModuleDestroy
 {
   private readonly logger = new Logger(DesignGenerationProcessor.name)
+  private readonly restarts: number
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,8 +73,10 @@ export class DesignGenerationProcessor
     private readonly queue: GenerationQueue,
     private readonly access: AccessService,
     private readonly personas: PersonaSynthesizer,
+    private readonly audit: AuditService,
   ) {
     super()
+    this.restarts = config.get('DESIGN_VARIANT_RESTARTS', { infer: true })
   }
 
   onApplicationBootstrap(): void {
@@ -179,15 +186,20 @@ export class DesignGenerationProcessor
     }
     if (!(await this.requesterMayGenerate(row.requestedById, projectId))) {
       // The person who asked lost their right to generate while the job waited.
+      const message = 'The requester no longer has access to generate designs.'
       await this.prisma.generationJob.updateMany({
         where: { id, status: { in: ['QUEUED', 'RUNNING'] } },
-        data: {
-          status: 'CANCELLED',
-          error: 'The requester no longer has access to generate designs.',
-          finishedAt: new Date(),
-        },
+        data: { status: 'CANCELLED', error: message, finishedAt: new Date() },
       })
       await this.cache.invalidate(projectId)
+      await this.audit.record({
+        projectId,
+        actorId: null,
+        action: 'GenerationJob.cancel',
+        entityType: 'GenerationJob',
+        entityId: id,
+        changes: { roundId: row.roundId, reason: message },
+      })
       this.logger.warn(
         logEvent('generation.requester_unauthorized', { job: id }),
       )
@@ -207,6 +219,21 @@ export class DesignGenerationProcessor
       return { variantIds: [], failedVariants: 0, personaId: null }
     }
     await this.cache.invalidate(projectId)
+    if (!row.startedAt) {
+      // First pickup (not a retry): the project's activity shows it working.
+      await this.audit.record({
+        projectId,
+        actorId: null,
+        action: 'GenerationJob.start',
+        entityType: 'GenerationJob',
+        entityId: id,
+        changes: {
+          roundId: row.roundId,
+          refinement: row.baseVariantId !== null,
+          variantCount: row.variantCount,
+        },
+      })
+    }
     this.logger.log(
       logEvent('generation.started', {
         job: id,
@@ -230,12 +257,28 @@ export class DesignGenerationProcessor
       const personas = artifact
         ? [artifact.persona, ...input.personas]
         : input.personas
+      const existing = row.baseVariantId
+        ? []
+        : await this.prisma.uIVariant.findMany({
+            where: {
+              roundId: row.roundId,
+              parentVariantId: null,
+              status: { not: 'ARCHIVED' },
+            },
+            select: { name: true, label: true },
+            orderBy: { createdAt: 'asc' },
+          })
       const results = await this.generateAll(
         job,
         row.variantCount,
         input,
         personas,
         abort.signal,
+        // A design added to a round must differ from the ones already in it.
+        existing.map((v) => ({
+          title: `${v.label ? `Design ${v.label}: ` : ''}${v.name}`,
+          rationale: 'Already in this round.',
+        })),
       )
       await job.updateProgress({
         stage: 'saving',
@@ -251,7 +294,7 @@ export class DesignGenerationProcessor
         artifact,
       )
     } catch (error) {
-      await this.fail(job, projectId, error, abort.signal.aborted)
+      await this.fail(job, projectId, row.roundId, error, abort.signal.aborted)
       throw error instanceof LlmNotConfiguredError || abort.signal.aborted
         ? new UnrecoverableError((error as Error).message)
         : error
@@ -300,7 +343,25 @@ export class DesignGenerationProcessor
       stage: 'persona',
       of: 1,
     } satisfies GenerationProgress)
-    const { persona, usage } = await this.personas.synthesize(input, signal)
+    let lastSent = 0
+    const { persona, usage, thought } = await this.personas.synthesize(
+      input,
+      signal,
+      (thought) => {
+        const now = Date.now()
+        if (now - lastSent < PROGRESS_THROTTLE_MS) {
+          return
+        }
+        lastSent = now
+        void job
+          .updateProgress({
+            stage: 'persona',
+            of: 1,
+            thought: thoughtTail(thought),
+          } satisfies GenerationProgress)
+          .catch(() => undefined)
+      },
+    )
     try {
       const created = await this.prisma.userPersona.create({
         data: { ...persona, projectId, origin: 'AI', generationJobId: id },
@@ -311,14 +372,14 @@ export class DesignGenerationProcessor
         logEvent('persona.saved', { job: id, persona: created.id }),
       )
 
-      return { id: created.id, persona, usage }
+      return { id: created.id, persona, usage, thought }
     } catch (error) {
       // A concurrent attempt saved it first (unique per job): use that one.
       const raced = await this.prisma.userPersona.findUnique({
         where: { generationJobId: id },
       })
       if (raced) {
-        return { id: raced.id, persona: raced, usage }
+        return { id: raced.id, persona: raced, usage, thought }
       }
       throw error
     }
@@ -330,39 +391,109 @@ export class DesignGenerationProcessor
     input: GenerationInput,
     personas: PersonaInput[],
     signal: AbortSignal,
+    existing: Array<{ title: string; rationale: string }> = [],
   ): Promise<VariantResult[]> {
     const results: VariantResult[] = []
-    const previous: Array<{ title: string; rationale: string }> = []
+    const previous: Array<{ title: string; rationale: string }> = [...existing]
 
     for (let index = 1; index <= total; index++) {
+      await job.updateProgress({
+        stage: 'thinking',
+        variant: index,
+        of: total,
+      } satisfies GenerationProgress)
       let lastSent = 0
-      const result = await this.generator.generate(
-        { input, personas, index, total, previous },
-        {
-          signal,
-          progress: (progress) => {
-            const now = Date.now()
-            if (
-              progress.receivedChars !== undefined &&
-              now - lastSent < PROGRESS_THROTTLE_MS
-            ) {
-              return
-            }
-            lastSent = now
-            void job
-              .updateProgress({
-                ...progress,
-                variant: index,
-                of: total,
-              } satisfies GenerationProgress)
-              .catch(() => undefined)
+      let lastStage: string | undefined = 'thinking'
+      // Assigned by the first run: the loop below always runs at least once.
+      let result!: VariantResult
+      // Every run is paid for, so tokens and attempts add up across restarts.
+      const spent = { promptTokens: 0, completionTokens: 0 }
+      let attempts = 0
+      // Guardrail against missing designs: a design that still fails after
+      // its repairs is started over (told what failed) before it is dropped.
+      for (let run = 0; run <= this.restarts; run++) {
+        const avoid =
+          run > 0 && 'issues' in result
+            ? result.issues
+                .slice(0, 8)
+                .map(
+                  (i) =>
+                    (i.criterion ? `WCAG ${i.criterion}: ` : '') + i.message,
+                )
+            : undefined
+        if (run > 0) {
+          this.logger.warn(
+            logEvent('generation.variant_restart', {
+              job: job.data.generationJobId,
+              variant: index,
+              run,
+            }),
+          )
+        }
+        result = await this.generator.generate(
+          { input, personas, index, total, previous, avoid },
+          {
+            signal,
+            progress: (progress) => {
+              const now = Date.now()
+              const isStageChange = progress.stage !== lastStage
+              if (
+                !isStageChange &&
+                (progress.receivedChars !== undefined ||
+                  progress.thought !== undefined) &&
+                now - lastSent < PROGRESS_THROTTLE_MS
+              ) {
+                return
+              }
+              lastSent = now
+              lastStage = progress.stage
+              void job
+                .updateProgress({
+                  ...progress,
+                  thought: thoughtTail(progress.thought),
+                  variant: index,
+                  of: total,
+                } satisfies GenerationProgress)
+                .catch(() => undefined)
+            },
           },
-        },
-      )
+        )
+        spent.promptTokens += result.usage.promptTokens
+        spent.completionTokens += result.usage.completionTokens
+        attempts += result.attempts
+        if (result.passed) {
+          break
+        }
+      }
+      result = { ...result, usage: spent, attempts }
       results.push(result)
       if (result.passed) {
         previous.push({ title: result.title, rationale: result.rationale })
       }
+      const currentSummaries = results.map((r, i) => ({
+        variant: i + 1,
+        passed: r.passed,
+        attempts: r.attempts,
+        thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
+        ...(r.passed
+          ? {
+              title: r.title,
+              rationale: r.rationale,
+              warnings: r.report.warnings,
+              removed: r.report.removed,
+            }
+          : {}),
+      }))
+      await this.prisma.generationJob
+        .update({
+          where: { id: job.data.generationJobId },
+          data: {
+            outputMetadata: {
+              variants: currentSummaries,
+            } as Prisma.InputJsonObject,
+          },
+        })
+        .catch(() => undefined)
     }
 
     return results
@@ -387,6 +518,7 @@ export class DesignGenerationProcessor
       variant: i + 1,
       passed: r.passed,
       attempts: r.attempts,
+      thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
       ...('issues' in r
         ? { issues: r.issues.slice(0, 20) }
         : {
@@ -399,6 +531,8 @@ export class DesignGenerationProcessor
     const metadata = {
       usage,
       personaId: artifact?.id ?? null,
+      personaThought:
+        thoughtTail(artifact?.thought, STORED_THOUGHT_CHARS) ?? null,
       variants: summary,
     } as Prisma.InputJsonObject
     const passed = results.filter(
@@ -415,6 +549,7 @@ export class DesignGenerationProcessor
       )
     }
 
+    let refinement = false
     const variantIds = await this.prisma.$transaction(async (tx) => {
       const done = await tx.generationJob.updateMany({
         where: { id, status: 'RUNNING' },
@@ -429,12 +564,27 @@ export class DesignGenerationProcessor
       }
       const job = await tx.generationJob.findUniqueOrThrow({
         where: { id },
-        select: { baseVariantId: true },
+        select: {
+          baseVariantId: true,
+          baseVariant: { select: { label: true } },
+        },
       })
+      refinement = job.baseVariantId !== null
       const existing = await tx.userStory.findMany({
         where: { id: { in: input.stories.map((s) => s.id) }, projectId },
         select: { id: true },
       })
+      // New designs take the round's next free letters (A, B, … then the
+      // missing B when it is generated again); refinements keep their base's.
+      const taken = new Set(
+        (
+          await tx.uIVariant.findMany({
+            where: { roundId, parentVariantId: null },
+            select: { label: true },
+          })
+        ).map((v) => v.label),
+      )
+      const freeLabels = [...VARIANT_LABELS].filter((l) => !taken.has(l))
       const ids: string[] = []
       for (const [i, result] of passed.entries()) {
         const variant = await tx.uIVariant.create({
@@ -444,7 +594,8 @@ export class DesignGenerationProcessor
             // Refinements keep their lineage; they are READY, never APPROVED.
             parentVariantId: job.baseVariantId,
             name: result.title,
-            label: VARIANT_LABELS[i],
+            // A refinement is a new version of its base, so it keeps its label.
+            label: job.baseVariant?.label ?? freeLabels[i] ?? VARIANT_LABELS[i],
             uiLibrary: input.intent.designSystem,
             html: result.html,
             accessibility: result.report as unknown as Prisma.InputJsonObject,
@@ -459,6 +610,21 @@ export class DesignGenerationProcessor
       return ids
     })
     await this.cache.invalidate(projectId)
+    // The worker runs outside any request, so the audit interceptor never sees
+    // this: record it so the project's activity can link to the designs.
+    await this.audit.record({
+      projectId,
+      actorId: null,
+      action: 'GenerationJob.complete',
+      entityType: 'GenerationJob',
+      entityId: id,
+      changes: {
+        roundId,
+        variantIds,
+        refinement,
+        failedVariants: results.length - passed.length,
+      },
+    })
     this.logger.log(
       logEvent('generation.succeeded', {
         job: id,
@@ -481,6 +647,7 @@ export class DesignGenerationProcessor
   private async fail(
     job: Job<DesignGenerationJobData>,
     projectId: string,
+    roundId: string,
     error: unknown,
     cancelled: boolean,
   ): Promise<void> {
@@ -499,13 +666,23 @@ export class DesignGenerationProcessor
       )
     }
     // Only a RUNNING job is ours to change; a cancelled one stays cancelled.
-    await this.prisma.generationJob.updateMany({
+    const changed = await this.prisma.generationJob.updateMany({
       where: { id, status: 'RUNNING' },
       data: final
         ? { status: 'FAILED', error: message, finishedAt: new Date() }
         : { status: 'QUEUED', error: `Retrying after: ${message}` },
     })
     await this.cache.invalidate(projectId)
+    if (final && !cancelled && changed.count > 0) {
+      await this.audit.record({
+        projectId,
+        actorId: null,
+        action: 'GenerationJob.fail',
+        entityType: 'GenerationJob',
+        entityId: id,
+        changes: { roundId, error: message.slice(0, 500) },
+      })
+    }
   }
 
   private async abortIfCancelled(

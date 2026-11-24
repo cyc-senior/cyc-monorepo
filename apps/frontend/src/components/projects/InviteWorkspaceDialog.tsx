@@ -2,8 +2,19 @@
 
 import React, { useState } from "react";
 import axios from "axios";
-import { X, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  UserAdd01Icon,
+  Cancel01Icon,
+  Add01Icon,
+  InformationCircleIcon,
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  Loading03Icon,
+} from "@hugeicons/core-free-icons";
 import { inviteWorkspaceMember } from "@/services/workspace.service";
 
 export interface InviteWorkspaceDialogProps {
@@ -19,43 +30,88 @@ export function InviteWorkspaceDialog({
   workspaceId,
   workspaceName = "Workspace",
 }: InviteWorkspaceDialogProps) {
-  const [email, setEmail] = useState("");
+  const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
   const [isSent, setIsSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [sentCount, setSentCount] = useState(0);
 
   if (!isOpen) return null;
 
+  const handleEmailChange = (index: number, val: string) => {
+    setInviteEmails((prev) => {
+      const copy = [...prev];
+      copy[index] = val;
+      return copy;
+    });
+    if (errorMessage) setErrorMessage("");
+  };
+
+  const handleAddEmail = () => {
+    setInviteEmails((prev) => [...prev, ""]);
+  };
+
+  const handleRemoveEmail = (index: number) => {
+    setInviteEmails((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail || !workspaceId) return;
+    const validEmails = inviteEmails
+      .map((e) => e.trim())
+      .filter((e) => Boolean(e));
+
+    if (validEmails.length === 0) {
+      setErrorMessage("Please enter at least one email address.");
+      return;
+    }
+
+    if (!workspaceId) {
+      setErrorMessage("No active workspace selected.");
+      return;
+    }
 
     setErrorMessage("");
     setIsLoading(true);
 
     try {
-      await inviteWorkspaceMember(workspaceId, trimmedEmail, "MEMBER");
-      setIsSent(true);
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        const apiMsg = (err.response?.data as { message?: string })?.message;
-        setErrorMessage(
-          apiMsg ||
-            "Could not invite this user. Make sure they have registered or aren't already a member."
-        );
-      } else {
-        setErrorMessage("Failed to send invitation. Please try again.");
+      const results = await Promise.allSettled(
+        validEmails.map((email) =>
+          inviteWorkspaceMember(workspaceId, email, "MEMBER")
+        )
+      );
+
+      const successful = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected");
+
+      if (successful > 0) {
+        setSentCount(successful);
+        setIsSent(true);
+      } else if (failed.length > 0) {
+        const firstErr = (failed[0] as PromiseRejectedResult).reason;
+        if (axios.isAxiosError(firstErr)) {
+          const apiMsg = (firstErr.response?.data as { message?: string })
+            ?.message;
+          setErrorMessage(
+            apiMsg ||
+              "Could not invite these users. Make sure they have registered or aren't already members."
+          );
+        } else {
+          setErrorMessage("Failed to send invitations. Please try again.");
+        }
       }
+    } catch {
+      setErrorMessage("Failed to send invitations. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleClose = () => {
-    setEmail("");
+    setInviteEmails([""]);
     setIsSent(false);
     setErrorMessage("");
+    setSentCount(0);
     onClose();
   };
 
@@ -68,7 +124,7 @@ export function InviteWorkspaceDialog({
     >
       <div className="fixed inset-0" aria-hidden="true" onClick={handleClose} />
 
-      <div className="relative z-10 w-full max-w-[480px] bg-card border border-border rounded-[14px] p-6 shadow-xl drop-shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative z-10 w-full max-w-[500px] bg-card border border-border rounded-[14px] p-6 shadow-xl flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
@@ -79,7 +135,7 @@ export function InviteWorkspaceDialog({
               Invite to workspace
             </h2>
             <p className="text-sm text-muted-foreground">
-              Invite a teammate or client to {workspaceName}.
+              Invite teammates to {workspaceName}.
             </p>
           </div>
 
@@ -89,20 +145,22 @@ export function InviteWorkspaceDialog({
             aria-label="Close dialog"
             className="size-8 rounded-[10px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
           >
-            <X className="size-4" />
+            <HugeIcon icon={Cancel01Icon} size={16} />
           </button>
         </div>
 
         {isSent ? (
           <div className="flex flex-col items-center justify-center py-6 text-center gap-3">
-            <div className="size-10 rounded-full bg-primary-subtle text-primary-text flex items-center justify-center">
-              <CheckCircle2 className="size-6" />
+            <div className="size-12 rounded-full bg-primary-subtle text-primary-text flex items-center justify-center">
+              <HugeIcon icon={CheckmarkCircle02Icon} size={28} />
             </div>
             <p className="text-base font-semibold text-foreground">
-              Member added to workspace!
+              {sentCount === 1
+                ? "Invitation sent!"
+                : `Invitations sent to ${sentCount} teammates!`}
             </p>
             <p className="text-sm text-muted-foreground max-w-xs">
-              <span className="font-medium text-foreground">{email}</span> now has access to {workspaceName}.
+              They can now view and collaborate in {workspaceName}.
             </p>
             <Button
               type="button"
@@ -113,54 +171,92 @@ export function InviteWorkspaceDialog({
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSend} className="flex flex-col gap-4">
+          <form onSubmit={handleSend} className="flex flex-col gap-5">
             {errorMessage && (
               <div className="flex items-center gap-2 rounded-[10px] border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                <AlertCircle className="size-4 shrink-0" />
+                <HugeIcon icon={AlertCircleIcon} size={16} className="shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor="invite-email"
-                className="text-sm font-medium text-foreground"
-              >
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <input
-                  id="invite-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  className="h-8 pl-8 pr-2.5 rounded-[10px] border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full transition-all"
-                />
+            {/* Email input rows */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Teammate email addresses</Label>
+              <div className="space-y-2">
+                {inviteEmails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      type="email"
+                      placeholder="e.g. teammate@company.com"
+                      value={email}
+                      onChange={(e) => handleEmailChange(idx, e.target.value)}
+                      className="h-8 text-sm rounded-[10px]"
+                    />
+                    {inviteEmails.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveEmail(idx)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0 cursor-pointer"
+                      >
+                        <HugeIcon icon={Cancel01Icon} size={16} />
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                The invited user must sign in using this exact email address to access the workspace.
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddEmail}
+                className="gap-1.5 text-xs h-7 rounded-[8px] cursor-pointer"
+              >
+                <HugeIcon icon={Add01Icon} size={14} />
+                <span>Add another</span>
+              </Button>
+            </div>
+
+            {/* Note banner */}
+            <div className="rounded-[10px] border border-border bg-muted/40 p-3 flex items-start gap-2.5 text-xs text-muted-foreground">
+              <HugeIcon
+                icon={InformationCircleIcon}
+                size={16}
+                className="shrink-0 text-muted-foreground mt-0.5"
+              />
+              <p className="leading-relaxed">
+                Invited teammates can view and edit projects in this workspace.
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 onClick={handleClose}
-                className="h-8 px-2.5 rounded-[10px] text-sm font-medium text-foreground hover:bg-accent cursor-pointer"
+                className="h-8 px-3 rounded-[10px] text-sm font-medium cursor-pointer"
               >
                 Cancel
               </Button>
-
               <Button
                 type="submit"
-                disabled={isLoading || !email.trim() || !workspaceId}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 rounded-[10px] text-sm font-medium transition-colors cursor-pointer"
+                disabled={isLoading}
+                className="h-8 px-3 rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium cursor-pointer gap-2"
               >
-                {isLoading ? "Sending..." : "Send invite"}
+                {isLoading ? (
+                  <>
+                    <HugeIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <HugeIcon icon={UserAdd01Icon} size={16} />
+                    <span>Send invites</span>
+                  </>
+                )}
               </Button>
             </div>
           </form>

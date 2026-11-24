@@ -22,7 +22,7 @@ import { DesignModule } from './modules/design/design.module'
 import { HealthModule } from './modules/health/health.module'
 import { IterationModule } from './modules/iteration/iteration.module'
 import { TestingModule } from './modules/testing/testing.module'
-import { OrganizationsModule } from './modules/organizations/organizations.module'
+import { WorkspacesModule } from './modules/workspaces/workspaces.module'
 import { ProjectsModule } from './modules/projects/projects.module'
 import { RoundsModule } from './modules/rounds/rounds.module'
 import { StakeholdersModule } from './modules/stakeholders/stakeholders.module'
@@ -44,7 +44,7 @@ import { PrismaModule } from './prisma/prisma.module'
     AuthModule,
     UsersModule,
     HealthModule,
-    OrganizationsModule,
+    WorkspacesModule,
     ProjectsModule,
     DesignModule,
     RoundsModule,

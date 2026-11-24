@@ -102,7 +102,12 @@ describe('validateEnv', () => {
   })
 
   it('reads boolean flags from strings', () => {
-    expect(validateEnv(base).LLM_DISABLE_THINKING).toBe(true)
+    // Thinking is on by default so the generation trace can show it.
+    expect(validateEnv(base).LLM_DISABLE_THINKING).toBe(false)
+    expect(
+      validateEnv({ ...base, LLM_DISABLE_THINKING: 'true' })
+        .LLM_DISABLE_THINKING,
+    ).toBe(true)
     expect(
       validateEnv({ ...base, LLM_DISABLE_THINKING: 'false' })
         .LLM_DISABLE_THINKING,
@@ -110,6 +115,9 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...base, DESIGN_REPAIR_ATTEMPTS: '9' })).toThrow(
       'DESIGN_REPAIR_ATTEMPTS',
     )
+    expect(() =>
+      validateEnv({ ...base, DESIGN_VARIANT_RESTARTS: '4' }),
+    ).toThrow('DESIGN_VARIANT_RESTARTS')
   })
 
   it('rejects a non-Redis cache URL', () => {

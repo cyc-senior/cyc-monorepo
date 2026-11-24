@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, HelpCircle, LogOut } from "lucide-react";
 import { CYCLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +13,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  ArrowDown01Icon,
+  HelpCircleIcon,
+  Logout01Icon,
+} from "@hugeicons/core-free-icons";
 
 export interface NavbarUser {
   name: string;
@@ -37,6 +43,10 @@ export function Navbar({
 }: NavbarProps) {
   const isAuthVariant = variant === "auth";
   const pathname = usePathname();
+  // Pages like the landing page pass no user; the session still decides
+  // whether "Sign in" or "Dashboard" makes sense.
+  const { user: sessionUser } = useAuth();
+  const signedIn = Boolean(user ?? sessionUser);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background text-foreground">
@@ -44,7 +54,7 @@ export function Navbar({
         {/* Left: Logo + Nav links */}
         <div className="flex items-center gap-6">
           <Link
-            href={user ? "/dashboard" : "/"}
+            href={signedIn ? "/dashboard" : "/"}
             className="flex items-center gap-2 transition-opacity hover:opacity-80"
             aria-label="Home"
           >
@@ -111,7 +121,7 @@ export function Navbar({
                   className="flex size-8 items-center justify-center rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
                   aria-label="Help"
                 >
-                  <HelpCircle className="size-4" />
+                  <HugeIcon icon={HelpCircleIcon} size={16} />
                 </button>
 
                 <DropdownMenu>
@@ -129,7 +139,7 @@ export function Navbar({
                       <span className="text-sm font-medium text-foreground hidden sm:inline">
                         {user.name}
                       </span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                      <HugeIcon icon={ArrowDown01Icon} size={16} className="text-muted-foreground transition-transform duration-200" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
@@ -146,7 +156,7 @@ export function Navbar({
                       onClick={onSignOut}
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                     >
-                      <LogOut className="mr-2 h-4 w-4" />
+                      <HugeIcon icon={Logout01Icon} size={16} className="mr-2" />
                       <span>Sign out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -154,7 +164,11 @@ export function Navbar({
               </>
             ) : (
               <Button variant="ghost" className="bg-secondary rounded-[10px]" asChild>
-                <Link href="/signin">Sign in</Link>
+                {signedIn ? (
+                  <Link href="/dashboard">Dashboard</Link>
+                ) : (
+                  <Link href="/signin">Sign in</Link>
+                )}
               </Button>
             )}
           </div>

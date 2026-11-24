@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -33,8 +34,12 @@ export class AuthController {
   ) {}
 
   /** Builds cookie options for the refresh token. */
+  private isProduction(): boolean {
+    return this.config.get('NODE_ENV', { infer: true }) === 'production'
+  }
+
   private getCookieOptions(): CookieOptions {
-    const isProd = this.config.get('NODE_ENV', { infer: true }) === 'production'
+    const isProd = this.isProduction()
     const domain =
       this.config.get('COOKIE_DOMAIN', { infer: true }) || undefined
     const days =
@@ -77,8 +82,11 @@ export class AuthController {
 
   /**
    * Rotates the refresh token and issues a new pair.
-   * Accepts the refresh token from either body or httpOnly cookie.
+   * Accepts the refresh token from either body or httpOnly cookie. Outside
+   * production, a body token with `cookie: true` is moved into the httpOnly
+   * cookie (the dev sign-in link, `pnpm dev:url`).
    *
+   * @throws {400} `cookie: true` in production.
    * @throws {401} Refresh token invalid or expired.
    */
   @Public()
@@ -95,11 +103,18 @@ export class AuthController {
     if (!rawToken) {
       throw new UnauthorizedException('No refresh token provided.')
     }
+    // Only the dev sign-in page needs to turn a body token into a session
+    // cookie; in production a page could otherwise plant a session (login
+    // CSRF). Checked before the token is spent.
+    if (dto?.cookie && this.isProduction()) {
+      throw new BadRequestException('`cookie` is not supported here.')
+    }
 
     const tokens = await this.authService.refresh(rawToken)
 
-    // For cookie flow: update httpOnly cookie and omit refreshToken from the JSON response
-    if (hasCookieToken && !hasBodyToken) {
+    // Cookie flow (or a body token asking for one): update the httpOnly
+    // cookie and omit refreshToken from the JSON response.
+    if ((hasCookieToken && !hasBodyToken) || (hasBodyToken && dto?.cookie)) {
       res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
       return {
         accessToken: tokens.accessToken,

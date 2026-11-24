@@ -36,8 +36,8 @@ export class ProjectsController {
   /**
    * List the projects the caller is a member of.
    *
-   * @remarks Projects are created inside an organization:
-   * `POST /organizations/{organizationId}/projects`.
+   * @remarks Projects are created inside a workspace:
+   * `POST /workspaces/{workspaceId}/projects`.
    */
   @Get()
   @ApiAuthenticated()

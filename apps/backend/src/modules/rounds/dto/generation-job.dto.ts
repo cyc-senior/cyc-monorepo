@@ -63,11 +63,11 @@ export class CreateGenerationJobDto {
 
   /**
    * Synthesize a user persona from this prompt and save it to the project
-   * (origin AI) before designing. On by default.
+   * (origin AI) before designing. Defaults to true when no personaIds are provided.
    */
   @IsOptional()
   @IsBoolean()
-  synthesizePersona?: boolean = true
+  synthesizePersona?: boolean
 
   /**
    * Refine an existing variant of the project instead of designing from

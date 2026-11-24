@@ -7,11 +7,23 @@ import axios, {
 } from "axios";
 import { AuthTokens } from "@/types/auth";
 
-const API_URL =
+const rawApiUrl =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+export const API_URL = rawApiUrl.endsWith("/api")
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/$/, "")}/api`;
 
 let inMemoryToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let initialRefreshAttempted = false;
+
+// Queue of pending requests waiting for an ongoing token refresh
+let pendingQueue: Array<(token: string | null) => void> = [];
+
+function processQueue(token: string | null) {
+  pendingQueue.forEach((callback) => callback(token));
+  pendingQueue = [];
+}
 
 /**
  * Cross-tab coordination channel for synchronized token refreshes.
@@ -85,8 +97,10 @@ export async function refreshAccessToken(): Promise<string | null> {
       const token = response.data.accessToken;
       setAccessToken(token);
       authChannel?.postMessage({ type: "TOKEN_REFRESHED", token });
+      processQueue(token);
       return token;
     } catch (err: unknown) {
+      processQueue(null);
       // Only wipe session if the server explicitly reports unauthenticated (401/403)
       if (
         axios.isAxiosError(err) &&
@@ -103,10 +117,33 @@ export async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-// Request Interceptor: attach Bearer token
+// Request Interceptor: attach Bearer token or wait if refresh is in flight
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig & { skipAuth?: boolean }) => {
-    if (!config.skipAuth && inMemoryToken) {
+  async (config: InternalAxiosRequestConfig & { skipAuth?: boolean }) => {
+    if (config.skipAuth) {
+      return config;
+    }
+
+    // On browser page load/refresh, obtain the initial access token before firing requests
+    if (
+      !inMemoryToken &&
+      !initialRefreshAttempted &&
+      typeof window !== "undefined"
+    ) {
+      initialRefreshAttempted = true;
+      await refreshAccessToken();
+    }
+
+    // If an initial refresh or token rotation is in flight, wait for it
+    if (refreshPromise) {
+      const refreshedToken = await refreshPromise;
+      if (refreshedToken) {
+        config.headers.set("Authorization", `Bearer ${refreshedToken}`);
+      }
+      return config;
+    }
+
+    if (inMemoryToken) {
       config.headers.set("Authorization", `Bearer ${inMemoryToken}`);
     }
     return config;
@@ -129,6 +166,20 @@ api.interceptors.response.use(
       !originalRequest.skipAuth
     ) {
       originalRequest._retry = true;
+
+      // If refresh is already in-flight, queue up behind it
+      if (refreshPromise) {
+        return new Promise((resolve, reject) => {
+          pendingQueue.push((token) => {
+            if (token) {
+              originalRequest.headers.set("Authorization", `Bearer ${token}`);
+              resolve(api(originalRequest));
+            } else {
+              reject(error);
+            }
+          });
+        });
+      }
 
       const newToken = await refreshAccessToken();
       if (newToken) {

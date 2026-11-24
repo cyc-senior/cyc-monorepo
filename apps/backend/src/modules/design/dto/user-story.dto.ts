@@ -8,7 +8,12 @@ import {
 } from 'class-validator'
 
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
-import { StoryOrigin, UserStoryStatus } from '../../../generated/prisma/client'
+import {
+  DesignRoundStatus,
+  GenerationJobStatus,
+  StoryOrigin,
+  UserStoryStatus,
+} from '../../../generated/prisma/client'
 
 export class CreateUserStoryDto {
   /** @example 'Pay with a saved card' */
@@ -47,6 +52,38 @@ export class UserStoryQueryDto extends PaginationQueryDto {
   status?: UserStoryStatus
 }
 
+export class StoryActiveJobDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string
+
+  @ApiProperty({ enum: GenerationJobStatus, enumName: 'GenerationJobStatus' })
+  status: GenerationJobStatus
+
+  /** A refinement of an existing design, not the first A/B generation. */
+  refinement: boolean
+}
+
+/** Where a story's design cycle stands (its latest design round). */
+export class StoryDesignCycleDto {
+  @ApiProperty({ format: 'uuid' })
+  roundId: string
+
+  roundNumber: number
+
+  @ApiProperty({ enum: DesignRoundStatus, enumName: 'DesignRoundStatus' })
+  roundStatus: DesignRoundStatus
+
+  /** Designs (variants) in the round, archived ones excluded. */
+  variantCount: number
+
+  /** Designs approved for testing ("Ready to test"). */
+  approvedCount: number
+
+  /** A generation that is queued or running, if any. */
+  @ApiProperty({ nullable: true })
+  activeJob: StoryActiveJobDto | null
+}
+
 export class UserStoryDto {
   @ApiProperty({ format: 'uuid' })
   id: string
@@ -76,4 +113,8 @@ export class UserStoryDto {
   createdAt: Date
 
   updatedAt: Date
+
+  /** Null until the story's structured prompt is approved (a round exists). */
+  @ApiProperty({ type: StoryDesignCycleDto, nullable: true })
+  designCycle: StoryDesignCycleDto | null
 }

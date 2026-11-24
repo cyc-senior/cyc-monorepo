@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  concat,
   concatMap,
   defer,
   interval,
@@ -118,7 +119,7 @@ export class GenerationJobsService {
     userId: string,
     dto: CreateGenerationJobDto,
   ): Promise<GenerationJobDto> {
-    await requireWritableRound(this.prisma, projectId, roundId)
+    const round = await requireWritableRound(this.prisma, projectId, roundId)
     const existing = await this.byIdempotencyKey(roundId, dto.idempotencyKey)
     if (existing) {
       return existing
@@ -139,6 +140,13 @@ export class GenerationJobsService {
       )
     }
     const stories = await this.stories(projectId, dto.storyIds)
+    if (!round.storyId && stories.length > 0) {
+      // A round made without a story belongs to the first story it designs.
+      await this.prisma.designRound.updateMany({
+        where: { id: roundId, storyId: null },
+        data: { storyId: stories[0].id },
+      })
+    }
     const personas = await this.personas(projectId, dto.personaIds)
     const baseDesign = await this.baseDesign(projectId, dto.baseVariantId)
     const feedbackThemes = await this.feedbackThemes(roundId)
@@ -167,7 +175,8 @@ export class GenerationJobsService {
       personas,
       stories,
       prompt: dto.prompt,
-      synthesizePersona: dto.synthesizePersona ?? true,
+      synthesizePersona:
+        dto.synthesizePersona ?? (dto.personaIds?.length ? false : true),
       baseDesign,
       feedbackThemes,
     }
@@ -275,14 +284,24 @@ export class GenerationJobsService {
     let sequence = 0
 
     const live = this.events.forJob(id).pipe(
-      concatMap((signal) =>
-        signal.kind === 'progress'
-          ? of<MessageEvent>({
-              type: 'progress',
-              data: { jobId: id, ...signal.progress },
-            })
-          : defer(() => this.snapshot(id)),
-      ),
+      concatMap((signal) => {
+        if (signal.kind !== 'progress') {
+          return defer(() => this.snapshot(id))
+        }
+        const progress = of<MessageEvent>({
+          type: 'progress',
+          data: { jobId: id, ...signal.progress },
+        })
+        // BullMQ's `active` event fires before the worker marks the row
+        // RUNNING; `started` is reported right after, so re-read the state
+        // here or clients would see QUEUED until the job ends.
+        return signal.progress.stage === 'started'
+          ? concat(
+              defer(() => this.snapshot(id)),
+              progress,
+            )
+          : progress
+      }),
     )
     const heartbeat = interval(HEARTBEAT_MS).pipe(
       map((): MessageEvent => ({ type: 'heartbeat', data: { jobId: id } })),

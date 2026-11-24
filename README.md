@@ -37,6 +37,16 @@ connect to the KMUTT VPN (see the notice above).
 | `pnpm db:migrate`                        | Create/apply migrations (development)                    |
 | `pnpm db:generate`                       | Regenerate the Prisma client                             |
 | `pnpm db:studio`                         | Browse data in Prisma Studio                             |
+| `pnpm db:reset`                          | Drop the dev database and re-apply every migration       |
+
+> **Migrations are append-only.** Never edit, squash or delete a migration that
+> has been merged: databases that already applied it would no longer match the
+> history. Change the schema with a new migration instead (hand-write renames,
+> since Prisma's generated SQL drops and recreates renamed tables).
+>
+> If your local database was created from the short-lived squashed
+> `20261120060503_init` migration (on `feat/create-project`), Prisma will report
+> it as missing: run `pnpm db:reset` once (this deletes local dev data).
 
 ### Local URLs
 
@@ -60,6 +70,19 @@ Use the access token as a bearer token:
 TOKEN=$(pnpm --silent dev:token --raw)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:4000/api/users/me
 ```
+
+To sign in to the **frontend** without Google, print a one-time sign-in link and
+open it in the browser (with the backend and frontend running):
+
+```bash
+open "$(pnpm --silent dev:url)"                   # macOS; seeded admin
+open "$(pnpm --silent dev:url --email a@b.com)"   # another existing user
+```
+
+The link points at `http://localhost:3000/auth/dev#refreshToken=...`. That page
+exists only under `next dev` (404 in production builds) and stores the refresh
+token as the session cookie, so reloads stay signed in. Each link works once;
+run the command again for a new one.
 
 In Swagger (`http://localhost:4000/api`), click **Authorize** and paste the token. Access tokens last 15
 minutes (`JWT_ACCESS_TTL_SECONDS`); run the command again for a new one.

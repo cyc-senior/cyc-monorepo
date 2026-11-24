@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
 import { PrismaService } from '../../prisma/prisma.service'
-import { AccessContext, OrgAccessContext } from './access.types'
+import { AccessContext, WorkspaceAccessContext } from './access.types'
 
 @Injectable()
 export class AccessService {
@@ -17,24 +17,24 @@ export class AccessService {
   ): Promise<AccessContext | null> {
     const member = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId, userId } },
-      select: { role: true, organizationId: true },
+      select: { role: true, workspaceId: true },
     })
 
     return member
-      ? { projectId, organizationId: member.organizationId, role: member.role }
+      ? { projectId, workspaceId: member.workspaceId, role: member.role }
       : null
   }
 
-  /** The user's role in the organization, or `null` (missing = not a member). */
-  async forOrganization(
+  /** The user's role in the workspace, or `null` (missing = not a member). */
+  async forWorkspace(
     userId: string,
-    organizationId: string,
-  ): Promise<OrgAccessContext | null> {
-    const member = await this.prisma.organizationMember.findUnique({
-      where: { organizationId_userId: { organizationId, userId } },
+    workspaceId: string,
+  ): Promise<WorkspaceAccessContext | null> {
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
       select: { role: true },
     })
 
-    return member ? { organizationId, role: member.role } : null
+    return member ? { workspaceId, role: member.role } : null
   }
 }

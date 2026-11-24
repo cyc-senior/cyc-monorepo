@@ -104,4 +104,44 @@ describe('LlmClient', () => {
       LlmNotConfiguredError,
     )
   })
+
+  it('captures reasoning_content deltas during streaming', async () => {
+    const client = new LlmClient(config({ LLM_DISABLE_THINKING: false }))
+    const reasoningDelta = (reasoning_content: string) => ({
+      choices: [{ delta: { reasoning_content }, finish_reason: null }],
+    })
+    withStream(client, [
+      reasoningDelta('Analyzing requirements...'),
+      reasoningDelta(' Choosing palette.'),
+      delta('{"a":1}', 'stop'),
+      { choices: [], usage: { prompt_tokens: 15, completion_tokens: 10 } },
+    ])
+    const thoughts: string[] = []
+
+    const result = await client.structured({
+      ...request,
+      onThoughtDelta: (_chunk, total) => thoughts.push(total),
+    })
+
+    expect(result.thought).toBe('Analyzing requirements... Choosing palette.')
+    expect(result.content).toBe('{"a":1}')
+    expect(thoughts).toEqual([
+      'Analyzing requirements...',
+      'Analyzing requirements... Choosing palette.',
+    ])
+  })
+
+  it('separates inline <think> tags from structured content', async () => {
+    const client = new LlmClient(config({ LLM_DISABLE_THINKING: false }))
+    withStream(client, [
+      delta('<think>Planning variant'),
+      delta(' A layout</think>{"b":2}', 'stop'),
+      { choices: [], usage: { prompt_tokens: 10, completion_tokens: 8 } },
+    ])
+
+    const result = await client.structured(request)
+
+    expect(result.thought).toBe('Planning variant A layout')
+    expect(result.content).toBe('{"b":2}')
+  })
 })

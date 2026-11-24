@@ -1,6 +1,10 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
 
-import { AccessContext, AccessRequest, OrgAccessContext } from './access.types'
+import {
+  AccessContext,
+  AccessRequest,
+  WorkspaceAccessContext,
+} from './access.types'
 
 /** Injects the {@link AccessContext} resolved by the permission guard. */
 export const Access = createParamDecorator(
@@ -8,8 +12,8 @@ export const Access = createParamDecorator(
     ctx.switchToHttp().getRequest<AccessRequest>().access,
 )
 
-/** Injects the {@link OrgAccessContext} resolved by the organization guard. */
-export const OrgAccess = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): OrgAccessContext =>
-    ctx.switchToHttp().getRequest<AccessRequest>().orgAccess,
+/** Injects the {@link WorkspaceAccessContext} resolved by the workspace guard. */
+export const WorkspaceAccess = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): WorkspaceAccessContext =>
+    ctx.switchToHttp().getRequest<AccessRequest>().workspaceAccess,
 )

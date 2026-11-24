@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger'
 import {
   ArrayMaxSize,
   IsArray,
@@ -62,9 +67,22 @@ export class CreateUIVariantDto {
   @IsOptional()
   @IsIn(['DRAFT', 'READY', 'ARCHIVED'])
   status?: 'DRAFT' | 'READY' | 'ARCHIVED'
+
+  /**
+   * The variant of the same round this one is a new version of, e.g. when an
+   * older version is restored. Keeps the A/B lineage
+   * (`GET /variants/{variantId}/history`).
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  parentVariantId?: string
 }
 
-export class UpdateUIVariantDto extends PartialType(CreateUIVariantDto) {}
+/** Lineage is fixed at creation: a variant cannot be re-parented. */
+export class UpdateUIVariantDto extends PartialType(
+  OmitType(CreateUIVariantDto, ['parentVariantId'] as const),
+) {}
 
 export class ApproveUIVariantDto {
   /** Why it is approved (kept in the decision history). */

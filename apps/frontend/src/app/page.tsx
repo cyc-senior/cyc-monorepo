@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
@@ -25,7 +26,9 @@ import { MobileDesktopNotice } from "@/components/mobile-desktop-notice";
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col overflow-x-clip bg-[var(--cyc-bg-brand)] sm:bg-background text-foreground">
-      <Navbar variant="default" user={null} />
+      <Suspense fallback={<div className="h-16 border-b border-border bg-background" />}>
+        <Navbar variant="default" user={null} />
+      </Suspense>
 
       <MobileDesktopNotice>
         <main className="flex-1">

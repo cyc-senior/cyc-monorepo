@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Info } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import {
+  AlertCircleIcon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
 
 // Mock session resolver
 function getSessionDetails(code: string) {
@@ -51,18 +55,13 @@ function GoogleIcon() {
 }
 
 function SignInContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithGoogle, user, isLoading } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const sessionCode = searchParams.get("session_code");
   const authError = searchParams.get("error");
   const session = sessionCode ? getSessionDetails(sessionCode) : null;
 
-  React.useEffect(() => {
-    if (!isLoading && user) {
-      router.replace("/dashboard");
-    }
-  }, [isLoading, user, router]);
+  // Signed-in visitors are sent on by the (auth) layout.
 
   // Google sign in error state
   const showGoogleError =
@@ -130,7 +129,7 @@ function SignInContent() {
       {/* Alert Error when Google sign-in fails or cancelled */}
       {showGoogleError && (
         <Alert variant="destructive" className="relative">
-          <AlertCircle className="h-4 w-4" />
+          <HugeIcon icon={AlertCircleIcon} size={16} />
           <AlertTitle>Couldn&apos;t sign you in with Google</AlertTitle>
           <AlertDescription>
             The sign-in was cancelled or didn&apos;t finish. Try again, or use your email.
@@ -141,7 +140,7 @@ function SignInContent() {
       {/* Alert Info when session code provided */}
       {session && (
         <Alert variant="info" className="relative">
-          <Info className="h-4 w-4" />
+          <HugeIcon icon={InformationCircleIcon} size={16} />
           <AlertTitle>Joining session {session.code}</AlertTitle>
           <AlertDescription>{session.title}</AlertDescription>
         </Alert>
@@ -164,7 +163,9 @@ function SignInContent() {
             /* Session Join Mode */
             <form onSubmit={handleJoinSession} className="space-y-4" noValidate>
               <div className="space-y-1.5">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   placeholder="Jane Doe"
@@ -183,7 +184,9 @@ function SignInContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="session-email">Email</Label>
+                <Label htmlFor="session-email">
+                  Email <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="session-email"
                   type="email"
@@ -211,7 +214,9 @@ function SignInContent() {
             <div className="space-y-4">
               <form onSubmit={handleStandardSubmit} className="space-y-4" noValidate>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -232,7 +237,9 @@ function SignInContent() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
                     <Link
                       href="/forgot-password"
                       className="text-xs text-link font-medium hover:text-foreground transition-colors"

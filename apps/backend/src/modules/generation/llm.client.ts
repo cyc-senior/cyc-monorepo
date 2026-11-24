@@ -6,6 +6,7 @@ import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { LlmAbortedError } from './llm-aborted.error'
 import { LlmNotConfiguredError } from './llm-not-configured.error'
+import { ThinkTagSplitter } from './think-tag-splitter'
 
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant'
@@ -14,6 +15,7 @@ export interface LlmMessage {
 
 export interface StructuredCompletion {
   content: string
+  thought?: string
   /** `length` means the output was cut off. */
   finishReason: string | null
   usage: { promptTokens: number; completionTokens: number }
@@ -67,6 +69,8 @@ export class LlmClient {
     signal?: AbortSignal
     /** Called as output arrives, with the characters received so far. */
     onDelta?: (receivedChars: number) => void
+    /** Called as reasoning/thinking tokens arrive. */
+    onThoughtDelta?: (thoughtDelta: string, totalThought: string) => void
   }): Promise<StructuredCompletion> {
     if (!this.client) {
       throw new LlmNotConfiguredError()
@@ -98,20 +102,49 @@ export class LlmClient {
     })
 
     let content = ''
-    let finishReason: string | null = null
-    const usage = { promptTokens: 0, completionTokens: 0 }
-    for await (const chunk of stream) {
-      const choice = chunk.choices[0]
-      if (choice?.delta?.content) {
-        content += choice.delta.content
+    let thought = ''
+    const splitter = new ThinkTagSplitter()
+    const addParts = (parts: { content: string; thought: string }) => {
+      if (parts.thought) {
+        thought += parts.thought
+        options.onThoughtDelta?.(parts.thought, thought)
+      }
+      if (parts.content) {
+        content += parts.content
         options.onDelta?.(content.length)
       }
+    }
+    let finishReason: string | null = null
+    const usage = { promptTokens: 0, completionTokens: 0 }
+
+    for await (const chunk of stream) {
+      const choice = chunk.choices[0]
+      const delta = choice?.delta as
+        | (typeof choice.delta & {
+            reasoning_content?: string
+            reasoning?: string
+          })
+        | undefined
+
+      // Check for reasoning_content (vLLM / Qwen / DeepSeek-R1 / OpenAI format)
+      const reasoningChunk = delta?.reasoning_content ?? delta?.reasoning
+      if (reasoningChunk) {
+        thought += reasoningChunk
+        options.onThoughtDelta?.(reasoningChunk, thought)
+      }
+
+      // Inline <think>…</think> reasoning (models without a reasoning parser).
+      if (delta?.content) {
+        addParts(splitter.push(delta.content))
+      }
+
       finishReason = choice?.finish_reason ?? finishReason
       if (chunk.usage) {
         usage.promptTokens = chunk.usage.prompt_tokens
         usage.completionTokens = chunk.usage.completion_tokens
       }
     }
+    addParts(splitter.flush())
     // An aborted stream can end quietly; never return its partial output.
     if (options.signal?.aborted) {
       throw new LlmAbortedError()
@@ -127,6 +160,11 @@ export class LlmClient {
       }),
     )
 
-    return { content, finishReason, usage }
+    return {
+      content,
+      thought: thought.length > 0 ? thought : undefined,
+      finishReason,
+      usage,
+    }
   }
 }
