@@ -26,6 +26,7 @@ import {
   CreateDesignRoundDto,
   DesignRoundDto,
   DesignRoundQueryDto,
+  DraftPromptQueryDto,
   UpdateDesignRoundDto,
 } from './dto/design-round.dto'
 import { RoundsService } from './rounds.service'
@@ -62,10 +63,13 @@ export class RoundsController {
   @ApiProduces('text/event-stream')
   draftPrompt(
     @UuidParam('projectId') projectId: string,
-    @Query('storyId') storyId: string,
-    @Query('personaId') personaId?: string,
+    @Query() query: DraftPromptQueryDto,
   ): Observable<MessageEvent> {
-    return this.rounds.streamDraftPrompt(projectId, storyId, personaId)
+    return this.rounds.streamDraftPrompt(
+      projectId,
+      query.storyId,
+      query.personaId,
+    )
   }
 
   /**

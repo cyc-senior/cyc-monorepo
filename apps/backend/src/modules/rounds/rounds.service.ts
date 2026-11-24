@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   MessageEvent,
+  NotFoundException,
 } from '@nestjs/common'
 import { Observable } from 'rxjs'
 
@@ -239,13 +240,10 @@ export class RoundsService {
 
       ;(async () => {
         try {
-          subscriber.next({
-            data: {
-              status: 'Drafting your prompt with AI...',
-              stage: 'loading_inputs',
-            },
-          })
-
+          // Inputs are checked before any progress is reported: a story or
+          // persona outside the project ends the stream with an `error`
+          // event and nothing else. (The query DTO already rejects missing
+          // or malformed ids with a 400 before the stream opens.)
           const [story, intent, persona] = await Promise.all([
             this.prisma.userStory.findFirst({
               where: { id: storyId, projectId },
@@ -264,9 +262,24 @@ export class RoundsService {
           ])
 
           if (!story) {
-            subscriber.error(new BadRequestException('User story not found.'))
+            subscriber.error(new NotFoundException('User story not found.'))
             return
           }
+          if (personaId && !persona) {
+            subscriber.error(
+              new BadRequestException(
+                'personaId must be a persona of this project.',
+              ),
+            )
+            return
+          }
+
+          subscriber.next({
+            data: {
+              status: 'Drafting your prompt with AI...',
+              stage: 'loading_inputs',
+            },
+          })
 
           const defaultGoal =
             story.acceptanceCriteria ||

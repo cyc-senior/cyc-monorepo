@@ -34,6 +34,20 @@ export class CreateDesignRoundDto {
   storyId?: string | null
 }
 
+/** Query of `GET .../rounds/draft-prompt/events`. */
+export class DraftPromptQueryDto {
+  /** The user story of the project to draft the prompt for. */
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  storyId: string
+
+  /** A persona of the project to draft for (default: the first one). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  personaId?: string
+}
+
 export class UpdateDesignRoundDto extends PartialType(
   OmitType(CreateDesignRoundDto, ['storyId'] as const),
 ) {
