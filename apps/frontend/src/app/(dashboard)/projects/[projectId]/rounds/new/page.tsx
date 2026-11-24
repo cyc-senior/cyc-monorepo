@@ -70,7 +70,6 @@ function ReviewStructuredPromptContent() {
   // Editable prompt fields - strictly populated by backend AI response
   const [goalText, setGoalText] = React.useState("");
   const [isEditingGoal, setIsEditingGoal] = React.useState(false);
-  const [isSavingGoal, setIsSavingGoal] = React.useState(false);
 
   const [problemText, setProblemText] = React.useState("");
   const [isEditingProblem, setIsEditingProblem] = React.useState(false);
@@ -238,26 +237,9 @@ function ReviewStructuredPromptContent() {
     retryRef.current();
   };
 
-  const handleSaveGoal = async () => {
-    if (!isEditingGoal) {
-      setIsEditingGoal(true);
-      return;
-    }
-    if (!storyId) {
-      setIsEditingGoal(false);
-      return;
-    }
-    setIsSavingGoal(true);
-    try {
-      await updateUserStory(projectId, storyId, { acceptanceCriteria: goalText });
-      setIsEditingGoal(false);
-    } catch (e) {
-      console.error("Failed to persist goal", e);
-      setIsEditingGoal(false);
-    } finally {
-      setIsSavingGoal(false);
-    }
-  };
+  // The goal only shapes this prompt. It is not written back to the story:
+  // the story's acceptance criteria are the designer's, not the AI's goal.
+  const handleToggleGoal = () => setIsEditingGoal((editing) => !editing);
 
   const handleSaveProblem = async () => {
     if (!isEditingProblem) {
@@ -402,11 +384,11 @@ function ReviewStructuredPromptContent() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={isLoading || isSavingGoal}
-                onClick={handleSaveGoal}
+                disabled={isLoading}
+                onClick={handleToggleGoal}
                 className="h-7 px-2 text-xs font-medium text-foreground hover:bg-muted rounded-[8px] cursor-pointer"
               >
-                <span>{isSavingGoal ? "Saving..." : isEditingGoal ? "Done" : "Edit"}</span>
+                <span>{isEditingGoal ? "Done" : "Edit"}</span>
               </Button>
             </div>
 
