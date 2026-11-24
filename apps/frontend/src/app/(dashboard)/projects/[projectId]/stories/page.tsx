@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ProjectMainLandingView } from "../page";
+import { ProjectMainLandingView } from "@/components/projects/ProjectMainLandingView";
 
 export default function ProjectStoriesPage() {
   return (

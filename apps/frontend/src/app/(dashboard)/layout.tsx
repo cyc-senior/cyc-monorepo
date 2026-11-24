@@ -83,7 +83,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
           />
         </Suspense>
-        <main className="flex-1 overflow-y-auto w-full">{children}</main>
+        <main className="flex-1 overflow-y-auto w-full">
+          <Suspense
+            fallback={
+              <div className="w-full flex justify-center py-24">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+              </div>
+            }
+          >
+            {children}
+          </Suspense>
+        </main>
       </div>
     </div>
   );
