@@ -18,6 +18,8 @@ export interface GenerationProgress {
   attempt?: number
   /** Characters of model output received so far in this attempt. */
   receivedChars?: number
+  /** Live reasoning or thinking text emitted by the model. */
+  thought?: string
   /** Errors found by the last check. */
   errors?: number
   message?: string

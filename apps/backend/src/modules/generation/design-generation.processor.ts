@@ -42,7 +42,7 @@ interface PersonaArtifact {
 /** While generating, check this often whether the job was cancelled. */
 const CANCEL_POLL_MS = 3_000
 /** Streamed progress is relayed at most this often. */
-const PROGRESS_THROTTLE_MS = 1_000
+const PROGRESS_THROTTLE_MS = 500
 const VARIANT_LABELS = 'ABCDEFGH'
 
 /**
@@ -406,7 +406,8 @@ export class DesignGenerationProcessor
             progress: (progress) => {
               const now = Date.now()
               if (
-                progress.receivedChars !== undefined &&
+                (progress.receivedChars !== undefined ||
+                  progress.thought !== undefined) &&
                 now - lastSent < PROGRESS_THROTTLE_MS
               ) {
                 return

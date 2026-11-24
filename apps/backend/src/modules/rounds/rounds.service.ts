@@ -406,6 +406,15 @@ export class RoundsService {
                 }),
               },
             ],
+            onThoughtDelta: (_chunk, totalThought) => {
+              subscriber.next({
+                data: {
+                  status: 'Reasoning about prompt strategy...',
+                  stage: 'llm_streaming',
+                  thought: totalThought,
+                },
+              })
+            },
             onDelta: (chars) => {
               subscriber.next({
                 data: {

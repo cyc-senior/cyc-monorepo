@@ -14,6 +14,7 @@ export interface LlmMessage {
 
 export interface StructuredCompletion {
   content: string
+  thought?: string
   /** `length` means the output was cut off. */
   finishReason: string | null
   usage: { promptTokens: number; completionTokens: number }
@@ -67,6 +68,8 @@ export class LlmClient {
     signal?: AbortSignal
     /** Called as output arrives, with the characters received so far. */
     onDelta?: (receivedChars: number) => void
+    /** Called as reasoning/thinking tokens arrive. */
+    onThoughtDelta?: (thoughtDelta: string, totalThought: string) => void
   }): Promise<StructuredCompletion> {
     if (!this.client) {
       throw new LlmNotConfiguredError()
@@ -98,14 +101,71 @@ export class LlmClient {
     })
 
     let content = ''
+    let thought = ''
+    let inThinkTag = false
     let finishReason: string | null = null
     const usage = { promptTokens: 0, completionTokens: 0 }
+
     for await (const chunk of stream) {
       const choice = chunk.choices[0]
-      if (choice?.delta?.content) {
-        content += choice.delta.content
-        options.onDelta?.(content.length)
+      const delta = choice?.delta as
+        | (typeof choice.delta & {
+            reasoning_content?: string
+            reasoning?: string
+          })
+        | undefined
+
+      // Check for reasoning_content (vLLM / Qwen / DeepSeek-R1 / OpenAI format)
+      const reasoningChunk = delta?.reasoning_content ?? delta?.reasoning
+      if (reasoningChunk) {
+        thought += reasoningChunk
+        options.onThoughtDelta?.(reasoningChunk, thought)
       }
+
+      // Check content, handling potential inline <think>...</think> tags
+      if (delta?.content) {
+        let chunkContent = delta.content
+        if (inThinkTag) {
+          const endIdx = chunkContent.indexOf('</think>')
+          if (endIdx !== -1) {
+            const thinkPart = chunkContent.slice(0, endIdx)
+            thought += thinkPart
+            options.onThoughtDelta?.(thinkPart, thought)
+            inThinkTag = false
+            chunkContent = chunkContent.slice(endIdx + 8) // '</think>'.length
+          } else {
+            thought += chunkContent
+            options.onThoughtDelta?.(chunkContent, thought)
+            chunkContent = ''
+          }
+        } else {
+          const startIdx = chunkContent.indexOf('<think>')
+          if (startIdx !== -1) {
+            const beforeThink = chunkContent.slice(0, startIdx)
+            content += beforeThink
+            chunkContent = chunkContent.slice(startIdx + 7) // '<think>'.length
+            inThinkTag = true
+            const endIdx = chunkContent.indexOf('</think>')
+            if (endIdx !== -1) {
+              const thinkPart = chunkContent.slice(0, endIdx)
+              thought += thinkPart
+              options.onThoughtDelta?.(thinkPart, thought)
+              inThinkTag = false
+              chunkContent = chunkContent.slice(endIdx + 8)
+            } else {
+              thought += chunkContent
+              options.onThoughtDelta?.(chunkContent, thought)
+              chunkContent = ''
+            }
+          }
+        }
+
+        if (chunkContent) {
+          content += chunkContent
+          options.onDelta?.(content.length)
+        }
+      }
+
       finishReason = choice?.finish_reason ?? finishReason
       if (chunk.usage) {
         usage.promptTokens = chunk.usage.prompt_tokens
@@ -127,6 +187,11 @@ export class LlmClient {
       }),
     )
 
-    return { content, finishReason, usage }
+    return {
+      content,
+      thought: thought.length > 0 ? thought : undefined,
+      finishReason,
+      usage,
+    }
   }
 }

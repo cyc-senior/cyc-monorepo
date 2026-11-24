@@ -10,6 +10,8 @@ import {
 export interface JobStreamState {
   snapshot: JobSnapshot | null;
   progress: GenerationProgress | null;
+  /** Accumulated thoughts by variant index (1-based). */
+  thoughtsByVariant: Record<number, string>;
   /** The stream itself could not be read (not a failed job). */
   streamError: string | null;
 }
@@ -17,6 +19,7 @@ export interface JobStreamState {
 const EMPTY: JobStreamState = {
   snapshot: null,
   progress: null,
+  thoughtsByVariant: {},
   streamError: null,
 };
 
@@ -42,9 +45,24 @@ export function useJobStream(
       (event) =>
         setState((prev) => {
           const base = prev.jobId === jobId ? prev : { jobId, ...EMPTY };
-          return event.type === "progress"
-            ? { ...base, progress: event.data, streamError: null }
-            : { ...base, snapshot: event.data, streamError: null };
+          if (event.type === "progress") {
+            const nextThoughts =
+              event.data.variant && event.data.thought
+                ? {
+                    ...base.thoughtsByVariant,
+                    [event.data.variant]: event.data.thought,
+                  }
+                : base.thoughtsByVariant;
+
+            return {
+              ...base,
+              progress: event.data,
+              thoughtsByVariant: nextThoughts,
+              streamError: null,
+            };
+          }
+
+          return { ...base, snapshot: event.data, streamError: null };
         }),
       abort.signal
     ).catch((error: unknown) =>

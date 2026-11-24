@@ -12,7 +12,16 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { Trace, TraceLine, TraceIcon, TraceTitle } from "@/components/ui/trace";
+import {
+  Trace,
+  TraceLine,
+  TraceIcon,
+  TraceTitle,
+  TraceCollapsible,
+  TraceCollapsibleTrigger,
+  TraceCollapsibleContent,
+} from "@/components/ui/trace";
+import { Brain } from "lucide-react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import { useJobStream } from "@/components/generation/use-job-stream";
 import {
@@ -361,6 +370,13 @@ function GeneratingContent() {
                     ? "running"
                     : "pending";
 
+              const variantMatch = step.key.match(/^variant-(\d+)$/);
+              const variantIdx = variantMatch ? Number(variantMatch[1]) : null;
+              const stepThought = variantIdx
+                ? live.thoughtsByVariant[variantIdx] ??
+                  (live.progress?.variant === variantIdx ? live.progress.thought : undefined)
+                : undefined;
+
               return (
                 <TraceLine key={step.key} status={traceStatus}>
                   <TraceIcon>
@@ -374,7 +390,24 @@ function GeneratingContent() {
                       <HugeIcon icon={CircleIcon} size={16} className="text-muted-foreground" />
                     )}
                   </TraceIcon>
-                  <TraceTitle>{step.label}</TraceTitle>
+                  <div className="flex flex-1 flex-col min-w-0">
+                    <TraceTitle>{step.label}</TraceTitle>
+                    {stepThought && (
+                      <TraceCollapsible defaultOpen={step.state === "active"} className="mt-1">
+                        <TraceCollapsibleTrigger>
+                          <Brain className="size-3.5 text-violet-500 animate-pulse shrink-0" />
+                          <span>
+                            Thought process ({stepThought.length.toLocaleString()} chars)
+                          </span>
+                        </TraceCollapsibleTrigger>
+                        <TraceCollapsibleContent>
+                          <div className="rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
+                            {stepThought}
+                          </div>
+                        </TraceCollapsibleContent>
+                      </TraceCollapsible>
+                    )}
+                  </div>
                 </TraceLine>
               );
             })}

@@ -111,6 +111,7 @@ export class DesignGenerator {
     let issues: HtmlIssue[] = []
 
     for (let attempt = 1; attempt <= this.repairs + 1; attempt++) {
+      let currentThought = ''
       hooks.progress?.({
         stage: attempt === 1 ? 'generating' : 'repairing',
         attempt,
@@ -121,11 +122,20 @@ export class DesignGenerator {
         schema: DESIGN_JSON_SCHEMA,
         temperature: attempt === 1 ? 0.8 : 0.4,
         signal: hooks.signal,
+        onThoughtDelta: (_chunk, totalThought) => {
+          currentThought = totalThought
+          hooks.progress?.({
+            stage: attempt === 1 ? 'generating' : 'repairing',
+            attempt,
+            thought: currentThought,
+          })
+        },
         onDelta: (receivedChars) =>
           hooks.progress?.({
             stage: attempt === 1 ? 'generating' : 'repairing',
             attempt,
             receivedChars,
+            thought: currentThought || undefined,
           }),
       })
       usage.promptTokens += completion.usage.promptTokens
