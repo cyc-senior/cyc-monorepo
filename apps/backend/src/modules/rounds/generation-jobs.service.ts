@@ -175,7 +175,10 @@ export class GenerationJobsService {
       personas,
       stories,
       prompt: dto.prompt,
-      synthesizePersona: dto.synthesizePersona ?? true,
+      synthesizePersona:
+        dto.synthesizePersona !== undefined
+          ? dto.synthesizePersona
+          : !(dto.personaIds && dto.personaIds.length > 0),
       baseDesign,
       feedbackThemes,
     }

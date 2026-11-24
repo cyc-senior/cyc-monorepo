@@ -295,6 +295,7 @@ function ReviewStructuredPromptContent() {
         prompt: `Goal: ${goalText}. User: ${personaSummary}. Problem: ${problemText}. Constraints: ${mustUseText}. Variant A: ${designAName} (${designADesc}). Variant B: ${designBName} (${designBDesc}). Evaluation: ${comparisonQuestion}.`,
         storyIds: [storyId],
         personaIds: selectedPersonaId ? [selectedPersonaId] : personas.slice(0, 5).map((p) => p.id),
+        synthesizePersona: Boolean(!selectedPersonaId && personas.length === 0),
       });
 
       router.push(`/projects/${projectId}/rounds/${round.id}/generate?job=${job.id}`);
