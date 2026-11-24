@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,16 +26,20 @@ import {
 } from "@hugeicons/core-free-icons";
 import {
   createUserStory,
+  updateUserStory,
+  getUserStoryById,
   listPersonas,
   getDesignIntent,
   PersonaItem,
   DesignIntentDetail,
 } from "@/lib/project-client";
 
-export default function NewUserStoryPage() {
+function NewUserStoryContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const projectId = params.projectId as string;
+  const existingStoryId = searchParams.get("storyId");
 
   // Story formula: As a... I want to... So that...
   const [role, setRole] = React.useState("");
@@ -62,12 +66,76 @@ export default function NewUserStoryPage() {
   React.useEffect(() => {
     async function loadData() {
       try {
-        const [personaList, intentDetail] = await Promise.all([
+        const [personaList, intentDetail, existingStory] = await Promise.all([
           listPersonas(projectId).catch(() => []),
           getDesignIntent(projectId).catch(() => null),
+          existingStoryId ? getUserStoryById(projectId, existingStoryId).catch(() => null) : Promise.resolve(null),
         ]);
         setPersonas(personaList);
         setIntent(intentDetail);
+
+        if (existingStory) {
+          if (existingStory.problemStatement) {
+            setProblemStatement(existingStory.problemStatement);
+          }
+          if (existingStory.acceptanceCriteria) {
+            setSuccessMetric(existingStory.acceptanceCriteria);
+          }
+
+          // Parse formula: "As a {role}, I want to {want}, so that {benefit}"
+          const formulaMatch = existingStory.title.match(
+            /^As a (.*?),\s*I want to (.*?),\s*so that (.*)$/i
+          );
+          if (formulaMatch) {
+            setRole(formulaMatch[1].trim());
+            setWant(formulaMatch[2].trim());
+            setBenefit(formulaMatch[3].trim());
+          } else {
+            setWant(existingStory.title);
+          }
+
+          // Parse description lines for Scope: Target Personas, Devices, Screens
+          if (existingStory.description) {
+            const lines = existingStory.description.split("\n");
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith("Role:") && !formulaMatch) {
+                setRole(trimmed.replace(/^Role:\s*/, "").trim());
+              } else if (trimmed.startsWith("Goal:") && !formulaMatch) {
+                setWant(trimmed.replace(/^Goal:\s*/, "").trim());
+              } else if (trimmed.startsWith("Benefit:") && !formulaMatch) {
+                setBenefit(trimmed.replace(/^Benefit:\s*/, "").trim());
+              } else if (trimmed.startsWith("Target Personas:")) {
+                const personaIds = trimmed
+                  .replace(/^Target Personas:\s*/, "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (personaIds.length > 0) {
+                  setSelectedPersonaIds(personaIds);
+                }
+              } else if (trimmed.startsWith("Devices:")) {
+                const devs = trimmed
+                  .replace(/^Devices:\s*/, "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (devs.length > 0) {
+                  setDevices(devs);
+                }
+              } else if (trimmed.startsWith("Screens:")) {
+                const scrs = trimmed
+                  .replace(/^Screens:\s*/, "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (scrs.length > 0) {
+                  setScreensList(scrs);
+                }
+              }
+            }
+          }
+        }
       } catch {
         // Ignored
       }
@@ -75,7 +143,7 @@ export default function NewUserStoryPage() {
     if (projectId) {
       loadData();
     }
-  }, [projectId]);
+  }, [projectId, existingStoryId]);
 
   const toggleDevice = (dev: string) => {
     setDevices((prev) =>
@@ -131,15 +199,19 @@ export default function NewUserStoryPage() {
         screensList.length > 0 ? `Screens: ${screensList.join(", ")}` : "",
       ].filter(Boolean).join("\n");
 
-      const created = await createUserStory(projectId, {
+      const storyPayload = {
         title: storyTitle.length > 200 ? storyTitle.slice(0, 197) + "..." : storyTitle,
         description: descriptionParts,
         problemStatement: problemStatement.trim(),
         acceptanceCriteria: successMetric.trim() || undefined,
-      });
+      };
+
+      const storyId = existingStoryId
+        ? (await updateUserStory(projectId, existingStoryId, storyPayload)).id
+        : (await createUserStory(projectId, storyPayload)).id;
 
       // Proceed to Screen 16: Review structured prompt
-      router.push(`/projects/${projectId}/rounds/new?storyId=${created.id}`);
+      router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -584,7 +656,7 @@ export default function NewUserStoryPage() {
             asChild
             className="rounded-[10px] h-8 px-3 font-medium text-sm text-foreground hover:bg-muted cursor-pointer"
           >
-            <Link href={`/projects/${projectId}`}>
+            <Link href={`/projects/${projectId}/stories`}>
               <HugeIcon icon={ArrowLeft01Icon} size={16} />
               <span>Back</span>
             </Link>
@@ -601,5 +673,19 @@ export default function NewUserStoryPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NewUserStoryPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-12 text-center text-muted-foreground">
+          Loading user story form...
+        </div>
+      }
+    >
+      <NewUserStoryContent />
+    </React.Suspense>
   );
 }

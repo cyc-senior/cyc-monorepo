@@ -693,7 +693,7 @@ function ReviewStructuredPromptContent() {
           asChild
           className="rounded-[10px] h-8 px-3 font-medium text-sm text-foreground hover:bg-muted cursor-pointer"
         >
-          <Link href={`/projects/${projectId}/stories/new`}>
+          <Link href={`/projects/${projectId}/stories/new?storyId=${storyId}`}>
             <HugeIcon icon={ArrowLeft01Icon} size={16} />
             <span>Back</span>
           </Link>
