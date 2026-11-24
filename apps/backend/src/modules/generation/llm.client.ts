@@ -6,6 +6,7 @@ import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { LlmAbortedError } from './llm-aborted.error'
 import { LlmNotConfiguredError } from './llm-not-configured.error'
+import { ThinkTagSplitter } from './think-tag-splitter'
 
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant'
@@ -102,7 +103,17 @@ export class LlmClient {
 
     let content = ''
     let thought = ''
-    let inThinkTag = false
+    const splitter = new ThinkTagSplitter()
+    const addParts = (parts: { content: string; thought: string }) => {
+      if (parts.thought) {
+        thought += parts.thought
+        options.onThoughtDelta?.(parts.thought, thought)
+      }
+      if (parts.content) {
+        content += parts.content
+        options.onDelta?.(content.length)
+      }
+    }
     let finishReason: string | null = null
     const usage = { promptTokens: 0, completionTokens: 0 }
 
@@ -122,48 +133,9 @@ export class LlmClient {
         options.onThoughtDelta?.(reasoningChunk, thought)
       }
 
-      // Check content, handling potential inline <think>...</think> tags
+      // Inline <think>…</think> reasoning (models without a reasoning parser).
       if (delta?.content) {
-        let chunkContent = delta.content
-        if (inThinkTag) {
-          const endIdx = chunkContent.indexOf('</think>')
-          if (endIdx >= 0) {
-            const thinkPart = chunkContent.slice(0, endIdx)
-            thought += thinkPart
-            options.onThoughtDelta?.(thinkPart, thought)
-            inThinkTag = false
-            chunkContent = chunkContent.slice(endIdx + 8) // '</think>'.length
-          } else {
-            thought += chunkContent
-            options.onThoughtDelta?.(chunkContent, thought)
-            chunkContent = ''
-          }
-        } else {
-          const startIdx = chunkContent.indexOf('<think>')
-          if (startIdx >= 0) {
-            const beforeThink = chunkContent.slice(0, startIdx)
-            content += beforeThink
-            chunkContent = chunkContent.slice(startIdx + 7) // '<think>'.length
-            inThinkTag = true
-            const endIdx = chunkContent.indexOf('</think>')
-            if (endIdx >= 0) {
-              const thinkPart = chunkContent.slice(0, endIdx)
-              thought += thinkPart
-              options.onThoughtDelta?.(thinkPart, thought)
-              inThinkTag = false
-              chunkContent = chunkContent.slice(endIdx + 8)
-            } else {
-              thought += chunkContent
-              options.onThoughtDelta?.(chunkContent, thought)
-              chunkContent = ''
-            }
-          }
-        }
-
-        if (chunkContent) {
-          content += chunkContent
-          options.onDelta?.(content.length)
-        }
+        addParts(splitter.push(delta.content))
       }
 
       finishReason = choice?.finish_reason ?? finishReason
@@ -172,6 +144,7 @@ export class LlmClient {
         usage.completionTokens = chunk.usage.completion_tokens
       }
     }
+    addParts(splitter.flush())
     // An aborted stream can end quietly; never return its partial output.
     if (options.signal?.aborted) {
       throw new LlmAbortedError()
