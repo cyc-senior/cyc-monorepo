@@ -759,7 +759,7 @@ export default function DesignIntentStep2Page() {
 
       {/* Modal 12A: Add Persona Dialog matching Figma Node 815:10541 */}
       <Dialog open={isPersonaModalOpen} onOpenChange={setIsPersonaModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-[14px] p-6">
+        <DialogContent className="sm:max-w-xl rounded-[14px] p-6">
           <form onSubmit={handleCreatePersona} noValidate className="space-y-4">
             <DialogHeader className="flex flex-row items-center justify-between pb-2">
               <DialogTitle className="font-heading font-medium text-xl text-foreground">
@@ -773,7 +773,7 @@ export default function DesignIntentStep2Page() {
               </Alert>
             )}
 
-            <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-[67vh] overflow-y-auto p-1">
               {/* Name & Age Row */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2 space-y-1.5">
@@ -790,7 +790,7 @@ export default function DesignIntentStep2Page() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="persona-age" className="text-sm font-medium text-foreground">
-                    Age
+                    Age <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="persona-age"
@@ -805,7 +805,7 @@ export default function DesignIntentStep2Page() {
               {/* Short description */}
               <div className="space-y-1.5">
                 <Label htmlFor="persona-desc" className="text-sm font-medium text-foreground">
-                  Short description
+                  Short description <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="persona-desc"
@@ -819,7 +819,7 @@ export default function DesignIntentStep2Page() {
               {/* Behavioral considerations */}
               <div className="space-y-1.5">
                 <Label htmlFor="persona-behaviors" className="text-sm font-medium text-foreground">
-                  Behavioral considerations
+                  Behavioral considerations <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="persona-behaviors"
@@ -834,7 +834,7 @@ export default function DesignIntentStep2Page() {
               {/* Frustrations */}
               <div className="space-y-1.5">
                 <Label htmlFor="persona-frustrations" className="text-sm font-medium text-foreground">
-                  Frustrations
+                  Frustrations <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="persona-frustrations"
@@ -849,7 +849,7 @@ export default function DesignIntentStep2Page() {
               {/* Goals */}
               <div className="space-y-1.5">
                 <Label htmlFor="persona-goals" className="text-sm font-medium text-foreground">
-                  Goals
+                  Goals <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="persona-goals"
@@ -864,7 +864,7 @@ export default function DesignIntentStep2Page() {
               {/* Tasks */}
               <div className="space-y-1.5">
                 <Label htmlFor="persona-tasks" className="text-sm font-medium text-foreground">
-                  Tasks
+                  Tasks <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="persona-tasks"
