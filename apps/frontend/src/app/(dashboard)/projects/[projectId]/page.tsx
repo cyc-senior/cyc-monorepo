@@ -99,6 +99,10 @@ function getActivityButton(log: AuditLogItem, projectId: string): ActivityButton
       label: "View",
       resolve: async () => {
         const job = await getGenerationJob(projectId, jobId);
+        if (job.status === "CANCELLED") {
+          const storyId = job.inputSnapshot?.stories?.[0]?.id;
+          return storyId ? `/projects/${projectId}/rounds/new?storyId=${storyId}` : `/projects/${projectId}`;
+        }
         return job.status === "SUCCEEDED" || job.baseVariantId
           ? refine(job.roundId)
           : progress(job.roundId, job.id);

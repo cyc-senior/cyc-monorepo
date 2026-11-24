@@ -247,8 +247,13 @@ function GeneratingContent() {
   React.useEffect(() => {
     if (status === "SUCCEEDED") {
       router.replace(`/projects/${projectId}/rounds/${roundId}/refine`);
+    } else if (status === "CANCELLED") {
+      const storyId = job?.inputSnapshot?.stories?.[0]?.id;
+      if (storyId) {
+        router.replace(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+      }
     }
-  }, [status, router, projectId, roundId]);
+  }, [status, router, projectId, roundId, job]);
 
   React.useEffect(() => {
     const storyTitle = job?.inputSnapshot?.stories?.[0]?.title;
@@ -266,7 +271,12 @@ function GeneratingContent() {
       if (status === "QUEUED" || status === "RUNNING") {
         await cancelGenerationJob(projectId, job.id);
       }
-      router.push(`/projects/${projectId}`);
+      const storyId = job.inputSnapshot?.stories?.[0]?.id;
+      if (storyId) {
+        router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+      } else {
+        router.push(`/projects/${projectId}`);
+      }
     } catch {
       setActionError("Couldn't cancel the generation. Try again.");
       setBusyAction(null);
@@ -417,8 +427,18 @@ function GeneratingContent() {
 
         {ended ? (
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => router.push(`/projects/${projectId}`)}>
-              Back to project
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const storyId = job.inputSnapshot?.stories?.[0]?.id;
+                if (storyId) {
+                  router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+                } else {
+                  router.push(`/projects/${projectId}`);
+                }
+              }}
+            >
+              {status === "CANCELLED" ? "Review prompt" : "Back to project"}
             </Button>
             <Button onClick={handleRetry} disabled={busyAction !== null}>
               {busyAction === "retry" ? "Starting…" : "Try again"}

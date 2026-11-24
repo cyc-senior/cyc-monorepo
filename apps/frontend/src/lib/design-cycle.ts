@@ -22,6 +22,10 @@ function designHref(projectId: string, story: UserStoryItem): string | undefined
   if (!cycle) return undefined;
   const round = `/projects/${projectId}/rounds/${cycle.roundId}`;
   if (cycle.variantCount > 0) return `${round}/refine`;
+  // Cancelled generation shouldn't trap user on dead generate page; route back to prompt
+  if (cycle.activeJob?.status === "CANCELLED" || cycle.roundStatus === "CANCELLED") {
+    return undefined;
+  }
   return cycle.activeJob ? `${round}/generate?job=${cycle.activeJob.id}` : `${round}/generate`;
 }
 
@@ -29,6 +33,9 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
   const cycle = story.designCycle;
   const designs = designHref(projectId, story);
   const approved = Boolean(cycle && (cycle.approvedCount > 0 || cycle.roundStatus === "APPROVED"));
+  const isCancelled = Boolean(
+    cycle && (cycle.activeJob?.status === "CANCELLED" || cycle.roundStatus === "CANCELLED")
+  );
 
   return [
     {
@@ -40,14 +47,17 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
     {
       key: "prompt",
       label: "Review prompt",
-      state: cycle ? "done" : "current",
-      // Approving the prompt again would start another round: only open it before.
-      href: cycle ? undefined : `/projects/${projectId}/rounds/new?storyId=${story.id}`,
+      state: !cycle || isCancelled ? "current" : "done",
+      // Approving the prompt again would start another round: open it before designs exist or if cancelled.
+      href:
+        !cycle || isCancelled || cycle.variantCount === 0
+          ? `/projects/${projectId}/rounds/new?storyId=${story.id}`
+          : undefined,
     },
     {
       key: "refine",
       label: "Refine UI",
-      state: !cycle ? "todo" : approved ? "done" : "current",
+      state: !cycle || isCancelled ? "todo" : approved ? "done" : "current",
       href: designs,
     },
     {
