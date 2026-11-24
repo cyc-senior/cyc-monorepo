@@ -356,6 +356,62 @@ function GeneratingContent() {
   const status: GenerationJobStatus = live.snapshot?.status ?? job?.status ?? "QUEUED";
   const errorText = live.snapshot?.error ?? job?.error ?? null;
 
+  // Track running thought key to auto-expand active thought and auto-collapse when next item appears
+  const [prevRunningKey, setPrevRunningKey] = React.useState<string | null>(null);
+  const [manuallyOpenedKey, setManuallyOpenedKey] = React.useState<string | null>(null);
+  const [manuallyClosedKey, setManuallyClosedKey] = React.useState<string | null>(null);
+
+  const currentRunningThoughtKey = React.useMemo(() => {
+    const progress = live.progress;
+    if (progress?.stage === "persona") {
+      return "persona";
+    }
+    const v = progress?.variant;
+    if (v && progress) {
+      if (progress.stage === "thinking") {
+        return `v${v}-thinking`;
+      }
+      if (progress.stage === "repairing") {
+        const attempt = progress.attempt ?? 2;
+        return `v${v}-repairing-${attempt}`;
+      }
+    }
+    for (let idx = 1; idx <= (job?.variantCount ?? 2); idx++) {
+      const traces = live.tracesByVariant[idx] ?? [];
+      const running = traces.find(
+        (t) =>
+          (t.phase === "thinking" || t.phase === "repairing") &&
+          t.status === "running"
+      );
+      if (running) {
+        return `v${idx}-${running.id}`;
+      }
+    }
+    return null;
+  }, [live.progress, live.tracesByVariant, job?.variantCount]);
+
+  // Adjust state during render when running thought changes (auto-collapse previous thought when new thought appears)
+  if (currentRunningThoughtKey !== prevRunningKey) {
+    setPrevRunningKey(currentRunningThoughtKey);
+    setManuallyOpenedKey(null);
+    setManuallyClosedKey(null);
+  }
+
+  const openThoughtKey =
+    status === "SUCCEEDED"
+      ? manuallyOpenedKey
+      : (manuallyOpenedKey ?? (manuallyClosedKey === currentRunningThoughtKey ? null : currentRunningThoughtKey));
+
+  const handleToggleThought = React.useCallback((key: string, open: boolean) => {
+    if (open) {
+      setManuallyOpenedKey(key);
+      setManuallyClosedKey(null);
+    } else {
+      setManuallyOpenedKey(null);
+      setManuallyClosedKey(key);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (status === "SUCCEEDED") {
       router.replace(`/projects/${projectId}/rounds/${roundId}/refine`);
@@ -556,9 +612,14 @@ function GeneratingContent() {
                           const personaThought =
                             live.personaThought ?? job.outputMetadata?.personaThought;
                           const isRunning = step.state === "active";
+                          const key = "persona";
+                          const isOpen = openThoughtKey === key;
                           return (
                             <TraceCollapsible
-                              defaultOpen={isRunning}
+                              open={isOpen}
+                              onOpenChange={(open) =>
+                                handleToggleThought(key, open)
+                              }
                               className="w-full"
                             >
                               <div className="flex items-center gap-2">
@@ -611,11 +672,16 @@ function GeneratingContent() {
                             const displayTitle = isRunning
                               ? "Thinking..."
                               : `Thought for ${item.thoughtDurationSeconds ?? 5} seconds`;
+                            const thoughtKey = `v${variantIdx}-thinking`;
+                            const isOpen = openThoughtKey === thoughtKey;
 
                             return (
                               <TraceCollapsible
                                 key={item.id}
-                                defaultOpen={isRunning}
+                                open={isOpen}
+                                onOpenChange={(open) =>
+                                  handleToggleThought(thoughtKey, open)
+                                }
                                 className="w-full"
                               >
                                 <div className="flex items-center gap-2">
@@ -662,10 +728,16 @@ function GeneratingContent() {
                               ? `Thinking about repairs (Attempt ${item.attempt || 2})...`
                               : `Thought for ${item.thoughtDurationSeconds ?? 3} seconds (Attempt ${item.attempt || 2})`;
 
+                            const thoughtKey = `v${variantIdx}-${item.id}`;
+                            const isOpen = openThoughtKey === thoughtKey;
+
                             return (
                               <TraceCollapsible
                                 key={item.id}
-                                defaultOpen={isRunning}
+                                open={isOpen}
+                                onOpenChange={(open) =>
+                                  handleToggleThought(thoughtKey, open)
+                                }
                                 className="w-full"
                               >
                                 <div className="flex items-center gap-2">
