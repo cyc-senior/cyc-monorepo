@@ -458,6 +458,7 @@ export class DesignGenerationProcessor
       variant: i + 1,
       passed: r.passed,
       attempts: r.attempts,
+      thought: r.thought,
       ...('issues' in r
         ? { issues: r.issues.slice(0, 20) }
         : {

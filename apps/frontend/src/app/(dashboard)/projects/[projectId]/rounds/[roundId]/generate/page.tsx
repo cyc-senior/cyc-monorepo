@@ -374,7 +374,8 @@ function GeneratingContent() {
               const variantIdx = variantMatch ? Number(variantMatch[1]) : null;
               const stepThought = variantIdx
                 ? live.thoughtsByVariant[variantIdx] ??
-                  (live.progress?.variant === variantIdx ? live.progress.thought : undefined)
+                  (live.progress?.variant === variantIdx ? live.progress.thought : undefined) ??
+                  job.outputMetadata?.variants?.find((v) => v.variant === variantIdx)?.thought
                 : undefined;
 
               return (

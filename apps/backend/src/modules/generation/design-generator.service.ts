@@ -49,8 +49,15 @@ export type VariantResult =
       report: HtmlReport
       attempts: number
       usage: Usage
+      thought?: string
     }
-  | { passed: false; issues: HtmlIssue[]; attempts: number; usage: Usage }
+  | {
+      passed: false
+      issues: HtmlIssue[]
+      attempts: number
+      usage: Usage
+      thought?: string
+    }
 
 export interface VariantRequest {
   input: GenerationInput
@@ -109,9 +116,9 @@ export class DesignGenerator {
     }
     const usage: Usage = { promptTokens: 0, completionTokens: 0 }
     let issues: HtmlIssue[] = []
+    let currentThought = ''
 
     for (let attempt = 1; attempt <= this.repairs + 1; attempt++) {
-      let currentThought = ''
       hooks.progress?.({
         stage: attempt === 1 ? 'generating' : 'repairing',
         attempt,
@@ -201,6 +208,7 @@ export class DesignGenerator {
             report: check.report,
             attempts: attempt,
             usage,
+            thought: currentThought || undefined,
           }
         }
         issues = check.report.issues.filter(
@@ -214,7 +222,13 @@ export class DesignGenerator {
       )
     }
 
-    return { passed: false, issues, attempts: this.repairs + 1, usage }
+    return {
+      passed: false,
+      issues,
+      attempts: this.repairs + 1,
+      usage,
+      thought: currentThought || undefined,
+    }
   }
 
   private parse(

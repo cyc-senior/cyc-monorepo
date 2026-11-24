@@ -52,6 +52,7 @@ export interface GenerationOutputVariant {
   attempts: number;
   title?: string;
   rationale?: string;
+  thought?: string;
   issues?: Array<{ message: string; criterion?: string }>;
 }
 

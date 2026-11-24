@@ -134,7 +134,7 @@ export class EnvironmentVariables {
   /** Turn off the model's reasoning phase (vLLM `enable_thinking: false`): much faster for structured output. */
   @EnvBoolean()
   @IsBoolean()
-  LLM_DISABLE_THINKING: boolean = true
+  LLM_DISABLE_THINKING: boolean = false
 
   /** How many times the model may repair a design that fails the UI kit or WCAG checks. */
   @IsInt()
