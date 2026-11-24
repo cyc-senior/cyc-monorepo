@@ -21,13 +21,17 @@ import {
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
 } from "@/components/ui/trace";
-import { Brain } from "lucide-react";
+import { Brain, CheckCircle2, FileCode, ShieldCheck, Wrench } from "lucide-react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
-import { useJobStream } from "@/components/generation/use-job-stream";
+import {
+  useJobStream,
+  VariantTraceItem,
+} from "@/components/generation/use-job-stream";
 import {
   cancelGenerationJob,
   GenerationJob,
   GenerationJobStatus,
+  GenerationOutputVariant,
   GenerationProgress,
   getGenerationJob,
   listRoundJobs,
@@ -73,6 +77,8 @@ function variantStatus(
       : { text: "Waiting", busy: false, done: false };
   }
   switch (progress.stage) {
+    case "thinking":
+      return { text: "Reasoning about layout…", busy: true, done: false };
     case "checking":
       return { text: "Checking accessibility…", busy: true, done: false };
     case "repairing":
@@ -97,8 +103,6 @@ function progressSteps(
   const current = progress?.variant ?? 0;
   const started = status === "RUNNING" || finished || Boolean(progress);
   const pastPersona = finished || (stage !== undefined && stage !== "started" && stage !== "persona");
-  const standard =
-    job.inputSnapshot?.intent?.designStandards?.[0] ?? "WCAG AA";
   const fullTitle = job.inputSnapshot?.stories?.[0]?.title;
   // Story titles are whole "As a … I want …" sentences; keep the step short.
   const storyTitle =
@@ -132,17 +136,64 @@ function progressSteps(
             : "todo",
     });
   }
-  steps.push({
-    key: "check",
-    label: `Checking ${standard} contrast`,
-    state:
-      finished || stage === "saving"
-        ? "done"
-        : stage === "checking" || stage === "repairing"
-          ? "active"
-          : "todo",
-  });
   return steps;
+}
+
+function getVariantTraces(
+  variantIdx: number,
+  standard: string,
+  liveTraces: VariantTraceItem[],
+  outputVariant?: GenerationOutputVariant,
+  thought?: string,
+  stepState?: StepState
+): VariantTraceItem[] {
+  if (liveTraces.length > 0) {
+    return liveTraces;
+  }
+  const effectiveThought = thought ?? outputVariant?.thought;
+  if (stepState === "done") {
+    const list: VariantTraceItem[] = [];
+    if (effectiveThought) {
+      list.push({
+        id: "thinking",
+        phase: "thinking",
+        status: "done",
+        title: "Analyzing UX strategy & persona goals",
+        thought: effectiveThought,
+      });
+    }
+    list.push({
+      id: "generating",
+      phase: "generating",
+      status: "done",
+      title: "Drafted HTML component hierarchy",
+    });
+    list.push({
+      id: "checking",
+      phase: "checking",
+      status: "done",
+      title: `Validated ${standard} contrast & design system rules`,
+    });
+    list.push({
+      id: "ready",
+      phase: "ready",
+      status: "done",
+      title: "Variant markup verified & saved",
+    });
+    return list;
+  }
+  if (stepState === "active") {
+    return [
+      {
+        id: "thinking",
+        phase: "thinking",
+        status: "running",
+        title: "Analyzing UX strategy & persona goals",
+        thought: effectiveThought,
+      },
+    ];
+  }
+  return [];
 }
 
 function VariantCard({
@@ -382,11 +433,28 @@ function GeneratingContent() {
 
               const variantMatch = step.key.match(/^variant-(\d+)$/);
               const variantIdx = variantMatch ? Number(variantMatch[1]) : null;
+              const outputVariant = variantIdx
+                ? job.outputMetadata?.variants?.find((v) => v.variant === variantIdx)
+                : undefined;
               const stepThought = variantIdx
                 ? live.thoughtsByVariant[variantIdx] ??
                   (live.progress?.variant === variantIdx ? live.progress.thought : undefined) ??
-                  job.outputMetadata?.variants?.find((v) => v.variant === variantIdx)?.thought
+                  outputVariant?.thought
                 : undefined;
+
+              const standard =
+                job.inputSnapshot?.intent?.designStandards?.[0] ?? "WCAG 2.2 AA";
+
+              const variantTraces = variantIdx
+                ? getVariantTraces(
+                    variantIdx,
+                    standard,
+                    live.tracesByVariant[variantIdx] ?? [],
+                    outputVariant,
+                    stepThought,
+                    step.state
+                  )
+                : [];
 
               return (
                 <TraceLine key={step.key} status={traceStatus}>
@@ -403,20 +471,94 @@ function GeneratingContent() {
                   </TraceIcon>
                   <div className="flex flex-1 flex-col min-w-0">
                     <TraceTitle>{step.label}</TraceTitle>
-                    {stepThought && (
-                      <TraceCollapsible defaultOpen={step.state === "active"} className="mt-1">
-                        <TraceCollapsibleTrigger>
-                          <Brain className="size-3.5 text-violet-500 animate-pulse shrink-0" />
-                          <span>
-                            Thought process ({stepThought.length.toLocaleString()} chars)
-                          </span>
-                        </TraceCollapsibleTrigger>
-                        <TraceCollapsibleContent>
-                          <div className="rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                            {stepThought}
+                    {variantTraces.length > 0 && (
+                      <div className="mt-2.5 ml-1 flex flex-col gap-2.5 border-l-2 border-border/60 pl-3 py-1">
+                        {variantTraces.map((item) => (
+                          <div key={item.id} className="flex flex-col gap-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              {item.phase === "thinking" && (
+                                <Brain
+                                  className={cn(
+                                    "size-3.5 shrink-0",
+                                    item.status === "running"
+                                      ? "text-violet-500 animate-pulse"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                              )}
+                              {item.phase === "generating" && (
+                                <FileCode
+                                  className={cn(
+                                    "size-3.5 shrink-0",
+                                    item.status === "running"
+                                      ? "text-blue-500 animate-pulse"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                              )}
+                              {item.phase === "checking" && (
+                                <ShieldCheck
+                                  className={cn(
+                                    "size-3.5 shrink-0",
+                                    item.status === "running"
+                                      ? "text-amber-500 animate-pulse"
+                                      : item.status === "error"
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                  )}
+                                />
+                              )}
+                              {item.phase === "repairing" && (
+                                <Wrench className="size-3.5 shrink-0 text-amber-500 animate-pulse" />
+                              )}
+                              {item.phase === "ready" && (
+                                <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500" />
+                              )}
+
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  item.status === "running" ? "text-foreground" : "text-muted-foreground"
+                                )}
+                              >
+                                {item.title}
+                                {item.receivedChars ? ` (${(item.receivedChars / 1024).toFixed(1)} KB)` : null}
+                              </span>
+
+                              {item.status === "running" && (
+                                <HugeIcon
+                                  icon={Loading02Icon}
+                                  size={12}
+                                  className="animate-spin text-muted-foreground ml-auto shrink-0"
+                                />
+                              )}
+                              {item.status === "done" && item.phase !== "ready" && (
+                                <HugeIcon
+                                  icon={Tick02Icon}
+                                  size={12}
+                                  className="text-muted-foreground/70 ml-auto shrink-0"
+                                />
+                              )}
+                            </div>
+
+                            {item.thought && (
+                              <TraceCollapsible defaultOpen={item.status === "running"} className="mt-0.5">
+                                <TraceCollapsibleTrigger className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline">
+                                  <span>
+                                    {item.status === "running" ? "Live thoughts" : "Reasoning summary"} (
+                                    {item.thought.length.toLocaleString()} chars)
+                                  </span>
+                                </TraceCollapsibleTrigger>
+                                <TraceCollapsibleContent>
+                                  <div className="mt-1 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
+                                    {item.thought}
+                                  </div>
+                                </TraceCollapsibleContent>
+                              </TraceCollapsible>
+                            )}
                           </div>
-                        </TraceCollapsibleContent>
-                      </TraceCollapsible>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </TraceLine>

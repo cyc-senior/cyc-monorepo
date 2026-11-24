@@ -132,7 +132,7 @@ export class DesignGenerator {
         onThoughtDelta: (_chunk, totalThought) => {
           currentThought = totalThought
           hooks.progress?.({
-            stage: attempt === 1 ? 'generating' : 'repairing',
+            stage: attempt === 1 ? 'thinking' : 'repairing',
             attempt,
             thought: currentThought,
           })

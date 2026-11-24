@@ -377,6 +377,7 @@ export class DesignGenerationProcessor
 
     for (let index = 1; index <= total; index++) {
       let lastSent = 0
+      let lastStage: string | undefined
       let result: VariantResult | undefined
       // Guardrail against missing designs: a design that still fails after
       // its repairs is started over (told what failed) before it is dropped.
@@ -405,7 +406,9 @@ export class DesignGenerationProcessor
             signal,
             progress: (progress) => {
               const now = Date.now()
+              const isStageChange = progress.stage !== lastStage
               if (
+                !isStageChange &&
                 (progress.receivedChars !== undefined ||
                   progress.thought !== undefined) &&
                 now - lastSent < PROGRESS_THROTTLE_MS
@@ -413,6 +416,7 @@ export class DesignGenerationProcessor
                 return
               }
               lastSent = now
+              lastStage = progress.stage
               void job
                 .updateProgress({
                   ...progress,

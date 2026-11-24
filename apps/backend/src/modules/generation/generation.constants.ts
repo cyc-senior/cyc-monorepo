@@ -10,7 +10,13 @@ export interface DesignGenerationJobData {
 /** Progress a worker reports while generating (relayed over SSE). */
 export interface GenerationProgress {
   stage:
-    'started' | 'persona' | 'generating' | 'checking' | 'repairing' | 'saving'
+    | 'started'
+    | 'persona'
+    | 'thinking'
+    | 'generating'
+    | 'checking'
+    | 'repairing'
+    | 'saving'
   /** 1-based variant being worked on, and how many the job makes. */
   variant?: number
   of: number

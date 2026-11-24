@@ -16,6 +16,7 @@ export type GenerationJobStatus =
 export type GenerationStage =
   | "started"
   | "persona"
+  | "thinking"
   | "generating"
   | "checking"
   | "repairing"
