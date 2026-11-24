@@ -23,6 +23,7 @@ import {
 import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { InviteWorkspaceDialog } from "@/components/projects/InviteWorkspaceDialog";
 import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
+import { ProjectsNav } from "./ProjectsNav";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Folder01Icon,
@@ -31,7 +32,6 @@ import {
   Settings01Icon,
   HelpCircleIcon,
   UnfoldMoreIcon,
-  ArrowRight01Icon,
   UserIcon,
   Logout01Icon,
   Add01Icon,
@@ -383,26 +383,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               <p className="px-3 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Recent projects
               </p>
-              <nav className="space-y-1">
-                <Link
-                  href="/projects"
-                  className="flex items-center justify-between px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors group"
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <HugeIcon
-                      icon={Folder01Icon}
-                      size={18}
-                      className="shrink-0 text-muted-foreground"
-                    />
-                    <span className="truncate">All projects</span>
-                  </div>
-                  <HugeIcon
-                    icon={ArrowRight01Icon}
-                    size={14}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
-                </Link>
-              </nav>
+              <ProjectsNav />
             </div>
           )}
         </div>

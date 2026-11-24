@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,16 +50,11 @@ function GoogleIcon() {
 }
 
 function SignUpContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithGoogle, user, isLoading } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const sessionCode = searchParams.get("session_code");
 
-  React.useEffect(() => {
-    if (!isLoading && user) {
-      router.replace("/dashboard");
-    }
-  }, [isLoading, user, router]);
+  // Signed-in visitors are sent on by the (auth) layout.
 
   // Form states
   const [fullName, setFullName] = React.useState("");

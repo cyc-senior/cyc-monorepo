@@ -9,7 +9,7 @@ import { AuthTokens } from "@/types/auth";
 
 const rawApiUrl =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-const API_URL = rawApiUrl.endsWith("/api")
+export const API_URL = rawApiUrl.endsWith("/api")
   ? rawApiUrl
   : `${rawApiUrl.replace(/\/$/, "")}/api`;
 

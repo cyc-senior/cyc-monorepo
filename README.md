@@ -61,6 +61,19 @@ TOKEN=$(pnpm --silent dev:token --raw)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:4000/api/users/me
 ```
 
+To sign in to the **frontend** without Google, print a one-time sign-in link and
+open it in the browser (with the backend and frontend running):
+
+```bash
+open "$(pnpm --silent dev:url)"                   # macOS; seeded admin
+open "$(pnpm --silent dev:url --email a@b.com)"   # another existing user
+```
+
+The link points at `http://localhost:3000/auth/dev#refreshToken=...`. That page
+exists only under `next dev` (404 in production builds) and stores the refresh
+token as the session cookie, so reloads stay signed in. Each link works once;
+run the command again for a new one.
+
 In Swagger (`http://localhost:4000/api`), click **Authorize** and paste the token. Access tokens last 15
 minutes (`JWT_ACCESS_TTL_SECONDS`); run the command again for a new one.
 

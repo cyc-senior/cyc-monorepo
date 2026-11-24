@@ -728,6 +728,7 @@ export default function DesignIntentStep2Page() {
             asChild
             className="gap-2 rounded-[10px] h-8 px-3 font-medium text-sm border-border cursor-pointer hover:bg-muted"
           >
+            {/* TODO : 404 Not Found */}
             <Link href={`/projects/${projectId}/setup/story`}>
               <HugeIcon icon={ArrowLeft01Icon} size={16} />
               <span>Back</span>

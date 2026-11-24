@@ -368,6 +368,7 @@ model UserStory {
   project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   generation StoryGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
   variants   UIVariant[]      @relation("VariantStories")
+  rounds     DesignRound[]
 
   @@index([projectId])
   @@index([generationId])
@@ -391,6 +392,8 @@ model DesignRound {
   roundNumber   Int
   title         String?
   parentRoundId String?           @db.Uuid
+  /// The user story this round designs (one story is one design cycle).
+  storyId       String?           @db.Uuid
   status        DesignRoundStatus @default(DRAFT)
   approvedById  String?           @db.Uuid
   approvedAt    DateTime?
@@ -399,6 +402,7 @@ model DesignRound {
 
   project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parentRound      DesignRound?           @relation("RoundLineage", fields: [parentRoundId], references: [id], onDelete: SetNull)
+  story            UserStory?             @relation(fields: [storyId], references: [id], onDelete: SetNull)
   childRounds      DesignRound[]          @relation("RoundLineage")
   approvedBy       User?                  @relation("RoundApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   generationJobs   GenerationJob[]
@@ -411,9 +415,10 @@ model DesignRound {
   acknowledgements RoundAcknowledgement[]
   reports          Report[]
 
-  /// Target of composite foreign keys that keep a round's children in its project.
   @@unique([id, projectId])
   @@unique([projectId, roundNumber])
+  /// Target of composite foreign keys that keep a round's children in its project.
+  @@index([storyId])
   @@index([parentRoundId])
   @@index([approvedById])
   @@map("design_rounds")

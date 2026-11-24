@@ -1,6 +1,7 @@
 import React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
+import { cn } from "@/lib/utils";
 
 interface HugeIconProps {
   icon: IconSvgElement;
@@ -19,7 +20,8 @@ export function HugeIcon({
     <HugeiconsIcon
       icon={icon}
       size={size}
-      className={className}
+      // Icons keep their size next to long text in flex rows.
+      className={cn("shrink-0", className)}
       strokeWidth={strokeWidth}
     />
   );

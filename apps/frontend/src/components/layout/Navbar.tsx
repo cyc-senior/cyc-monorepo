@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   ArrowDown01Icon,
@@ -42,6 +43,10 @@ export function Navbar({
 }: NavbarProps) {
   const isAuthVariant = variant === "auth";
   const pathname = usePathname();
+  // Pages like the landing page pass no user; the session still decides
+  // whether "Sign in" or "Dashboard" makes sense.
+  const { user: sessionUser } = useAuth();
+  const signedIn = Boolean(user ?? sessionUser);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background text-foreground">
@@ -49,7 +54,7 @@ export function Navbar({
         {/* Left: Logo + Nav links */}
         <div className="flex items-center gap-6">
           <Link
-            href={user ? "/dashboard" : "/"}
+            href={signedIn ? "/dashboard" : "/"}
             className="flex items-center gap-2 transition-opacity hover:opacity-80"
             aria-label="Home"
           >
@@ -159,7 +164,11 @@ export function Navbar({
               </>
             ) : (
               <Button variant="ghost" className="bg-secondary rounded-[10px]" asChild>
-                <Link href="/signin">Sign in</Link>
+                {signedIn ? (
+                  <Link href="/dashboard">Dashboard</Link>
+                ) : (
+                  <Link href="/signin">Sign in</Link>
+                )}
               </Button>
             )}
           </div>

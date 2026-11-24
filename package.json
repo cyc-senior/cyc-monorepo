@@ -19,6 +19,7 @@
     "db:studio": "pnpm --filter backend run db:studio",
     "db:reset": "pnpm --filter backend run db:reset",
     "dev:token": "pnpm --filter backend run dev:token",
+    "dev:url": "pnpm --filter backend run dev:url",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test:ci",

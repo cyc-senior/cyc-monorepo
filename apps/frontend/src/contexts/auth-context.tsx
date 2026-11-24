@@ -15,6 +15,7 @@ import {
   refreshAccessToken,
   setAccessToken as setClientAccessToken,
 } from "@/lib/api-client";
+import { forgetReturnTo } from "@/lib/return-to";
 
 interface AuthContextType {
   user: User | null;
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
+    forgetReturnTo();
     await apiFetch("/auth/logout", {
       method: "POST",
       data: {},

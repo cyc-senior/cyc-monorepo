@@ -50,11 +50,23 @@ export class RoundsService {
     if (dto.parentRoundId) {
       await this.get(projectId, dto.parentRoundId)
     }
+    if (
+      dto.storyId &&
+      !(await this.prisma.userStory.findFirst({
+        where: { id: dto.storyId, projectId },
+        select: { id: true },
+      }))
+    ) {
+      throw new BadRequestException(
+        'storyId must be a user story of this project.',
+      )
+    }
 
     return this.prisma.$transaction((tx) =>
       createNextRound(tx, projectId, {
         title: dto.title,
         parentRoundId: dto.parentRoundId,
+        storyId: dto.storyId ?? undefined,
       }),
     )
   }

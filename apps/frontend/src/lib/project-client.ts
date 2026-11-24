@@ -130,6 +130,20 @@ export interface UserStoryItem {
   personaIds?: string[];
   screenScope?: string[];
   devices?: string[];
+  /** Where the story's design cycle stands; null before its prompt is approved. */
+  designCycle?: StoryDesignCycle | null;
+}
+
+export interface StoryDesignCycle {
+  roundId: string;
+  roundNumber: number;
+  roundStatus: string;
+  /** Designs in the round (archived excluded). */
+  variantCount: number;
+  /** Designs approved for testing. */
+  approvedCount: number;
+  /** A generation in progress, if any. */
+  activeJob: { id: string; status: string; refinement: boolean } | null;
 }
 
 export interface CreateUserStoryPayload {
@@ -153,6 +167,8 @@ export interface DesignRoundItem {
 export interface CreateDesignRoundPayload {
   title?: string | null;
   parentRoundId?: string | null;
+  /** The user story this round designs. */
+  storyId?: string | null;
 }
 
 export interface GenerationJobItem {

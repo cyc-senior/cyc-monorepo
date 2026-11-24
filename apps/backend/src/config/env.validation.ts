@@ -143,6 +143,15 @@ export class EnvironmentVariables {
   DESIGN_REPAIR_ATTEMPTS: number = 2
 
   /**
+   * When a design still fails after its repairs, start it over this many
+   * times (a fresh attempt told what failed) before the design is given up.
+   */
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  DESIGN_VARIANT_RESTARTS: number = 1
+
+  /**
    * Namespace of the job queues in Redis. Environments sharing a Redis (or a
    * developer's machine running two databases) need different prefixes, or
    * their workers take each other's jobs.

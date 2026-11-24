@@ -8,6 +8,7 @@ import { BreadcrumbProvider } from "@/contexts/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
+import { consumeReturnTo, rememberReturnTo } from "@/lib/return-to";
 
 function WorkspaceRedirectGuard() {
   const pathname = usePathname();
@@ -98,20 +99,37 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/signin");
-    }
-  }, [isLoading, user, router]);
-
   return (
     <WorkspaceProvider>
       <BreadcrumbProvider>
+        {/* The guard reads the URL, which is only known at request time. */}
+        <Suspense fallback={null}>
+          <SessionGuard />
+        </Suspense>
         <DashboardShell>{children}</DashboardShell>
       </BreadcrumbProvider>
     </WorkspaceProvider>
   );
+}
+
+/** Sends signed-out visitors to sign in and back here afterwards. */
+function SessionGuard() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      // Come back here after signing in, whichever way that happens.
+      rememberReturnTo(`${pathname}${window.location.search}`);
+      router.replace("/signin");
+    } else if (pathname === "/dashboard") {
+      // Google sign-in always lands on /dashboard: continue to the remembered page.
+      const returnTo = consumeReturnTo();
+      if (returnTo) router.replace(returnTo);
+    }
+  }, [isLoading, user, router, pathname]);
+
+  return null;
 }

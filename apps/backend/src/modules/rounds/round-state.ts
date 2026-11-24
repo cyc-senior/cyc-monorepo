@@ -35,9 +35,22 @@ export async function requireWritableRound(
 export async function createNextRound(
   tx: Prisma.TransactionClient,
   projectId: string,
-  data: { title?: string | null; parentRoundId?: string | null },
+  data: {
+    title?: string | null
+    parentRoundId?: string | null
+    /** Omitted: an iteration keeps its parent round's story. */
+    storyId?: string | null
+  },
 ): Promise<DesignRound> {
   await lockKey(tx, `project-rounds:${projectId}`)
+  let storyId = data.storyId ?? null
+  if (data.storyId === undefined && data.parentRoundId) {
+    const parent = await tx.designRound.findUnique({
+      where: { id: data.parentRoundId },
+      select: { storyId: true },
+    })
+    storyId = parent?.storyId ?? null
+  }
   const last = await tx.designRound.aggregate({
     where: { projectId },
     _max: { roundNumber: true },
@@ -48,6 +61,7 @@ export async function createNextRound(
       projectId,
       title: data.title,
       parentRoundId: data.parentRoundId,
+      storyId,
       roundNumber: (last._max.roundNumber ?? 0) + 1,
     },
   })

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { storyShortTitle } from "@/lib/design-cycle";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -111,7 +112,12 @@ function ReviewStructuredPromptContent() {
         );
 
         // Populate comparison based on story
-        setComparisonQuestion(`Which design makes it easier to ${storyData.title.slice(0, 80)}?`);
+        // The story's "I want to …" part, cut at a word boundary.
+        const want = storyShortTitle(storyData).replace(/\.$/, "");
+        const task = want.length > 80 ? `${want.slice(0, 80).replace(/\s+\S*$/, "")}…` : want;
+        setComparisonQuestion(
+          `Which design makes it easier to ${task.charAt(0).toLowerCase()}${task.slice(1)}?`
+        );
         setDesignAName("Direct flow");
         setDesignADesc("Streamlined single-page workflow minimizing steps.");
         setDesignBName("Guided flow");
@@ -139,17 +145,18 @@ function ReviewStructuredPromptContent() {
         : "Design Round";
       const round = await createDesignRound(projectId, {
         title: roundTitle,
+        storyId,
       });
 
       // 2. Start the AI Generation Job with the reviewed structured prompt and story linkage
-      await startGenerationJob(projectId, round.id, {
+      const job = await startGenerationJob(projectId, round.id, {
         prompt: `Goal: ${goalText}. User: ${personaText}. Problem: ${problemText}. Constraints: ${mustUseText}. Variant A: ${designAName} (${designADesc}). Variant B: ${designBName} (${designBDesc}). Evaluation: ${comparisonQuestion}.`,
         storyIds: [storyId],
         personaIds: personas.slice(0, 5).map((p) => p.id),
       });
 
-      // Redirect to project main page (Screen 14)
-      router.push(`/projects/${projectId}`);
+      // Follow the generation live (Screen 17: Generating A/B)
+      router.push(`/projects/${projectId}/rounds/${round.id}/generate?job=${job.id}`);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data

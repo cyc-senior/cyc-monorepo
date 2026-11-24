@@ -37,6 +37,8 @@ import {
   AuditLogItem,
 } from "@/lib/project-client";
 import { localizeAuditLog } from "@/lib/audit-localization";
+import { getGenerationJob, getVariant } from "@/lib/generation-client";
+import { storyContinueHref } from "@/lib/design-cycle";
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -53,7 +55,58 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-function getActivityButton(log: AuditLogItem, projectId: string) {
+interface ActivityButton {
+  label: string;
+  /** Known link, or… */
+  href?: string;
+  /** …a link that needs a lookup first (e.g. which round a variant is in). */
+  resolve?: () => Promise<string>;
+}
+
+function designLinks(projectId: string) {
+  const refine = (roundId: string) => `/projects/${projectId}/rounds/${roundId}/refine`;
+  const progress = (roundId: string, jobId: string) =>
+    `/projects/${projectId}/rounds/${roundId}/generate?job=${jobId}`;
+  return { refine, progress };
+}
+
+function getActivityButton(log: AuditLogItem, projectId: string): ActivityButton | null {
+  const { refine, progress } = designLinks(projectId);
+  const roundId = typeof log.changes?.roundId === "string" ? log.changes.roundId : null;
+
+  // Generated designs: open them, or the generation's progress page.
+  if (log.entityType === "GenerationJob" && log.entityId) {
+    const refinement =
+      log.changes?.refinement === true || Boolean(log.changes?.body?.baseVariantId);
+    if (log.action === "GenerationJob.complete" && roundId) {
+      return { label: "Refine", href: refine(roundId) };
+    }
+    // Refinements show their progress in the Refine page's chat; only the
+    // first A/B generation has its own Generating page.
+    if (refinement && roundId) {
+      return { label: "View", href: refine(roundId) };
+    }
+    if ((log.action === "GenerationJob.fail" || log.action === "GenerationJob.start") && roundId) {
+      return { label: "View", href: progress(roundId, log.entityId) };
+    }
+    const jobId = log.entityId;
+    return {
+      label: "View",
+      resolve: async () => {
+        const job = await getGenerationJob(projectId, jobId);
+        return job.status === "SUCCEEDED" || job.baseVariantId
+          ? refine(job.roundId)
+          : progress(job.roundId, job.id);
+      },
+    };
+  }
+  if (log.entityType === "UIVariant" && log.entityId && log.action !== "UIVariant.delete") {
+    const variantId = log.entityId;
+    return {
+      label: "Preview",
+      resolve: async () => refine((await getVariant(projectId, variantId)).roundId),
+    };
+  }
   if (log.action.startsWith("FeedbackTheme") || log.action.includes("cancel") || log.action.includes("reject")) {
     return {
       label: "Step in",
@@ -81,7 +134,7 @@ function getActivityButton(log: AuditLogItem, projectId: string) {
   if (log.entityType === "DesignIntent") {
     return {
       label: "View",
-      href: `/projects/${projectId}/intent`,
+      href: `/projects/${projectId}/setup/intent`,
     };
   }
   return null;
@@ -121,6 +174,18 @@ function ProjectMainLandingView() {
   const [reports, setReports] = React.useState<ReportItem[]>([]);
   const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>([]);
   const [selectedActivity, setSelectedActivity] = React.useState<AuditLogItem | null>(null);
+  const [activityError, setActivityError] = React.useState<string | null>(null);
+
+  /** Follows an activity button, looking its link up first when needed. */
+  const openActivity = async (button: ActivityButton) => {
+    setActivityError(null);
+    try {
+      const href = button.href ?? (await button.resolve?.());
+      if (href) router.push(href);
+    } catch {
+      setActivityError("That item is no longer available.");
+    }
+  };
   const [isLoading, setIsLoading] = React.useState(true);
 
   const latestAuditLogs = React.useMemo(() => {
@@ -247,10 +312,12 @@ function ProjectMainLandingView() {
               </span>
             </TabsTrigger>
 
-            {/* Design intent link styled matching unselected Tab without active indicator */}
+            {/* Design intent opens its own page; it uses the line tab's exact
+                spacing (pb-2.5, no top or side padding, 2px underline slot)
+                so it lines up with the tabs beside it. */}
             <Link
               href={`/projects/${projectId}/setup/intent`}
-              className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-all text-muted-foreground hover:text-foreground cursor-pointer rounded-none border-b-2 border-transparent"
+              className="-mb-px inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-0 pb-2.5 pt-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
             >
               Design intent
             </Link>
@@ -337,7 +404,7 @@ function ProjectMainLandingView() {
                       <Card
                         key={story.id}
                         className="rounded-[14px] border border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer bg-card p-0"
-                        onClick={() => router.push(`/projects/${projectId}/rounds/new?storyId=${story.id}`)}
+                        onClick={() => router.push(storyContinueHref(projectId, story))}
                       >
                         {/* Thumbnail matching Figma Node 924:20997: height 120px, bg #f5f5f5, pt-4 px-4, no bottom padding */}
                         <div className="h-[120px] bg-[#f5f5f5] dark:bg-muted/30 border-b border-border/60 px-4 pt-4 pb-0 flex items-end justify-center gap-2 overflow-hidden select-none">
@@ -489,6 +556,11 @@ function ProjectMainLandingView() {
                   <h2 className="text-xl font-heading font-medium text-foreground">
                     Activity
                   </h2>
+                  {activityError && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {activityError}
+                    </p>
+                  )}
 
                   {latestAuditLogs.length > 0 ? (
                     <div className="space-y-1">
@@ -550,7 +622,7 @@ function ProjectMainLandingView() {
                                 className="h-7 px-2.5 text-xs font-medium rounded-[10px] shrink-0 border-border/80 bg-background hover:bg-muted/50 cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  router.push(actionBtn.href);
+                                  void openActivity(actionBtn);
                                 }}
                               >
                                 {actionBtn.label}
@@ -602,7 +674,7 @@ function ProjectMainLandingView() {
                   <Card
                     key={story.id}
                     className="p-5 rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs flex flex-col justify-between gap-3 cursor-pointer"
-                    onClick={() => router.push(`/projects/${projectId}/rounds/new?storyId=${story.id}`)}
+                    onClick={() => router.push(storyContinueHref(projectId, story))}
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1054,7 +1126,7 @@ function ProjectMainLandingView() {
                       size="sm"
                       onClick={() => {
                         setSelectedActivity(null);
-                        router.push(actionBtn.href);
+                        void openActivity(actionBtn);
                       }}
                     >
                       {actionBtn.label}

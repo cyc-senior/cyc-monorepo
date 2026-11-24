@@ -24,6 +24,7 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node scripts/seed-admin.ts",
     "dev:token": "ts-node scripts/dev-token.ts",
+    "dev:url": "ts-node scripts/dev-token.ts --url",
     "env:init": "ts-node scripts/init-env.ts"
   },
   "dependencies": {
@@ -91,7 +92,15 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.ts$": "ts-jest"
+      "^.+\\.ts$": "ts-jest",
+      "^.+\\.js$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "allowJs": true
+          }
+        }
+      ]
     },
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/$1"
@@ -107,6 +116,9 @@
     ],
     "setupFiles": [
       "<rootDir>/../test/silence-logs.ts"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(\\.pnpm/[^/]+/node_modules/)?(htmlparser2|domhandler|domutils|dom-serializer|domelementtype|entities)/)"
     ]
   }
 }

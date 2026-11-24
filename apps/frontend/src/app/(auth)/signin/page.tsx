@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,18 +55,13 @@ function GoogleIcon() {
 }
 
 function SignInContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { loginWithGoogle, user, isLoading } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const sessionCode = searchParams.get("session_code");
   const authError = searchParams.get("error");
   const session = sessionCode ? getSessionDetails(sessionCode) : null;
 
-  React.useEffect(() => {
-    if (!isLoading && user) {
-      router.replace("/dashboard");
-    }
-  }, [isLoading, user, router]);
+  // Signed-in visitors are sent on by the (auth) layout.
 
   // Google sign in error state
   const showGoogleError =

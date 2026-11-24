@@ -5,10 +5,18 @@ import { z } from 'zod'
 import { llmJsonSchema } from '../../common/json-schema'
 import { logEvent } from '../../common/logging/log-event'
 import { EnvironmentVariables } from '../../config/env.validation'
-import { checkHtml, HtmlIssue, HtmlReport } from '../design/html/check-html'
-import { MAX_HTML_BYTES } from '../design/html/sanitize-html-design'
 import {
+  checkHtml,
+  fixContrast,
+  HtmlIssue,
+  HtmlReport,
+} from '../design/html/check-html'
+import { MAX_HTML_BYTES } from '../design/html/sanitize-html-design'
+import { applyUiKit, normalizeKitMarkup } from '../design/html/ui-kits'
+import {
+  accessibilityStandard,
   asConversation,
+  contrastMinimums,
   GenerationInput,
   PersonaInput,
   repairPrompt,
@@ -51,6 +59,8 @@ export interface VariantRequest {
   index: number
   total: number
   previous: Array<{ title: string; rationale: string }>
+  /** Problems an earlier attempt at this design could not fix. */
+  avoid?: string[]
 }
 
 export interface GenerationHooks {
@@ -86,12 +96,16 @@ export class DesignGenerator {
       index: request.index,
       total: request.total,
       previous: request.previous,
+      avoid: request.avoid,
     })
     const context = {
       platforms: input.project.platforms,
       brandColors: Object.values(input.intent.colors).filter(
         (color): color is string => Boolean(color),
       ),
+      designSystem: input.intent.designSystem,
+      requireKit: true,
+      standard: accessibilityStandard(input.intent.designStandards),
     }
     const usage: Usage = { promptTokens: 0, completionTokens: 0 }
     let issues: HtmlIssue[] = []
@@ -122,7 +136,40 @@ export class DesignGenerator {
       if ('issues' in parsed) {
         issues = parsed.issues
       } else {
-        const check = checkHtml(parsed.html, context)
+        // The design system's stylesheet and brand tokens are added here, not
+        // written by the model; the check then requires kit components.
+        // Guardrail: kit components written as class names get their slot.
+        const normalized = normalizeKitMarkup(
+          parsed.html,
+          input.intent.designSystem,
+        )
+        const kitted = applyUiKit(
+          normalized.html,
+          input.intent.designSystem,
+          input.intent.colors,
+          contrastMinimums(context.standard).normal,
+        )
+        // Guardrail: text colors that miss the contrast minimum on their own
+        // background are adjusted instead of failing the design.
+        const contrast = fixContrast(kitted, context.standard)
+        const check = checkHtml(contrast.html, context)
+        check.report.issues.push(
+          ...contrast.fixed.map((message) => ({
+            rule: 'wcag' as const,
+            criterion: /\bAAA\b/i.test(context.standard) ? '1.4.6' : '1.4.3',
+            severity: 'warning' as const,
+            message: `Contrast adjusted automatically: ${message}`,
+          })),
+        )
+        if (normalized.marked > 0) {
+          check.report.issues.push({
+            rule: 'kit',
+            severity: 'warning',
+            message: `${normalized.marked} element(s) named a kit component by class; they were given the matching data-slot.`,
+          })
+        }
+        check.report.warnings +=
+          contrast.fixed.length + (normalized.marked > 0 ? 1 : 0)
         this.logger.log(
           logEvent('design.checked', {
             variant: request.index,
@@ -130,6 +177,8 @@ export class DesignGenerator {
             passed: check.report.passed,
             errors: check.report.errors,
             warnings: check.report.warnings,
+            contrastFixes: contrast.fixed.length,
+            slotFixes: normalized.marked,
             bytes: check.report.bytes,
           }),
         )

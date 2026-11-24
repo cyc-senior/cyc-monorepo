@@ -170,15 +170,64 @@ export function localizeAuditLog(log: AuditLogItem): LocalizedAuditItem {
       };
 
     // AI Generation Jobs
+    // Generation lifecycle: queued → working → ready | failed | cancelled.
     case "GenerationJob.create":
-      return {
-        title: "AI design generation queued",
-        badge: "AI",
-        iconType: "ai",
-      };
+      return body.baseVariantId
+        ? {
+            title: "Design refinement queued",
+            subtitle: typeof body.prompt === "string" ? `"${body.prompt}"` : undefined,
+            badge: "AI",
+            iconType: "ai",
+          }
+        : {
+            title: "AI design generation queued",
+            badge: "AI",
+            iconType: "ai",
+          };
+    case "GenerationJob.start":
+      return log.changes?.refinement
+        ? {
+            title: "AI is working on a new version",
+            badge: "AI",
+            iconType: "ai",
+          }
+        : {
+            title: `AI is building ${Number(log.changes?.variantCount) === 1 ? "a design" : "A and B"}`,
+            badge: "AI",
+            iconType: "ai",
+          };
     case "GenerationJob.cancel":
       return {
         title: "AI design generation cancelled",
+        subtitle: typeof log.changes?.reason === "string" ? log.changes.reason : undefined,
+        badge: "AI",
+        iconType: "alert",
+      };
+    case "GenerationJob.complete": {
+      // Recorded by the generation worker: { roundId, variantIds, refinement }.
+      const changes = log.changes ?? {};
+      const count = Array.isArray(changes.variantIds) ? changes.variantIds.length : 0;
+      return changes.refinement
+        ? {
+            title: "New design version ready",
+            subtitle: "Preview it and keep refining",
+            badge: "AI",
+            iconType: "ai",
+          }
+        : {
+            title: count === 1 ? "AI design ready" : `${count || "A/B"} AI designs ready`,
+            subtitle:
+              Number(changes.failedVariants) > 0
+                ? `${count} of ${count + Number(changes.failedVariants)} passed the design system and accessibility checks`
+                : "Preview and refine them",
+            badge: "AI",
+            iconType: "ai",
+          };
+    }
+    case "GenerationJob.fail":
+      return {
+        title: "AI design generation failed",
+        subtitle: typeof log.changes?.error === "string" ? log.changes.error : undefined,
         badge: "AI",
         iconType: "alert",
       };

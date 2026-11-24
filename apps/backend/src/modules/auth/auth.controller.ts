@@ -77,7 +77,8 @@ export class AuthController {
 
   /**
    * Rotates the refresh token and issues a new pair.
-   * Accepts the refresh token from either body or httpOnly cookie.
+   * Accepts the refresh token from either body or httpOnly cookie. A body
+   * token with `cookie: true` is moved into the httpOnly cookie.
    *
    * @throws {401} Refresh token invalid or expired.
    */
@@ -98,8 +99,9 @@ export class AuthController {
 
     const tokens = await this.authService.refresh(rawToken)
 
-    // For cookie flow: update httpOnly cookie and omit refreshToken from the JSON response
-    if (hasCookieToken && !hasBodyToken) {
+    // Cookie flow (or a body token asking for one): update the httpOnly
+    // cookie and omit refreshToken from the JSON response.
+    if ((hasCookieToken && !hasBodyToken) || (hasBodyToken && dto?.cookie)) {
       res.cookie('refreshToken', tokens.refreshToken, this.getCookieOptions())
       return {
         accessToken: tokens.accessToken,
