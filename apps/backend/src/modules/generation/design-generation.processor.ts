@@ -393,8 +393,13 @@ export class DesignGenerationProcessor
     const previous: Array<{ title: string; rationale: string }> = [...existing]
 
     for (let index = 1; index <= total; index++) {
+      await job.updateProgress({
+        stage: 'thinking',
+        variant: index,
+        of: total,
+      } satisfies GenerationProgress)
       let lastSent = 0
-      let lastStage: string | undefined
+      let lastStage: string | undefined = 'thinking'
       let result: VariantResult | undefined
       // Guardrail against missing designs: a design that still fails after
       // its repairs is started over (told what failed) before it is dropped.
@@ -455,6 +460,30 @@ export class DesignGenerationProcessor
       if (result.passed) {
         previous.push({ title: result.title, rationale: result.rationale })
       }
+      const currentSummaries = results.map((r, i) => ({
+        variant: i + 1,
+        passed: r.passed,
+        attempts: r.attempts,
+        thought: r.thought,
+        ...(r.passed
+          ? {
+              title: r.title,
+              rationale: r.rationale,
+              warnings: r.report.warnings,
+              removed: r.report.removed,
+            }
+          : {}),
+      }))
+      await this.prisma.generationJob
+        .update({
+          where: { id: job.data.generationJobId },
+          data: {
+            outputMetadata: {
+              variants: currentSummaries,
+            } as Prisma.InputJsonObject,
+          },
+        })
+        .catch(() => undefined)
     }
 
     return results

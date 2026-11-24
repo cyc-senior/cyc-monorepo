@@ -305,6 +305,29 @@ function updateTraces(
   return next;
 }
 
+function loadCachedState(jobId: string | null): Partial<JobStreamState> {
+  if (!jobId || typeof window === "undefined") return {};
+  try {
+    const raw = sessionStorage.getItem(`gen_trace:${jobId}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
+
+function saveCachedState(jobId: string | null, state: JobStreamState) {
+  if (!jobId || typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      `gen_trace:${jobId}`,
+      JSON.stringify({
+        tracesByVariant: state.tracesByVariant,
+        thoughtsByVariant: state.thoughtsByVariant,
+        personaThought: state.personaThought,
+      })
+    );
+  } catch {}
+}
+
 /**
  * Live state of one generation job over SSE. Pass `null` to follow nothing.
  * The state is keyed by job, so switching jobs never shows the old one's.
@@ -314,7 +337,11 @@ export function useJobStream(
   jobId: string | null
 ): JobStreamState {
   const [state, setState] = useState<{ jobId: string | null } & JobStreamState>(
-    { jobId: null, ...EMPTY }
+    () => ({
+      jobId,
+      ...EMPTY,
+      ...loadCachedState(jobId),
+    })
   );
 
   useEffect(() => {
@@ -326,36 +353,38 @@ export function useJobStream(
       jobId,
       (event) =>
         setState((prev) => {
-          const base = prev.jobId === jobId ? prev : { jobId, ...EMPTY };
+          const cached = prev.jobId === jobId ? prev : { jobId, ...EMPTY, ...loadCachedState(jobId) };
           if (event.type === "progress") {
             const nextThoughts =
               event.data.variant && event.data.thought
                 ? {
-                    ...base.thoughtsByVariant,
+                    ...cached.thoughtsByVariant,
                     [event.data.variant]: event.data.thought,
                   }
-                : base.thoughtsByVariant;
+                : cached.thoughtsByVariant;
 
             const personaThought =
               event.data.stage === "persona" && event.data.thought
                 ? event.data.thought
-                : base.personaThought;
+                : cached.personaThought;
 
-            const nextTraces = updateTraces(base.tracesByVariant, event.data);
+            const nextTraces = updateTraces(cached.tracesByVariant, event.data);
 
-            return {
-              ...base,
+            const nextState = {
+              ...cached,
               progress: event.data,
               personaThought,
               thoughtsByVariant: nextThoughts,
               tracesByVariant: nextTraces,
               streamError: null,
             };
+            saveCachedState(jobId, nextState);
+            return nextState;
           }
 
           if (event.data.status === "SUCCEEDED") {
             const finishedTraces: Record<number, VariantTraceItem[]> = {
-              ...base.tracesByVariant,
+              ...cached.tracesByVariant,
             };
             for (const v in finishedTraces) {
               finishedTraces[v] = finishedTraces[v].map((item) => {
@@ -387,15 +416,17 @@ export function useJobStream(
                 (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
               );
             }
-            return {
-              ...base,
+            const nextState = {
+              ...cached,
               snapshot: event.data,
               tracesByVariant: finishedTraces,
               streamError: null,
             };
+            saveCachedState(jobId, nextState);
+            return nextState;
           }
 
-          return { ...base, snapshot: event.data, streamError: null };
+          return { ...cached, snapshot: event.data, streamError: null };
         }),
       abort.signal
     ).catch((error: unknown) =>

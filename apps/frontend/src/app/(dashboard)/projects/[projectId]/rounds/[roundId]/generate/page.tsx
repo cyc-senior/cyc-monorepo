@@ -58,46 +58,60 @@ interface Step {
 function variantStatus(
   index: number,
   status: GenerationJobStatus,
-  progress: GenerationProgress | null
+  progress: GenerationProgress | null,
+  traces: VariantTraceItem[] = []
 ): { text: string; busy: boolean; done: boolean } {
   if (status === "SUCCEEDED") return { text: "Ready", busy: false, done: true };
   if (status === "FAILED") return { text: "Failed", busy: false, done: false };
   if (status === "CANCELLED")
     return { text: "Cancelled", busy: false, done: false };
-  if (!progress || status === "QUEUED")
-    return { text: "Waiting", busy: false, done: false };
-  if (progress.stage === "saving")
-    return { text: "Saving…", busy: true, done: false };
-  const current = progress.variant ?? 0;
-  if (current > index) return { text: "Done", busy: false, done: true };
-  if (current < index) {
-    const starting =
-      index === 1 && (progress.stage === "started" || progress.stage === "persona");
-    return starting
-      ? { text: "Reading your intent…", busy: true, done: false }
-      : { text: "Waiting", busy: false, done: false };
+
+  const isReady = traces.some((t) => t.phase === "ready" && t.status === "done");
+  const hasItemsRunning = traces.some((t) => t.status === "running");
+  const current = progress?.variant ?? 0;
+
+  if (isReady || current > index) {
+    return { text: "Done", busy: false, done: true };
   }
-  switch (progress.stage) {
-    case "thinking":
+
+  if (current === index || hasItemsRunning) {
+    if (progress?.stage === "thinking") {
       return { text: "Reasoning about layout…", busy: true, done: false };
-    case "checking":
+    }
+    if (progress?.stage === "checking") {
       return { text: "Checking accessibility…", busy: true, done: false };
-    case "repairing":
+    }
+    if (progress?.stage === "repairing") {
       return {
         text: `Fixing ${progress.errors ?? "a few"} issue${progress.errors === 1 ? "" : "s"}…`,
         busy: true,
         done: false,
       };
-    default:
-      return { text: "Laying out…", busy: true, done: false };
+    }
+    return { text: "Laying out…", busy: true, done: false };
   }
+
+  if (!progress || status === "QUEUED") {
+    return { text: "Waiting", busy: false, done: false };
+  }
+
+  if (progress.stage === "saving") {
+    return { text: "Saving…", busy: true, done: false };
+  }
+
+  const starting =
+    index === 1 && (progress.stage === "started" || progress.stage === "persona");
+  return starting
+    ? { text: "Reading your intent…", busy: true, done: false }
+    : { text: "Waiting", busy: false, done: false };
 }
 
 /** The checklist under the cards, from the job's live progress. */
 function progressSteps(
   job: GenerationJob,
   status: GenerationJobStatus,
-  progress: GenerationProgress | null
+  progress: GenerationProgress | null,
+  tracesByVariant: Record<number, VariantTraceItem[]> = {}
 ): Step[] {
   const finished = status === "SUCCEEDED";
   const stage = progress?.stage;
@@ -126,15 +140,30 @@ function progressSteps(
     });
   }
   for (let i = 1; i <= job.variantCount; i++) {
+    const vTraces = tracesByVariant[i] ?? [];
+    const isReady = vTraces.some(
+      (t) => t.phase === "ready" && t.status === "done"
+    );
+    const nextVariantHasItems = Boolean(
+      (tracesByVariant[i + 1] && tracesByVariant[i + 1].length > 0) || current > i
+    );
+    const hasRunningItem = vTraces.some((t) => t.status === "running");
+
+    const isDone =
+      finished ||
+      stage === "saving" ||
+      current > i ||
+      (isReady && (nextVariantHasItems || i < job.variantCount));
+
+    const isActive =
+      !isDone &&
+      (current === i || hasRunningItem) &&
+      pastPersona;
+
     steps.push({
       key: `variant-${i}`,
       label: `Laying out variant ${LABELS[i - 1] ?? i}`,
-      state:
-        finished || stage === "saving" || current > i
-          ? "done"
-          : current === i && pastPersona
-            ? "active"
-            : "todo",
+      state: isDone ? "done" : isActive ? "active" : "todo",
     });
   }
   return steps;
@@ -162,7 +191,7 @@ function getVariantTraces(
     );
   }
 
-  if (stepState === "done") {
+  if (stepState === "done" || Boolean(outputVariant)) {
     const list: VariantTraceItem[] = [];
     const estimatedSeconds = effectiveThought
       ? Math.max(3, Math.min(15, Math.round(effectiveThought.length / 300)))
@@ -231,13 +260,15 @@ function VariantCard({
   index,
   status,
   progress,
+  traces = [],
 }: {
   label: string;
   index: number;
   status: GenerationJobStatus;
   progress: GenerationProgress | null;
+  traces?: VariantTraceItem[];
 }) {
-  const line = variantStatus(index, status, progress);
+  const line = variantStatus(index, status, progress, traces);
   return (
     <div className="flex w-full max-w-[440px] flex-col gap-4 rounded-[14px] border border-border bg-card p-6 shadow-sm">
       <h2 className="font-heading text-xl font-medium leading-7 text-foreground">
@@ -402,7 +433,7 @@ function GeneratingContent() {
   const designSystem =
     DESIGN_SYSTEM_NAMES[job.uiLibrary] ?? job.inputSnapshot?.intent?.designSystem ?? job.uiLibrary;
   const labels = LABELS.slice(0, job.variantCount);
-  const steps = progressSteps(job, status, live.progress);
+  const steps = progressSteps(job, status, live.progress, live.tracesByVariant);
   const ended = status === "FAILED" || status === "CANCELLED";
 
   return (
@@ -444,6 +475,7 @@ function GeneratingContent() {
               index={i + 1}
               status={status}
               progress={live.progress}
+              traces={live.tracesByVariant[i + 1]}
             />
           ))}
         </div>
