@@ -288,32 +288,11 @@ export class RoundsService {
           })
 
           if (!this.llm.configured) {
-            // Fallback when LLM client is not configured
-            const fallbackResult: DraftPromptResult = {
-              goal: defaultGoal,
-              problem: defaultProblem,
-              mustUse: defaultMustUse,
-              comparisonQuestion: `Which design makes it easier to ${story.title.toLowerCase().replace(/\.$/, '')}?`,
-              variantA: {
-                name: 'Direct flow',
-                description:
-                  'Streamlined single-page workflow minimizing steps.',
-              },
-              variantB: {
-                name: 'Guided flow',
-                description:
-                  'Structured multi-step workflow with contextual guidance.',
-              },
-            }
-
-            subscriber.next({
-              data: {
-                status: 'Drafting complete',
-                stage: 'completed',
-                prompt: fallbackResult,
-              },
-            })
-            subscriber.complete()
+            subscriber.error(
+              new BadRequestException(
+                'LLM provider is not configured on the backend. Please verify LLM_BASE_URL and LLM_API_KEY.',
+              ),
+            )
             return
           }
 

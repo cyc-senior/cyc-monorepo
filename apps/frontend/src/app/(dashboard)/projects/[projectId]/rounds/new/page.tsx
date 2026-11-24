@@ -49,7 +49,7 @@ function ReviewStructuredPromptContent() {
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = React.useState<string>("");
 
-  // Editable prompt fields
+  // Editable prompt fields - strictly populated by backend AI response
   const [goalText, setGoalText] = React.useState("");
   const [isEditingGoal, setIsEditingGoal] = React.useState(false);
   const [isSavingGoal, setIsSavingGoal] = React.useState(false);
@@ -61,17 +61,11 @@ function ReviewStructuredPromptContent() {
   const [mustUseText, setMustUseText] = React.useState("");
   const [isEditingMustUse, setIsEditingMustUse] = React.useState(false);
 
-  const [comparisonQuestion, setComparisonQuestion] = React.useState(
-    "Which design makes it easier to achieve the user's goal?"
-  );
-  const [designAName, setDesignAName] = React.useState("Direct flow");
-  const [designADesc, setDesignADesc] = React.useState(
-    "All essential inputs on a single view for speed."
-  );
-  const [designBName, setDesignBName] = React.useState("Guided step-by-step");
-  const [designBDesc, setDesignBDesc] = React.useState(
-    "A staged flow prioritizing clarity and guidance."
-  );
+  const [comparisonQuestion, setComparisonQuestion] = React.useState("");
+  const [designAName, setDesignAName] = React.useState("");
+  const [designADesc, setDesignADesc] = React.useState("");
+  const [designBName, setDesignBName] = React.useState("");
+  const [designBDesc, setDesignBDesc] = React.useState("");
   const [isEditingDiff, setIsEditingDiff] = React.useState(false);
 
   const [isGenerating, setIsGenerating] = React.useState(false);
@@ -107,25 +101,6 @@ function ReviewStructuredPromptContent() {
         const personaIdToUse = initialPersona?.id || "";
         setSelectedPersonaId(personaIdToUse);
 
-        // Fallbacks
-        const defaultGoal =
-          storyData.acceptanceCriteria ||
-          storyData.title ||
-          "Complete the primary user workflow successfully.";
-        setGoalText(defaultGoal);
-
-        const defaultProblem =
-          storyData.problemStatement ||
-          "Users need a more efficient way to accomplish this task.";
-        setProblemText(defaultProblem);
-
-        const ds = intentData?.designSystem === "MUI" ? "Material UI" : "shadcn";
-        const standard = intentData?.designStandards?.[0] || "WCAG 2.2 AA";
-        const color = intentData?.primaryColor || "#F2652A";
-        setMustUseText(
-          `Use ${ds} components only and meet ${standard}. Use ${color} for primary actions. Keep copy plain and friendly, and provide clear user feedback.`
-        );
-
         // Start SSE stream from backend to draft prompt
         const sseUrl = `${API_URL}/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
           personaIdToUse ? `&personaId=${personaIdToUse}` : ""
@@ -158,7 +133,15 @@ function ReviewStructuredPromptContent() {
           }
 
           if (!res.ok || !res.body) {
-            // Non-blocking fallback
+            const errText = await res.text().catch(() => "");
+            let errorMsg = `Backend stream failed (${res.status} ${res.statusText})`;
+            try {
+              const parsedErr = JSON.parse(errText);
+              if (parsedErr?.message) errorMsg = parsedErr.message;
+            } catch {
+              if (errText) errorMsg += `: ${errText}`;
+            }
+            setError(errorMsg);
             setIsLoading(false);
             setBackendStatus(null);
             return;
@@ -212,7 +195,8 @@ function ReviewStructuredPromptContent() {
           }
         } catch (fetchErr: unknown) {
           if ((fetchErr as Error).name !== "AbortError") {
-            console.warn("SSE fetch warning or finished", fetchErr);
+            const msg = (fetchErr as Error).message || "Failed to connect to prompt drafting service.";
+            setError(msg);
           }
         } finally {
           if (!isCancelled) {
@@ -220,9 +204,10 @@ function ReviewStructuredPromptContent() {
             setBackendStatus(null);
           }
         }
-      } catch (err) {
-        console.error("Failed to load prompt review data:", err);
+      } catch (err: unknown) {
         if (!isCancelled) {
+          const msg = (err as Error).message || "Failed to load project details for prompt drafting.";
+          setError(msg);
           setIsLoading(false);
           setBackendStatus(null);
         }
