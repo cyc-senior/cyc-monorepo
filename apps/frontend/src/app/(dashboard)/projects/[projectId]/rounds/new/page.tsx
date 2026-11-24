@@ -95,6 +95,8 @@ function ReviewStructuredPromptContent() {
   const [thoughtText, setThoughtText] = React.useState<string>("");
 
   const retryRef = React.useRef<() => void>(() => {});
+  /** The round made by an earlier "Approve & generate" whose job did not start. */
+  const createdRoundIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -299,24 +301,29 @@ function ReviewStructuredPromptContent() {
       const roundTitle = story?.title
         ? `Design Round: ${story.title.length > 50 ? story.title.slice(0, 47) + "..." : story.title}`
         : "Design Round";
-      const round = await createDesignRound(projectId, {
-        title: roundTitle,
-        storyId,
-      });
+      // If starting the job failed after the round was made, a retry reuses
+      // that round instead of leaving an empty one behind.
+      const roundId =
+        createdRoundIdRef.current ??
+        (await createDesignRound(projectId, {
+          title: roundTitle,
+          storyId,
+        })).id;
+      createdRoundIdRef.current = roundId;
 
       const selectedPersona = personas.find((p) => p.id === selectedPersonaId);
       const personaSummary = selectedPersona
         ? `${selectedPersona.name}${selectedPersona.age ? `, ${selectedPersona.age}` : ""}. ${selectedPersona.shortDescription || ""}`
         : "Target end user.";
 
-      const job = await startGenerationJob(projectId, round.id, {
+      const job = await startGenerationJob(projectId, roundId, {
         prompt: `Goal: ${goalText}. User: ${personaSummary}. Problem: ${problemText}. Constraints: ${mustUseText}. Variant A: ${designAName} (${designADesc}). Variant B: ${designBName} (${designBDesc}). Evaluation: ${comparisonQuestion}.`,
         storyIds: [storyId],
         personaIds: selectedPersonaId ? [selectedPersonaId] : personas.slice(0, 5).map((p) => p.id),
         synthesizePersona: Boolean(!selectedPersonaId && personas.length === 0),
       });
 
-      router.push(`/projects/${projectId}/rounds/${round.id}/generate?job=${job.id}`);
+      router.push(`/projects/${projectId}/rounds/${roundId}/generate?job=${job.id}`);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
