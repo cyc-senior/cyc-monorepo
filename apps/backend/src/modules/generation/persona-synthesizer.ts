@@ -40,10 +40,13 @@ export class PersonaSynthesizer {
   async synthesize(
     input: GenerationInput,
     signal?: AbortSignal,
+    onThoughtDelta?: (thought: string) => void,
   ): Promise<{
     persona: PersonaInput
     usage: { promptTokens: number; completionTokens: number }
+    thought?: string
   }> {
+    let currentThought = ''
     const completion = await this.llm.structured({
       messages: personaConversation(input),
       schemaName: 'user_persona',
@@ -51,6 +54,10 @@ export class PersonaSynthesizer {
       model: this.llm.analysisModel,
       temperature: 0.5,
       signal,
+      onThoughtDelta: (_chunk, totalThought) => {
+        currentThought = totalThought
+        onThoughtDelta?.(totalThought)
+      },
     })
     if (completion.finishReason === 'length') {
       throw new Error('The persona was cut off by the model; retrying.')
@@ -78,6 +85,7 @@ export class PersonaSynthesizer {
         shortDescription: parsed.data.shortDescription.trim(),
       },
       usage: completion.usage,
+      thought: currentThought || undefined,
     }
   }
 }

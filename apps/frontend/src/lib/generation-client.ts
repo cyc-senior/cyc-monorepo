@@ -66,7 +66,10 @@ export interface GenerationJob {
   variantCount: number;
   uiLibrary: string;
   inputSnapshot: GenerationInputSnapshot | null;
-  outputMetadata: { variants?: GenerationOutputVariant[] } | null;
+  outputMetadata: {
+    variants?: GenerationOutputVariant[];
+    personaThought?: string;
+  } | null;
   error: string | null;
   startedAt: string | null;
   finishedAt: string | null;

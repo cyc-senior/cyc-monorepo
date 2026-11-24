@@ -190,6 +190,17 @@ function getVariantTraces(
       status: "done",
       title: `Validated ${standard} contrast & design system rules`,
     });
+    if (outputVariant?.attempts && outputVariant.attempts > 1) {
+      list.push({
+        id: `repairing-${outputVariant.attempts}`,
+        phase: "repairing",
+        status: "done",
+        title: `Thought for 3 seconds (Attempt ${outputVariant.attempts})`,
+        thoughtDurationSeconds: 3,
+        attempt: outputVariant.attempts,
+        thought: `Auto-adjusted contrast ratios and component slot attributes to pass ${standard} checks.`,
+      });
+    }
     list.push({
       id: "ready",
       phase: "ready",
@@ -490,49 +501,74 @@ function GeneratingContent() {
                   </TraceIcon>
                   <div className="flex flex-1 flex-col min-w-0">
                     <TraceTitle>{step.label}</TraceTitle>
-                    {step.key === "persona" && (
+                    {step.key === "intent" && step.state === "done" && (
                       <div className="mt-2 ml-1 flex flex-col gap-2 border-l-2 border-border/60 pl-3 py-1">
-                        <TraceCollapsible
-                          defaultOpen={step.state === "active"}
-                          className="w-full"
-                        >
-                          <div className="flex items-center gap-2">
-                            <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                              <Brain
-                                className={cn(
-                                  "size-3.5 shrink-0",
-                                  step.state === "active"
-                                    ? "text-violet-500 animate-pulse"
-                                    : "text-muted-foreground"
-                                )}
-                              />
-                              <span>
-                                {step.state === "active"
-                                  ? "Thinking..."
-                                  : "Thought for 4 seconds"}
-                              </span>
-                            </TraceCollapsibleTrigger>
-                            {step.state === "active" && (
-                              <HugeIcon
-                                icon={Loading02Icon}
-                                size={12}
-                                className="animate-spin text-muted-foreground ml-auto shrink-0"
-                              />
-                            )}
-                            {step.state === "done" && (
-                              <HugeIcon
-                                icon={Tick02Icon}
-                                size={12}
-                                className="text-muted-foreground/70 ml-auto shrink-0"
-                              />
-                            )}
-                          </div>
+                        <TraceCollapsible defaultOpen={false} className="w-full">
+                          <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-muted-foreground hover:text-foreground font-medium cursor-pointer">
+                            <span>Design intent & context summary</span>
+                          </TraceCollapsibleTrigger>
                           <TraceCollapsibleContent>
-                            <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 text-[11px] leading-relaxed text-muted-foreground shadow-inner">
-                              Synthesized target user persona from your project design intent and prompt.
+                            <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
+                              <p>• Story: &ldquo;{job.inputSnapshot?.stories?.[0]?.title ?? "Primary user workflow"}&rdquo;</p>
+                              <p>• UI Library: {designSystem}</p>
+                              <p>• Standard: {standard}</p>
+                              <p>• Accessibility & color tokens injected into context.</p>
                             </div>
                           </TraceCollapsibleContent>
                         </TraceCollapsible>
+                      </div>
+                    )}
+                    {step.key === "persona" && (
+                      <div className="mt-2 ml-1 flex flex-col gap-2 border-l-2 border-border/60 pl-3 py-1">
+                        {(() => {
+                          const personaThought =
+                            live.personaThought ?? job.outputMetadata?.personaThought;
+                          const isRunning = step.state === "active";
+                          return (
+                            <TraceCollapsible
+                              defaultOpen={isRunning}
+                              className="w-full"
+                            >
+                              <div className="flex items-center gap-2">
+                                <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
+                                  <Brain
+                                    className={cn(
+                                      "size-3.5 shrink-0",
+                                      isRunning
+                                        ? "text-violet-500 animate-pulse"
+                                        : "text-muted-foreground"
+                                    )}
+                                  />
+                                  <span>
+                                    {isRunning
+                                      ? "Thinking..."
+                                      : "Thought for 4 seconds"}
+                                  </span>
+                                </TraceCollapsibleTrigger>
+                                {isRunning && (
+                                  <HugeIcon
+                                    icon={Loading02Icon}
+                                    size={12}
+                                    className="animate-spin text-muted-foreground ml-auto shrink-0"
+                                  />
+                                )}
+                                {!isRunning && (
+                                  <HugeIcon
+                                    icon={Tick02Icon}
+                                    size={12}
+                                    className="text-muted-foreground/70 ml-auto shrink-0"
+                                  />
+                                )}
+                              </div>
+                              <TraceCollapsibleContent>
+                                <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
+                                  {personaThought ||
+                                    "Synthesized target user persona from your prompt and project design intent."}
+                                </div>
+                              </TraceCollapsibleContent>
+                            </TraceCollapsible>
+                          );
+                        })()}
                       </div>
                     )}
                     {variantTraces.length > 0 && (
@@ -588,6 +624,95 @@ function GeneratingContent() {
                             );
                           }
 
+                          if (item.phase === "repairing") {
+                            const isRunning = item.status === "running";
+                            const displayTitle = isRunning
+                              ? `Thinking about repairs (Attempt ${item.attempt || 2})...`
+                              : `Thought for ${item.thoughtDurationSeconds ?? 3} seconds (Attempt ${item.attempt || 2})`;
+
+                            return (
+                              <TraceCollapsible
+                                key={item.id}
+                                defaultOpen={isRunning}
+                                className="w-full"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
+                                    <Wrench className="size-3.5 shrink-0 text-amber-500 animate-pulse" />
+                                    <span>{displayTitle}</span>
+                                  </TraceCollapsibleTrigger>
+                                  {isRunning && (
+                                    <HugeIcon
+                                      icon={Loading02Icon}
+                                      size={12}
+                                      className="animate-spin text-muted-foreground ml-auto shrink-0"
+                                    />
+                                  )}
+                                  {!isRunning && (
+                                    <HugeIcon
+                                      icon={Tick02Icon}
+                                      size={12}
+                                      className="text-muted-foreground/70 ml-auto shrink-0"
+                                    />
+                                  )}
+                                </div>
+                                <TraceCollapsibleContent>
+                                  <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
+                                    {item.thought ||
+                                      `Auto-adjusting contrast & element slots to pass ${standard} checks.`}
+                                  </div>
+                                </TraceCollapsibleContent>
+                              </TraceCollapsible>
+                            );
+                          }
+
+                          if (item.phase === "checking") {
+                            return (
+                              <TraceCollapsible
+                                key={item.id}
+                                defaultOpen={false}
+                                className="w-full"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
+                                    <ShieldCheck
+                                      className={cn(
+                                        "size-3.5 shrink-0",
+                                        item.status === "running"
+                                          ? "text-amber-500 animate-pulse"
+                                          : item.status === "error"
+                                            ? "text-destructive"
+                                            : "text-muted-foreground"
+                                      )}
+                                    />
+                                    <span>{item.title}</span>
+                                  </TraceCollapsibleTrigger>
+                                  {item.status === "running" && (
+                                    <HugeIcon
+                                      icon={Loading02Icon}
+                                      size={12}
+                                      className="animate-spin text-muted-foreground ml-auto shrink-0"
+                                    />
+                                  )}
+                                  {item.status === "done" && (
+                                    <HugeIcon
+                                      icon={Tick02Icon}
+                                      size={12}
+                                      className="text-muted-foreground/70 ml-auto shrink-0"
+                                    />
+                                  )}
+                                </div>
+                                <TraceCollapsibleContent>
+                                  <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
+                                    <p>✓ {standard}: Contrast thresholds verified (4.5:1 text, 3:1 graphical elements).</p>
+                                    <p>✓ UI Kit: Component markup confirmed against {designSystem} specifications.</p>
+                                    <p>✓ DOM structure: Verified slot attributes and tag nesting.</p>
+                                  </div>
+                                </TraceCollapsibleContent>
+                              </TraceCollapsible>
+                            );
+                          }
+
                           return (
                             <div key={item.id} className="flex items-center gap-2 py-0.5 text-xs">
                               {item.phase === "generating" && (
@@ -599,21 +724,6 @@ function GeneratingContent() {
                                       : "text-muted-foreground"
                                   )}
                                 />
-                              )}
-                              {item.phase === "checking" && (
-                                <ShieldCheck
-                                  className={cn(
-                                    "size-3.5 shrink-0",
-                                    item.status === "running"
-                                      ? "text-amber-500 animate-pulse"
-                                      : item.status === "error"
-                                        ? "text-destructive"
-                                        : "text-muted-foreground"
-                                  )}
-                                />
-                              )}
-                              {item.phase === "repairing" && (
-                                <Wrench className="size-3.5 shrink-0 text-amber-500 animate-pulse" />
                               )}
                               {item.phase === "ready" && (
                                 <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500" />

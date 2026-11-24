@@ -37,6 +37,7 @@ interface PersonaArtifact {
   id: string
   persona: PersonaInput
   usage: { promptTokens: number; completionTokens: number }
+  thought?: string
 }
 
 /** While generating, check this often whether the job was cancelled. */
@@ -340,7 +341,23 @@ export class DesignGenerationProcessor
       stage: 'persona',
       of: 1,
     } satisfies GenerationProgress)
-    const { persona, usage } = await this.personas.synthesize(input, signal)
+    let lastSent = 0
+    const { persona, usage, thought } = await this.personas.synthesize(
+      input,
+      signal,
+      (thought) => {
+        const now = Date.now()
+        if (now - lastSent < PROGRESS_THROTTLE_MS) return
+        lastSent = now
+        void job
+          .updateProgress({
+            stage: 'persona',
+            of: 1,
+            thought,
+          } satisfies GenerationProgress)
+          .catch(() => undefined)
+      },
+    )
     try {
       const created = await this.prisma.userPersona.create({
         data: { ...persona, projectId, origin: 'AI', generationJobId: id },
@@ -351,14 +368,14 @@ export class DesignGenerationProcessor
         logEvent('persona.saved', { job: id, persona: created.id }),
       )
 
-      return { id: created.id, persona, usage }
+      return { id: created.id, persona, usage, thought }
     } catch (error) {
       // A concurrent attempt saved it first (unique per job): use that one.
       const raced = await this.prisma.userPersona.findUnique({
         where: { generationJobId: id },
       })
       if (raced) {
-        return { id: raced.id, persona: raced, usage }
+        return { id: raced.id, persona: raced, usage, thought }
       }
       throw error
     }
@@ -475,6 +492,7 @@ export class DesignGenerationProcessor
     const metadata = {
       usage,
       personaId: artifact?.id ?? null,
+      personaThought: artifact?.thought ?? null,
       variants: summary,
     } as Prisma.InputJsonObject
     const passed = results.filter(

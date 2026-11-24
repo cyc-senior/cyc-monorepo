@@ -39,6 +39,8 @@ export interface VariantTraceItem {
 export interface JobStreamState {
   snapshot: JobSnapshot | null;
   progress: GenerationProgress | null;
+  /** Live thought emitted during persona synthesis */
+  personaThought: string | null;
   /** Accumulated thoughts by variant index (1-based). */
   thoughtsByVariant: Record<number, string>;
   /** Stacked traces by variant index (1-based). */
@@ -50,6 +52,7 @@ export interface JobStreamState {
 const EMPTY: JobStreamState = {
   snapshot: null,
   progress: null,
+  personaThought: null,
   thoughtsByVariant: {},
   tracesByVariant: {},
   streamError: null,
@@ -69,14 +72,16 @@ function updateTraces(
     if (next[v]) {
       const items = next[v].map((item) => {
         if (item.status === "running") {
-          if (item.phase === "thinking") {
+          if (item.phase === "thinking" || item.phase === "repairing") {
             const start = item.startedAt ?? Date.now() - 5000;
             const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
             return {
               ...item,
               status: "done" as const,
               thoughtDurationSeconds: dur,
-              title: `Thought for ${dur} seconds`,
+              title: item.phase === "thinking"
+                ? `Thought for ${dur} seconds`
+                : item.title,
             };
           }
           return { ...item, status: "done" as const };
@@ -183,6 +188,18 @@ function updateTraces(
             : "Drafted HTML component hierarchy",
         };
       }
+      if (
+        currentItems[i].phase === "repairing" &&
+        currentItems[i].status === "running"
+      ) {
+        const start = currentItems[i].startedAt ?? Date.now() - 3000;
+        const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
+        currentItems[i] = {
+          ...currentItems[i],
+          status: "done",
+          thoughtDurationSeconds: dur,
+        };
+      }
     }
     const existingIdx = currentItems.findIndex((i) => i.id === "checking");
     const hasErrors = progress.errors !== undefined && progress.errors > 0;
@@ -213,7 +230,8 @@ function updateTraces(
     if (existingIdx >= 0) {
       currentItems[existingIdx] = {
         ...currentItems[existingIdx],
-        errors: progress.errors,
+        thought: progress.thought ?? currentItems[existingIdx].thought,
+        errors: progress.errors ?? currentItems[existingIdx].errors,
       };
     } else {
       currentItems.push({
@@ -221,8 +239,10 @@ function updateTraces(
         phase: "repairing",
         status: "running",
         title: `Auto-adjusting contrast & element slots (Attempt ${progress.attempt ?? 2})`,
+        thought: progress.thought,
         errors: progress.errors,
         attempt: progress.attempt,
+        startedAt: Date.now(),
       });
     }
   } else if (progress.stage === "saving") {
@@ -230,14 +250,16 @@ function updateTraces(
     for (const v in next) {
       next[v] = next[v].map((item) => {
         if (item.status === "running") {
-          if (item.phase === "thinking") {
+          if (item.phase === "thinking" || item.phase === "repairing") {
             const start = item.startedAt ?? Date.now() - 5000;
             const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
             return {
               ...item,
               status: "done" as const,
               thoughtDurationSeconds: dur,
-              title: `Thought for ${dur} seconds`,
+              title: item.phase === "thinking"
+                ? `Thought for ${dur} seconds`
+                : item.title,
             };
           }
           if (item.phase === "generating") {
@@ -314,11 +336,17 @@ export function useJobStream(
                   }
                 : base.thoughtsByVariant;
 
+            const personaThought =
+              event.data.stage === "persona" && event.data.thought
+                ? event.data.thought
+                : base.personaThought;
+
             const nextTraces = updateTraces(base.tracesByVariant, event.data);
 
             return {
               ...base,
               progress: event.data,
+              personaThought,
               thoughtsByVariant: nextThoughts,
               tracesByVariant: nextTraces,
               streamError: null,
@@ -332,13 +360,15 @@ export function useJobStream(
             for (const v in finishedTraces) {
               finishedTraces[v] = finishedTraces[v].map((item) => {
                 if (item.status === "running") {
-                  if (item.phase === "thinking") {
+                  if (item.phase === "thinking" || item.phase === "repairing") {
                     const dur = item.thoughtDurationSeconds ?? 5;
                     return {
                       ...item,
                       status: "done" as const,
                       thoughtDurationSeconds: dur,
-                      title: `Thought for ${dur} seconds`,
+                      title: item.phase === "thinking"
+                        ? `Thought for ${dur} seconds`
+                        : item.title,
                     };
                   }
                   return { ...item, status: "done" as const };
