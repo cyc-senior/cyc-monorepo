@@ -17,6 +17,7 @@ import { Observable } from 'rxjs'
 import { NoCache } from '../../cache/no-cache.decorator'
 import { UuidParam } from '../../common/decorators/uuid-param.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator'
 import { Authorize } from '../access/authorize.decorator'
 import { Permission } from '../access/permissions'
 import { AuditAction, AuditEntity } from '../audit/audit.decorators'
@@ -28,6 +29,8 @@ import {
   UpdateDesignRoundDto,
 } from './dto/design-round.dto'
 import { RoundsService } from './rounds.service'
+
+const MINUTE = 60_000
 
 @ApiTags('design-rounds')
 @AuditEntity('DesignRound')
@@ -48,9 +51,13 @@ export class RoundsController {
 
   /**
    * SSE endpoint to stream AI structured prompt drafting for a user story.
+   *
+   * @remarks Calls the LLM, so it needs the same permission as starting a
+   *   generation and is rate limited.
    */
   @Sse('draft-prompt/events')
-  @Authorize(Permission.DesignRead)
+  @Authorize(Permission.DesignWrite)
+  @RateLimit({ limit: 10, windowMs: MINUTE })
   @NoCache()
   @ApiProduces('text/event-stream')
   draftPrompt(
