@@ -23,6 +23,7 @@ import {
   SparklesIcon,
   Loading03Icon,
 } from "@hugeicons/core-free-icons";
+import { Brain } from "lucide-react";
 import {
   getUserStoryById,
   updateUserStory,
@@ -74,6 +75,7 @@ function ReviewStructuredPromptContent() {
   const [backendStatus, setBackendStatus] = React.useState<string | null>(
     "Drafting your prompt with AI..."
   );
+  const [thoughtText, setThoughtText] = React.useState<string>("");
 
   const inFlightDraftRef = React.useRef<string | null>(null);
 
@@ -160,6 +162,9 @@ function ReviewStructuredPromptContent() {
                 const parsed = JSON.parse(payloadStr);
                 if (parsed.status) {
                   setBackendStatus(parsed.status);
+                }
+                if (parsed.thought) {
+                  setThoughtText(parsed.thought);
                 }
 
                 if (parsed.prompt) {
@@ -618,16 +623,27 @@ function ReviewStructuredPromptContent() {
         {/* Right Column */}
         <div className="w-full lg:w-[400px] shrink-0 space-y-4 lg:sticky lg:top-6 self-start">
           {/* Live Status Card while drafting */}
-          {backendStatus && (
-            <div className="rounded-[14px] border border-border bg-card p-4 shadow-xs flex items-center gap-3">
-              <HugeIcon
-                icon={Loading03Icon}
-                size={20}
-                className="animate-spin text-muted-foreground shrink-0"
-              />
-              <span className="text-sm font-medium text-foreground">
-                {backendStatus}
-              </span>
+          {(backendStatus || thoughtText) && (
+            <div className="rounded-[14px] border border-border bg-card p-4 shadow-xs flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                {isLoading ? (
+                  <HugeIcon
+                    icon={Loading03Icon}
+                    size={20}
+                    className="animate-spin text-muted-foreground shrink-0"
+                  />
+                ) : (
+                  <Brain className="size-5 text-violet-500 shrink-0" />
+                )}
+                <span className="text-sm font-medium text-foreground">
+                  {backendStatus || "AI strategy reasoning"}
+                </span>
+              </div>
+              {thoughtText && (
+                <div className="rounded-md border border-border/70 bg-muted/40 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-56 overflow-y-auto select-text shadow-inner">
+                  {thoughtText}
+                </div>
+              )}
             </div>
           )}
 

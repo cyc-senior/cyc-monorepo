@@ -357,6 +357,9 @@ export class RoundsService {
             additionalProperties: false,
           }
 
+          let lastSent = 0
+          const THROTTLE_MS = 400
+
           const completion = await this.llm.structured({
             schemaName: 'StructuredPromptReview',
             schema: promptSchema,
@@ -407,6 +410,11 @@ export class RoundsService {
               },
             ],
             onThoughtDelta: (_chunk, totalThought) => {
+              const now = Date.now()
+              if (now - lastSent < THROTTLE_MS) {
+                return
+              }
+              lastSent = now
               subscriber.next({
                 data: {
                   status: 'Reasoning about prompt strategy...',
@@ -416,6 +424,11 @@ export class RoundsService {
               })
             },
             onDelta: (chars) => {
+              const now = Date.now()
+              if (now - lastSent < THROTTLE_MS) {
+                return
+              }
+              lastSent = now
               subscriber.next({
                 data: {
                   status: 'Drafting your prompt with AI...',
