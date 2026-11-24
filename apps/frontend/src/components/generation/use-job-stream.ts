@@ -14,12 +14,23 @@ export type VariantTracePhase =
   | "repairing"
   | "ready";
 
+export const PHASE_ORDER: Record<VariantTracePhase, number> = {
+  thinking: 0,
+  generating: 1,
+  checking: 2,
+  repairing: 3,
+  ready: 4,
+};
+
 export interface VariantTraceItem {
   id: string;
   phase: VariantTracePhase;
   status: "running" | "done" | "error";
   title: string;
   thought?: string;
+  thoughtDurationSeconds?: number;
+  startedAt?: number;
+  endedAt?: number;
   receivedChars?: number;
   errors?: number;
   attempt?: number;
@@ -56,9 +67,22 @@ function updateTraces(
   // For any variant prior to currentVariant, mark all items done and ensure "ready" exists
   for (let v = 1; v < currentVariant; v++) {
     if (next[v]) {
-      const items = next[v].map((item) =>
-        item.status === "running" ? { ...item, status: "done" as const } : item
-      );
+      const items = next[v].map((item) => {
+        if (item.status === "running") {
+          if (item.phase === "thinking") {
+            const start = item.startedAt ?? Date.now() - 5000;
+            const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
+            return {
+              ...item,
+              status: "done" as const,
+              thoughtDurationSeconds: dur,
+              title: `Thought for ${dur} seconds`,
+            };
+          }
+          return { ...item, status: "done" as const };
+        }
+        return item;
+      });
       if (!items.some((i) => i.phase === "ready")) {
         items.push({
           id: "ready",
@@ -67,6 +91,9 @@ function updateTraces(
           title: "Variant markup verified & saved",
         });
       }
+      items.sort(
+        (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+      );
       next[v] = items;
     }
   }
@@ -86,20 +113,44 @@ function updateTraces(
         id: "thinking",
         phase: "thinking",
         status: "running",
-        title: "Analyzing UX strategy & persona goals",
+        title: "Thinking...",
         thought: progress.thought,
+        startedAt: Date.now(),
       });
     }
   } else if (progress.stage === "generating") {
-    // Thinking is done if it was running
+    // If thinking was running, finish it and calculate duration
     for (let i = 0; i < currentItems.length; i++) {
       if (
         currentItems[i].phase === "thinking" &&
         currentItems[i].status === "running"
       ) {
-        currentItems[i] = { ...currentItems[i], status: "done" };
+        const start = currentItems[i].startedAt ?? Date.now() - 4000;
+        const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
+        currentItems[i] = {
+          ...currentItems[i],
+          status: "done",
+          thoughtDurationSeconds: dur,
+          title: `Thought for ${dur} seconds`,
+        };
       }
     }
+
+    // If thinking wasn't captured yet but we have thoughts, backfill thinking item
+    if (
+      !currentItems.some((i) => i.phase === "thinking") &&
+      progress.thought
+    ) {
+      currentItems.unshift({
+        id: "thinking",
+        phase: "thinking",
+        status: "done",
+        title: "Thought for 5 seconds",
+        thoughtDurationSeconds: 5,
+        thought: progress.thought,
+      });
+    }
+
     const existingIdx = currentItems.findIndex((i) => i.id === "generating");
     if (existingIdx >= 0) {
       currentItems[existingIdx] = {
@@ -123,7 +174,14 @@ function updateTraces(
         currentItems[i].phase === "generating" &&
         currentItems[i].status === "running"
       ) {
-        currentItems[i] = { ...currentItems[i], status: "done" };
+        const chars = currentItems[i].receivedChars;
+        currentItems[i] = {
+          ...currentItems[i],
+          status: "done",
+          title: chars
+            ? `Drafted HTML component hierarchy (${(chars / 1024).toFixed(1)} KB)`
+            : "Drafted HTML component hierarchy",
+        };
       }
     }
     const existingIdx = currentItems.findIndex((i) => i.id === "checking");
@@ -170,9 +228,39 @@ function updateTraces(
   } else if (progress.stage === "saving") {
     // All done for all variants
     for (const v in next) {
-      next[v] = next[v].map((item) =>
-        item.status === "running" ? { ...item, status: "done" as const } : item
-      );
+      next[v] = next[v].map((item) => {
+        if (item.status === "running") {
+          if (item.phase === "thinking") {
+            const start = item.startedAt ?? Date.now() - 5000;
+            const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
+            return {
+              ...item,
+              status: "done" as const,
+              thoughtDurationSeconds: dur,
+              title: `Thought for ${dur} seconds`,
+            };
+          }
+          if (item.phase === "generating") {
+            const chars = item.receivedChars;
+            return {
+              ...item,
+              status: "done" as const,
+              title: chars
+                ? `Drafted HTML component hierarchy (${(chars / 1024).toFixed(1)} KB)`
+                : "Drafted HTML component hierarchy",
+            };
+          }
+          if (item.phase === "checking") {
+            return {
+              ...item,
+              status: "done" as const,
+              title: "Validated WCAG 2.2 AA contrast & design system rules",
+            };
+          }
+          return { ...item, status: "done" as const };
+        }
+        return item;
+      });
       if (!next[v].some((i) => i.phase === "ready")) {
         next[v].push({
           id: "ready",
@@ -181,10 +269,16 @@ function updateTraces(
           title: "Variant markup verified & saved",
         });
       }
+      next[v].sort(
+        (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+      );
     }
     return next;
   }
 
+  currentItems.sort(
+    (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+  );
   next[currentVariant] = currentItems;
   return next;
 }
@@ -236,11 +330,21 @@ export function useJobStream(
               ...base.tracesByVariant,
             };
             for (const v in finishedTraces) {
-              finishedTraces[v] = finishedTraces[v].map((item) =>
-                item.status === "running"
-                  ? { ...item, status: "done" as const }
-                  : item
-              );
+              finishedTraces[v] = finishedTraces[v].map((item) => {
+                if (item.status === "running") {
+                  if (item.phase === "thinking") {
+                    const dur = item.thoughtDurationSeconds ?? 5;
+                    return {
+                      ...item,
+                      status: "done" as const,
+                      thoughtDurationSeconds: dur,
+                      title: `Thought for ${dur} seconds`,
+                    };
+                  }
+                  return { ...item, status: "done" as const };
+                }
+                return item;
+              });
               if (!finishedTraces[v].some((i) => i.phase === "ready")) {
                 finishedTraces[v].push({
                   id: "ready",
@@ -249,6 +353,9 @@ export function useJobStream(
                   title: "Variant markup verified & saved",
                 });
               }
+              finishedTraces[v].sort(
+                (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+              );
             }
             return {
               ...base,

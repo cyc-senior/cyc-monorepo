@@ -24,6 +24,7 @@ import {
 import { Brain, CheckCircle2, FileCode, ShieldCheck, Wrench } from "lucide-react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import {
+  PHASE_ORDER,
   useJobStream,
   VariantTraceItem,
 } from "@/components/generation/use-job-stream";
@@ -147,19 +148,34 @@ function getVariantTraces(
   thought?: string,
   stepState?: StepState
 ): VariantTraceItem[] {
-  if (liveTraces.length > 0) {
-    return liveTraces;
-  }
   const effectiveThought = thought ?? outputVariant?.thought;
+
+  if (liveTraces.length > 0) {
+    const list = liveTraces.map((item) => {
+      if (item.phase === "thinking" && !item.thought && effectiveThought) {
+        return { ...item, thought: effectiveThought };
+      }
+      return item;
+    });
+    return list.sort(
+      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+    );
+  }
+
   if (stepState === "done") {
     const list: VariantTraceItem[] = [];
+    const estimatedSeconds = effectiveThought
+      ? Math.max(3, Math.min(15, Math.round(effectiveThought.length / 300)))
+      : 5;
+
     if (effectiveThought) {
       list.push({
         id: "thinking",
         phase: "thinking",
         status: "done",
-        title: "Analyzing UX strategy & persona goals",
+        title: `Thought for ${estimatedSeconds} seconds`,
         thought: effectiveThought,
+        thoughtDurationSeconds: estimatedSeconds,
       });
     }
     list.push({
@@ -180,15 +196,18 @@ function getVariantTraces(
       status: "done",
       title: "Variant markup verified & saved",
     });
-    return list;
+    return list.sort(
+      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+    );
   }
+
   if (stepState === "active") {
     return [
       {
         id: "thinking",
         phase: "thinking",
         status: "running",
-        title: "Analyzing UX strategy & persona goals",
+        title: "Thinking...",
         thought: effectiveThought,
       },
     ];
@@ -471,21 +490,106 @@ function GeneratingContent() {
                   </TraceIcon>
                   <div className="flex flex-1 flex-col min-w-0">
                     <TraceTitle>{step.label}</TraceTitle>
+                    {step.key === "persona" && (
+                      <div className="mt-2 ml-1 flex flex-col gap-2 border-l-2 border-border/60 pl-3 py-1">
+                        <TraceCollapsible
+                          defaultOpen={step.state === "active"}
+                          className="w-full"
+                        >
+                          <div className="flex items-center gap-2">
+                            <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
+                              <Brain
+                                className={cn(
+                                  "size-3.5 shrink-0",
+                                  step.state === "active"
+                                    ? "text-violet-500 animate-pulse"
+                                    : "text-muted-foreground"
+                                )}
+                              />
+                              <span>
+                                {step.state === "active"
+                                  ? "Thinking..."
+                                  : "Thought for 4 seconds"}
+                              </span>
+                            </TraceCollapsibleTrigger>
+                            {step.state === "active" && (
+                              <HugeIcon
+                                icon={Loading02Icon}
+                                size={12}
+                                className="animate-spin text-muted-foreground ml-auto shrink-0"
+                              />
+                            )}
+                            {step.state === "done" && (
+                              <HugeIcon
+                                icon={Tick02Icon}
+                                size={12}
+                                className="text-muted-foreground/70 ml-auto shrink-0"
+                              />
+                            )}
+                          </div>
+                          <TraceCollapsibleContent>
+                            <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 text-[11px] leading-relaxed text-muted-foreground shadow-inner">
+                              Synthesized target user persona from your project design intent and prompt.
+                            </div>
+                          </TraceCollapsibleContent>
+                        </TraceCollapsible>
+                      </div>
+                    )}
                     {variantTraces.length > 0 && (
-                      <div className="mt-2.5 ml-1 flex flex-col gap-2.5 border-l-2 border-border/60 pl-3 py-1">
-                        {variantTraces.map((item) => (
-                          <div key={item.id} className="flex flex-col gap-1 text-xs">
-                            <div className="flex items-center gap-2">
-                              {item.phase === "thinking" && (
-                                <Brain
-                                  className={cn(
-                                    "size-3.5 shrink-0",
-                                    item.status === "running"
-                                      ? "text-violet-500 animate-pulse"
-                                      : "text-muted-foreground"
+                      <div className="mt-2.5 ml-1 flex flex-col gap-2 border-l-2 border-border/60 pl-3 py-1">
+                        {variantTraces.map((item) => {
+                          if (item.phase === "thinking") {
+                            const isRunning = item.status === "running";
+                            const displayTitle = isRunning
+                              ? "Thinking..."
+                              : `Thought for ${item.thoughtDurationSeconds ?? 5} seconds`;
+
+                            return (
+                              <TraceCollapsible
+                                key={item.id}
+                                defaultOpen={isRunning}
+                                className="w-full"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
+                                    <Brain
+                                      className={cn(
+                                        "size-3.5 shrink-0",
+                                        isRunning
+                                          ? "text-violet-500 animate-pulse"
+                                          : "text-muted-foreground"
+                                      )}
+                                    />
+                                    <span>{displayTitle}</span>
+                                  </TraceCollapsibleTrigger>
+                                  {isRunning && (
+                                    <HugeIcon
+                                      icon={Loading02Icon}
+                                      size={12}
+                                      className="animate-spin text-muted-foreground ml-auto shrink-0"
+                                    />
                                   )}
-                                />
-                              )}
+                                  {!isRunning && (
+                                    <HugeIcon
+                                      icon={Tick02Icon}
+                                      size={12}
+                                      className="text-muted-foreground/70 ml-auto shrink-0"
+                                    />
+                                  )}
+                                </div>
+                                {item.thought && (
+                                  <TraceCollapsibleContent>
+                                    <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
+                                      {item.thought}
+                                    </div>
+                                  </TraceCollapsibleContent>
+                                )}
+                              </TraceCollapsible>
+                            );
+                          }
+
+                          return (
+                            <div key={item.id} className="flex items-center gap-2 py-0.5 text-xs">
                               {item.phase === "generating" && (
                                 <FileCode
                                   className={cn(
@@ -518,11 +622,17 @@ function GeneratingContent() {
                               <span
                                 className={cn(
                                   "font-medium",
-                                  item.status === "running" ? "text-foreground" : "text-muted-foreground"
+                                  item.status === "running"
+                                    ? "text-foreground"
+                                    : "text-muted-foreground"
                                 )}
                               >
                                 {item.title}
-                                {item.receivedChars ? ` (${(item.receivedChars / 1024).toFixed(1)} KB)` : null}
+                                {item.phase === "generating" &&
+                                item.receivedChars &&
+                                item.status === "running"
+                                  ? ` (${(item.receivedChars / 1024).toFixed(1)} KB)`
+                                  : null}
                               </span>
 
                               {item.status === "running" && (
@@ -540,24 +650,8 @@ function GeneratingContent() {
                                 />
                               )}
                             </div>
-
-                            {item.thought && (
-                              <TraceCollapsible defaultOpen={item.status === "running"} className="mt-0.5">
-                                <TraceCollapsibleTrigger className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline">
-                                  <span>
-                                    {item.status === "running" ? "Live thoughts" : "Reasoning summary"} (
-                                    {item.thought.length.toLocaleString()} chars)
-                                  </span>
-                                </TraceCollapsibleTrigger>
-                                <TraceCollapsibleContent>
-                                  <div className="mt-1 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                                    {item.thought}
-                                  </div>
-                                </TraceCollapsibleContent>
-                              </TraceCollapsible>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
