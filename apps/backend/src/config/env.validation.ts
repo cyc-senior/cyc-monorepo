@@ -131,7 +131,11 @@ export class EnvironmentVariables {
   @Min(1000)
   LLM_MAX_TOKENS: number = 16_000
 
-  /** Turn off the model's reasoning phase (vLLM `enable_thinking: false`): much faster for structured output. */
+  /**
+   * Turn off the model's reasoning phase (vLLM `enable_thinking: false`):
+   * much faster and cheaper for structured output. Off by default, so the
+   * generation trace can show the model's live reasoning.
+   */
   @EnvBoolean()
   @IsBoolean()
   LLM_DISABLE_THINKING: boolean = false
