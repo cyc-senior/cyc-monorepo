@@ -11,9 +11,10 @@ import {
   Query,
   Sse,
 } from '@nestjs/common'
-import { ApiTags } from '@nestjs/swagger'
+import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger'
 import { Observable } from 'rxjs'
 
+import { NoCache } from '../../cache/no-cache.decorator'
 import { UuidParam } from '../../common/decorators/uuid-param.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
 import { Authorize } from '../access/authorize.decorator'
@@ -50,6 +51,8 @@ export class RoundsController {
    */
   @Sse('draft-prompt/events')
   @Authorize(Permission.DesignRead)
+  @NoCache()
+  @ApiProduces('text/event-stream')
   draftPrompt(
     @UuidParam('projectId') projectId: string,
     @Query('storyId') storyId: string,
