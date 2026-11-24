@@ -53,7 +53,7 @@ import { useAuth } from "@/contexts/auth-context";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function TeamAndRolesStep3Page() {
+function TeamAndRolesStep3Content() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
@@ -406,5 +406,19 @@ export default function TeamAndRolesStep3Page() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function TeamAndRolesStep3Page() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-12 text-center text-muted-foreground">
+          Loading team setup...
+        </div>
+      }
+    >
+      <TeamAndRolesStep3Content />
+    </React.Suspense>
   );
 }

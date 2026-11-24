@@ -38,7 +38,7 @@ import {
   PersonaItem,
 } from "@/lib/project-client";
 
-export default function DesignIntentStep2Page() {
+function DesignIntentStep2Content() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
@@ -1148,5 +1148,19 @@ export default function DesignIntentStep2Page() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function DesignIntentStep2Page() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-12 text-center text-muted-foreground">
+          Loading design intent...
+        </div>
+      }
+    >
+      <DesignIntentStep2Content />
+    </React.Suspense>
   );
 }
