@@ -403,6 +403,9 @@ export class DesignGenerationProcessor
       let lastSent = 0
       let lastStage: string | undefined = 'thinking'
       let result: VariantResult | undefined
+      // Every run is paid for, so tokens and attempts add up across restarts.
+      const spent = { promptTokens: 0, completionTokens: 0 }
+      let attempts = 0
       // Guardrail against missing designs: a design that still fails after
       // its repairs is started over (told what failed) before it is dropped.
       for (let run = 0; run <= this.restarts; run++) {
@@ -451,6 +454,9 @@ export class DesignGenerationProcessor
             },
           },
         )
+        spent.promptTokens += result.usage.promptTokens
+        spent.completionTokens += result.usage.completionTokens
+        attempts += result.attempts
         if (result.passed) {
           break
         }
@@ -458,6 +464,7 @@ export class DesignGenerationProcessor
       if (!result) {
         continue
       }
+      result = { ...result, usage: spent, attempts }
       results.push(result)
       if (result.passed) {
         previous.push({ title: result.title, rationale: result.rationale })
