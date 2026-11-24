@@ -37,6 +37,16 @@ connect to the KMUTT VPN (see the notice above).
 | `pnpm db:migrate`                        | Create/apply migrations (development)                    |
 | `pnpm db:generate`                       | Regenerate the Prisma client                             |
 | `pnpm db:studio`                         | Browse data in Prisma Studio                             |
+| `pnpm db:reset`                          | Drop the dev database and re-apply every migration       |
+
+> **Migrations are append-only.** Never edit, squash or delete a migration that
+> has been merged: databases that already applied it would no longer match the
+> history. Change the schema with a new migration instead (hand-write renames,
+> since Prisma's generated SQL drops and recreates renamed tables).
+>
+> If your local database was created from the short-lived squashed
+> `20261120060503_init` migration (on `feat/create-project`), Prisma will report
+> it as missing: run `pnpm db:reset` once (this deletes local dev data).
 
 ### Local URLs
 
