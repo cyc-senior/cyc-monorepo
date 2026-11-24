@@ -13,7 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import axios from "axios";
 import { useAuth } from "@/contexts/auth-context";
+import {
+  PROFILE_PHOTO_MAX_BYTES,
+  PROFILE_PHOTO_TYPES,
+  updateMe,
+  uploadMyPicture,
+} from "@/services/user.service";
 
 interface AccountSettingsDialogProps {
   open: boolean;
@@ -25,24 +32,82 @@ function AccountSettingsContent({
 }: {
   onOpenChange: (open: boolean) => void;
 }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [name, setName] = React.useState(user?.name || "");
   const [avatarPreview, setAvatarPreview] = React.useState<string | null>(
     user?.image || null
   );
+  /** A newly chosen photo, uploaded on save. */
+  const [photoFile, setPhotoFile] = React.useState<File | null>(null);
+  /** The current photo was removed (applied on save). */
+  const [photoRemoved, setPhotoRemoved] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Release the preview's object URL when it is replaced or the dialog closes.
+  React.useEffect(() => {
+    if (!avatarPreview?.startsWith("blob:")) return;
+    return () => URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
+    if (!PROFILE_PHOTO_TYPES.includes(file.type)) {
+      setError("Choose a PNG or JPG image.");
+      return;
+    }
+    if (file.size > PROFILE_PHOTO_MAX_BYTES) {
+      setError("The photo must be 1 MB or smaller.");
+      return;
+    }
+    setError(null);
+    setPhotoFile(file);
+    setPhotoRemoved(false);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleRemovePhoto = () => {
     setAvatarPreview(null);
+    setPhotoFile(null);
+    setPhotoRemoved(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const trimmedName = name.trim();
+  const nameChanged = trimmedName !== (user?.name ?? "");
+
+  const handleSave = async () => {
+    if (nameChanged && !trimmedName) {
+      setError("Enter your name.");
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      if (nameChanged) {
+        await updateMe({ name: trimmedName });
+      }
+      if (photoFile) {
+        await uploadMyPicture(photoFile);
+      } else if (photoRemoved && user?.image) {
+        await updateMe({ image: null });
+      }
+      await refreshUser();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message = axios.isAxiosError<{ message?: string | string[] }>(err)
+        ? err.response?.data?.message
+        : undefined;
+      setError(
+        (Array.isArray(message) ? message[0] : message) ||
+          "Couldn't save your profile. Try again."
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -107,7 +172,7 @@ function AccountSettingsContent({
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
-                JPG or PNG, up to 2 MB
+                JPG or PNG, up to 1 MB
               </p>
             </div>
           </div>
@@ -163,6 +228,12 @@ function AccountSettingsContent({
         </div>
       </div>
 
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
       <DialogFooter className="gap-2 sm:gap-0">
         <Button
           type="button"
@@ -171,14 +242,8 @@ function AccountSettingsContent({
         >
           Cancel
         </Button>
-        <Button
-          type="button"
-          onClick={() => {
-            // TODO: persist user name and avatar to user profile backend
-            onOpenChange(false);
-          }}
-        >
-          Save changes
+        <Button type="button" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save changes"}
         </Button>
       </DialogFooter>
     </DialogContent>
