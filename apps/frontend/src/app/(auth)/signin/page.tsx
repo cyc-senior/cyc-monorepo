@@ -163,7 +163,9 @@ function SignInContent() {
             /* Session Join Mode */
             <form onSubmit={handleJoinSession} className="space-y-4" noValidate>
               <div className="space-y-1.5">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   placeholder="Jane Doe"
@@ -182,7 +184,9 @@ function SignInContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="session-email">Email</Label>
+                <Label htmlFor="session-email">
+                  Email <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="session-email"
                   type="email"
@@ -210,7 +214,9 @@ function SignInContent() {
             <div className="space-y-4">
               <form onSubmit={handleStandardSubmit} className="space-y-4" noValidate>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -231,7 +237,9 @@ function SignInContent() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">
+                      Password <span className="text-destructive">*</span>
+                    </Label>
                     <Link
                       href="/forgot-password"
                       className="text-xs text-link font-medium hover:text-foreground transition-colors"

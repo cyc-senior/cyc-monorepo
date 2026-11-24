@@ -158,7 +158,7 @@ export default function CreateWorkspaceScreen8Page() {
           {/* Field 1: Workspace name */}
           <div className="space-y-1.5">
             <Label htmlFor="workspace-name" className="text-sm font-medium">
-              Workspace name
+              Workspace name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="workspace-name"

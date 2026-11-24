@@ -214,7 +214,7 @@ function WorkspaceSettingsContent({
             {/* Field 1: Workspace name */}
             <div className="space-y-2">
               <Label htmlFor="ws-name" className="text-sm font-medium">
-                Workspace name
+                Workspace name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="ws-name"

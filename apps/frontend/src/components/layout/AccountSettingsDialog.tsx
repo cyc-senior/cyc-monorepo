@@ -116,7 +116,7 @@ function AccountSettingsContent({
         {/* Full name */}
         <div className="space-y-2">
           <Label htmlFor="account-full-name" className="text-sm font-medium">
-            Full name
+            Full name <span className="text-destructive">*</span>
           </Label>
           <Input
             id="account-full-name"

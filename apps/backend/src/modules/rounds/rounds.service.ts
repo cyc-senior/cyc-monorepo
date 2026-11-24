@@ -2,13 +2,17 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
+  MessageEvent,
 } from '@nestjs/common'
+import { Observable } from 'rxjs'
 
 import { recordDecision } from '../../common/decisions'
 import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
+import { LlmClient } from '../generation/llm.client'
 import {
   CreateDesignRoundDto,
   DesignRoundDto,
@@ -17,9 +21,29 @@ import {
 } from './dto/design-round.dto'
 import { createNextRound } from './round-state'
 
+export interface DraftPromptResult {
+  goal: string
+  problem: string
+  mustUse: string
+  comparisonQuestion: string
+  variantA: {
+    name: string
+    description: string
+  }
+  variantB: {
+    name: string
+    description: string
+  }
+}
+
 @Injectable()
 export class RoundsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(RoundsService.name)
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llm: LlmClient,
+  ) {}
 
   list(
     projectId: string,
@@ -200,5 +224,238 @@ export class RoundsService {
     )
 
     return fields.length === 1 && dto.status === 'ARCHIVED'
+  }
+
+  /**
+   * Streams the structured prompt drafting via LLM.
+   */
+  streamDraftPrompt(
+    projectId: string,
+    storyId: string,
+    personaId?: string,
+  ): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      const abortController = new AbortController()
+
+      ;(async () => {
+        try {
+          subscriber.next({
+            data: {
+              status: 'Drafting your prompt with AI...',
+              stage: 'loading_inputs',
+            },
+          })
+
+          const [story, intent, persona] = await Promise.all([
+            this.prisma.userStory.findFirst({
+              where: { id: storyId, projectId },
+            }),
+            this.prisma.designIntent.findFirst({
+              where: { projectId },
+              orderBy: { version: 'desc' },
+            }),
+            personaId
+              ? this.prisma.userPersona.findFirst({
+                  where: { id: personaId, projectId },
+                })
+              : this.prisma.userPersona.findFirst({
+                  where: { projectId },
+                }),
+          ])
+
+          if (!story) {
+            subscriber.error(new BadRequestException('User story not found.'))
+            return
+          }
+
+          const defaultGoal =
+            story.acceptanceCriteria ||
+            story.title ||
+            'Complete the primary user workflow successfully.'
+          const defaultProblem =
+            story.problemStatement ||
+            'Users need a more efficient way to accomplish this task.'
+          const ds = intent?.designSystem === 'MUI' ? 'Material UI' : 'shadcn'
+          const standard = intent?.designStandards?.[0] || 'WCAG 2.2 AA'
+          const color = intent?.primaryColor || '#F2652A'
+          const defaultMustUse = `Use ${ds} components only and meet ${standard}. Use ${color} for primary actions. Keep copy plain and friendly, and provide clear user feedback.`
+
+          subscriber.next({
+            data: {
+              status: 'Drafting your prompt with AI...',
+              stage: 'drafting',
+            },
+          })
+
+          if (!this.llm.configured) {
+            // Fallback when LLM client is not configured
+            const fallbackResult: DraftPromptResult = {
+              goal: defaultGoal,
+              problem: defaultProblem,
+              mustUse: defaultMustUse,
+              comparisonQuestion: `Which design makes it easier to ${story.title.toLowerCase().replace(/\.$/, '')}?`,
+              variantA: {
+                name: 'Direct flow',
+                description:
+                  'Streamlined single-page workflow minimizing steps.',
+              },
+              variantB: {
+                name: 'Guided flow',
+                description:
+                  'Structured multi-step workflow with contextual guidance.',
+              },
+            }
+
+            subscriber.next({
+              data: {
+                status: 'Drafting complete',
+                stage: 'completed',
+                prompt: fallbackResult,
+              },
+            })
+            subscriber.complete()
+            return
+          }
+
+          const promptSchema = {
+            type: 'object',
+            properties: {
+              goal: {
+                type: 'string',
+                description:
+                  'A clear, concise user goal to achieve in the interface',
+              },
+              problem: {
+                type: 'string',
+                description:
+                  'The core user problem or friction being addressed',
+              },
+              mustUse: {
+                type: 'string',
+                description:
+                  'Design system, accessibility standards, brand colors, and guidelines',
+              },
+              comparisonQuestion: {
+                type: 'string',
+                description:
+                  'The evaluation question testers answer when comparing Variant A vs Variant B',
+              },
+              variantA: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Name of Variant A' },
+                  description: {
+                    type: 'string',
+                    description:
+                      'One clear design thesis or UX strategy for Variant A',
+                  },
+                },
+                required: ['name', 'description'],
+                additionalProperties: false,
+              },
+              variantB: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Name of Variant B' },
+                  description: {
+                    type: 'string',
+                    description:
+                      'A distinct, contrasting UX strategy for Variant B',
+                  },
+                },
+                required: ['name', 'description'],
+                additionalProperties: false,
+              },
+            },
+            required: [
+              'goal',
+              'problem',
+              'mustUse',
+              'comparisonQuestion',
+              'variantA',
+              'variantB',
+            ],
+            additionalProperties: false,
+          }
+
+          const completion = await this.llm.structured({
+            schemaName: 'StructuredPromptReview',
+            schema: promptSchema,
+            signal: abortController.signal,
+            model: this.llm.analysisModel,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are an expert UX design strategist. Your task is to draft a structured prompt for A/B UI variant generation based on the user story, design intent, and persona. Keep Variant A and B differing in exactly one key dimension (e.g. single-page direct flow vs staged guided flow).',
+              },
+              {
+                role: 'user',
+                content: JSON.stringify({
+                  userStory: {
+                    title: story.title,
+                    description: story.description,
+                    problemStatement: story.problemStatement,
+                    acceptanceCriteria: story.acceptanceCriteria,
+                  },
+                  designIntent: intent
+                    ? {
+                        statement: intent.statement,
+                        designSystem: intent.designSystem,
+                        designStandards: intent.designStandards,
+                        primaryColor: intent.primaryColor,
+                        secondaryColor: intent.secondaryColor,
+                        accentColor: intent.accentColor,
+                        brandGuidelines: intent.brandGuidelines,
+                        toneOfVoice: intent.toneOfVoice,
+                      }
+                    : null,
+                  persona: persona
+                    ? {
+                        name: persona.name,
+                        age: persona.age,
+                        shortDescription: persona.shortDescription,
+                        frustrations: persona.frustrations,
+                        goals: persona.goals,
+                      }
+                    : null,
+                  defaults: {
+                    goal: defaultGoal,
+                    problem: defaultProblem,
+                    mustUse: defaultMustUse,
+                  },
+                }),
+              },
+            ],
+            onDelta: (chars) => {
+              subscriber.next({
+                data: {
+                  status: 'Drafting your prompt with AI...',
+                  stage: 'llm_streaming',
+                  charsReceived: chars,
+                },
+              })
+            },
+          })
+
+          const parsed = JSON.parse(completion.content) as DraftPromptResult
+          subscriber.next({
+            data: {
+              status: 'Drafting complete',
+              stage: 'completed',
+              prompt: parsed,
+            },
+          })
+          subscriber.complete()
+        } catch (err: unknown) {
+          this.logger.error('Error drafting prompt via LLM', err)
+          subscriber.error(err)
+        }
+      })()
+
+      return () => {
+        abortController.abort()
+      }
+    })
   }
 }

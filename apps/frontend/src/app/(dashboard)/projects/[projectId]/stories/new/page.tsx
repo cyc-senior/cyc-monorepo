@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Tick01Icon,
@@ -43,13 +50,8 @@ export default function NewUserStoryPage() {
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
   const [selectedPersonaIds, setSelectedPersonaIds] = React.useState<string[]>([]);
   const [devices, setDevices] = React.useState<string[]>(["DESKTOP", "MOBILE"]);
-  const [screensList, setScreensList] = React.useState<string[]>([
-    "Find a room",
-    "Room details",
-    "Booking confirmed",
-  ]);
+  const [screensList, setScreensList] = React.useState<string[]>([]);
   const [newScreenInput, setNewScreenInput] = React.useState("");
-  const [isAddingScreen, setIsAddingScreen] = React.useState(false);
 
   // Intent preview
   const [intent, setIntent] = React.useState<DesignIntentDetail | null>(null);
@@ -66,9 +68,6 @@ export default function NewUserStoryPage() {
         ]);
         setPersonas(personaList);
         setIntent(intentDetail);
-        if (personaList.length > 0) {
-          setSelectedPersonaIds([personaList[0].id]);
-        }
       } catch {
         // Ignored
       }
@@ -96,7 +95,6 @@ export default function NewUserStoryPage() {
     if (val && !screensList.includes(val)) {
       setScreensList((prev) => [...prev, val]);
       setNewScreenInput("");
-      setIsAddingScreen(false);
     }
   };
 
@@ -112,6 +110,10 @@ export default function NewUserStoryPage() {
     }
     if (!problemStatement.trim()) {
       setError("Please describe the problem statement.");
+      return;
+    }
+    if (devices.length === 0) {
+      setError("Please select at least 1 device in scope (Desktop or Mobile).");
       return;
     }
 
@@ -193,7 +195,7 @@ export default function NewUserStoryPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="story-role" className="text-sm font-medium text-foreground">
-                    As a…
+                    As a… <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="story-role"
@@ -206,7 +208,7 @@ export default function NewUserStoryPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="story-want" className="text-sm font-medium text-foreground">
-                    I want to…
+                    I want to… <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="story-want"
@@ -219,7 +221,7 @@ export default function NewUserStoryPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="story-benefit" className="text-sm font-medium text-foreground">
-                    So that…
+                    So that… <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="story-benefit"
@@ -241,7 +243,7 @@ export default function NewUserStoryPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="problem-statement" className="text-sm font-medium text-foreground">
-                    Problem statement
+                    Problem statement <span className="text-destructive">*</span>
                   </Label>
                   <Textarea
                     id="problem-statement"
@@ -276,9 +278,21 @@ export default function NewUserStoryPage() {
 
               {/* Persona section matching Figma Node 815:14303 */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-foreground">
-                  Persona
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-foreground">
+                    Persona
+                  </Label>
+                  {selectedPersonaIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPersonaIds([])}
+                      className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
                 {personas.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     No personas defined in design intent.{" "}
@@ -290,24 +304,65 @@ export default function NewUserStoryPage() {
                     </Link>
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {personas.map((p) => {
-                      const isSelected = selectedPersonaIds.includes(p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => togglePersona(p.id)}
-                          className={`rounded-[10px] px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                            isSelected
-                              ? "bg-[#ecfccb] text-[#4d7c0f] border border-transparent shadow-2xs"
-                              : "border border-border text-foreground hover:bg-muted"
-                          }`}
-                        >
-                          {p.name}{p.age ? `, ${p.age}` : ""}
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-2 pt-1">
+                    <Select
+                      value=""
+                      onValueChange={(val) => {
+                        if (val && !selectedPersonaIds.includes(val)) {
+                          setSelectedPersonaIds((prev) => [...prev, val]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-10 rounded-[10px] text-sm bg-background">
+                        <SelectValue placeholder="Select personas..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {personas.map((p) => {
+                          const isAlreadySelected = selectedPersonaIds.includes(p.id);
+                          return (
+                            <SelectItem
+                              key={p.id}
+                              value={p.id}
+                              disabled={isAlreadySelected}
+                            >
+                              <span className="font-medium">{p.name}</span>
+                              {p.age ? ` (${p.age} y/o)` : ""}
+                              {p.shortDescription ? ` - ${p.shortDescription}` : ""}
+                              {isAlreadySelected ? " (selected)" : ""}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Selected Personas Badges */}
+                    {selectedPersonaIds.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {selectedPersonaIds.map((id) => {
+                          const p = personas.find((item) => item.id === id);
+                          if (!p) return null;
+                          return (
+                            <span
+                              key={p.id}
+                              className="rounded-[10px] bg-[#ecfccb] text-[#4d7c0f] border border-[#d9f99d] px-2.5 py-1 text-xs font-medium flex items-center gap-1.5 shadow-2xs"
+                            >
+                              <span>
+                                {p.name}
+                                {p.age ? `, ${p.age}` : ""}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => togglePersona(p.id)}
+                                className="text-[#4d7c0f] hover:text-destructive cursor-pointer"
+                                title="Remove persona"
+                              >
+                                <HugeIcon icon={Cancel01Icon} size={12} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -317,79 +372,71 @@ export default function NewUserStoryPage() {
                 <Label className="text-sm font-medium text-foreground">
                   Screens in scope
                 </Label>
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {screensList.map((screen) => (
-                    <span
-                      key={screen}
-                      className="rounded-[10px] bg-muted px-2.5 py-1 text-xs font-medium text-foreground flex items-center gap-1.5"
-                    >
-                      <span>{screen}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveScreen(screen)}
-                        className="text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        <HugeIcon icon={Cancel01Icon} size={12} />
-                      </button>
-                    </span>
-                  ))}
-
-                  {isAddingScreen ? (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="text"
-                        placeholder="Screen name"
-                        value={newScreenInput}
-                        onChange={(e) => setNewScreenInput(e.target.value)}
-                        className="h-7 text-xs w-36 rounded-[8px]"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddScreen(e);
-                          } else if (e.key === "Escape") {
-                            setIsAddingScreen(false);
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleAddScreen}
-                        className="h-7 px-2 text-xs rounded-[8px]"
-                      >
-                        Add
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAddingScreen(false)}
-                        className="h-7 px-1.5 text-xs rounded-[8px]"
-                      >
-                        <HugeIcon icon={Cancel01Icon} size={14} />
-                      </Button>
-                    </div>
-                  ) : (
+                <div className="space-y-2 pt-1">
+                  {/* Screen input form directly visible */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      placeholder="e.g. Find a room, Booking confirmed"
+                      value={newScreenInput}
+                      onChange={(e) => setNewScreenInput(e.target.value)}
+                      className="h-9 text-sm rounded-[10px] flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddScreen(e);
+                        }
+                      }}
+                    />
                     <Button
                       type="button"
-                      variant="ghost"
                       size="sm"
-                      onClick={() => setIsAddingScreen(true)}
-                      className="h-7 px-2.5 text-xs font-medium gap-1 text-foreground hover:bg-muted rounded-[10px] cursor-pointer"
+                      onClick={handleAddScreen}
+                      disabled={!newScreenInput.trim()}
+                      className="h-9 px-3 text-xs rounded-[10px] gap-1 cursor-pointer"
                     >
                       <HugeIcon icon={Add01Icon} size={14} />
-                      <span>Add</span>
+                      <span>Add screen</span>
                     </Button>
+                  </div>
+
+                  {screensList.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {screensList.map((screen) => (
+                        <span
+                          key={screen}
+                          className="rounded-[10px] bg-muted px-2.5 py-1 text-xs font-medium text-foreground flex items-center gap-1.5"
+                        >
+                          <span>{screen}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveScreen(screen)}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Remove screen"
+                          >
+                            <HugeIcon icon={Cancel01Icon} size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No screens added yet. Type a screen name above and press Add or Enter.
+                    </p>
                   )}
                 </div>
               </div>
 
               {/* Devices in scope section matching Figma Node 815:14315 */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-foreground">
-                  Devices
-                </Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-sm font-medium text-foreground">
+                    Devices <span className="text-destructive">*</span>
+                  </Label>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    (select at least 1)
+                  </span>
+                </div>
                 <div className="flex items-center gap-5 pt-1">
                   {/* Desktop Checkbox */}
                   <button
@@ -446,9 +493,9 @@ export default function NewUserStoryPage() {
                 Tips for a better A/B
               </h3>
               <div className="space-y-2.5 text-sm text-muted-foreground">
-                <p>• Describe one problem, not a feature list.</p>
-                <p>• Use numbers you already have (drop-off, time).</p>
-                <p>• Name the screens so AI keeps the scope small.</p>
+                <p>-  Describe one problem, not a feature list.</p>
+                <p>- Use numbers you already have (drop-off, time).</p>
+                <p>- Name the screens so AI keeps the scope small.</p>
               </div>
             </div>
 

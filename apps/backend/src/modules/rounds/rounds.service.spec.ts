@@ -1,17 +1,39 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
 
 import { PrismaService } from '../../prisma/prisma.service'
+import { LlmClient } from '../generation/llm.client'
 import { RoundsService } from './rounds.service'
 
 describe('RoundsService', () => {
+  const txMock = {
+    $executeRaw: jest.fn(),
+    testSession: {
+      count: jest.fn().mockResolvedValue(0),
+    },
+    designRound: {
+      updateMany: jest.fn(),
+    },
+    designDecision: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+  }
   const prisma = {
     designRound: {
       findFirstOrThrow: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    $transaction: jest.fn((cb) => cb(txMock)),
   }
-  const service = new RoundsService(prisma as unknown as PrismaService)
+  const llm = {
+    configured: false,
+    analysisModel: 'test-model',
+    structured: jest.fn(),
+  }
+  const service = new RoundsService(
+    prisma as unknown as PrismaService,
+    llm as unknown as LlmClient,
+  )
   const round = (overrides = {}) => ({
     id: 'r-2',
     projectId: 'p-1',
@@ -24,6 +46,9 @@ describe('RoundsService', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     prisma.designRound.update.mockResolvedValue({})
+    txMock.testSession.count.mockResolvedValue(0)
+    txMock.designDecision.create.mockResolvedValue({})
+    prisma.$transaction.mockImplementation((cb) => cb(txMock))
   })
 
   describe('update', () => {
@@ -74,12 +99,12 @@ describe('RoundsService', () => {
   describe('approve', () => {
     it('records the approver', async () => {
       prisma.designRound.findFirstOrThrow.mockResolvedValue(round())
-      prisma.designRound.updateMany.mockResolvedValue({ count: 1 })
+      txMock.designRound.updateMany.mockResolvedValue({ count: 1 })
 
       await service.approve('p-1', 'r-2', 'user-1')
 
-      expect(prisma.designRound.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r-2', status: { notIn: ['APPROVED', 'ARCHIVED'] } },
+      expect(txMock.designRound.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r-2', projectId: 'p-1', status: { notIn: ['APPROVED', 'ARCHIVED'] } },
         data: expect.objectContaining({
           status: 'APPROVED',
           approvedById: 'user-1',
@@ -90,7 +115,7 @@ describe('RoundsService', () => {
 
     it('loses the race gracefully when already approved', async () => {
       prisma.designRound.findFirstOrThrow.mockResolvedValue(round())
-      prisma.designRound.updateMany.mockResolvedValue({ count: 0 })
+      txMock.designRound.updateMany.mockResolvedValue({ count: 0 })
 
       await expect(
         service.approve('p-1', 'r-2', 'user-1'),

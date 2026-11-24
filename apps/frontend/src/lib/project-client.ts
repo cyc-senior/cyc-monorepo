@@ -332,6 +332,17 @@ export async function createUserStory(
   });
 }
 
+export async function updateUserStory(
+  projectId: string,
+  storyId: string,
+  payload: Partial<CreateUserStoryPayload>
+): Promise<UserStoryItem> {
+  return apiFetch<UserStoryItem>(`/projects/${projectId}/user-stories/${storyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 /** Design Rounds & Generation API calls */
 export async function createDesignRound(
   projectId: string,

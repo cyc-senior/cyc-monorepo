@@ -5,11 +5,14 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  MessageEvent,
   Patch,
   Post,
   Query,
+  Sse,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
+import { Observable } from 'rxjs'
 
 import { UuidParam } from '../../common/decorators/uuid-param.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
@@ -40,6 +43,19 @@ export class RoundsController {
     @Query() query: DesignRoundQueryDto,
   ): Promise<Page<DesignRoundDto>> {
     return this.rounds.list(projectId, query)
+  }
+
+  /**
+   * SSE endpoint to stream AI structured prompt drafting for a user story.
+   */
+  @Sse('draft-prompt/events')
+  @Authorize(Permission.DesignRead)
+  draftPrompt(
+    @UuidParam('projectId') projectId: string,
+    @Query('storyId') storyId: string,
+    @Query('personaId') personaId?: string,
+  ): Observable<MessageEvent> {
+    return this.rounds.streamDraftPrompt(projectId, storyId, personaId)
   }
 
   /**

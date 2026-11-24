@@ -167,7 +167,7 @@ export default function CreateProjectPage() {
                       htmlFor="project-name"
                       className="text-sm font-medium leading-5 text-foreground cursor-pointer"
                     >
-                      Project name
+                      Project name <span className="text-destructive">*</span>
                     </label>
                     <input
                       id="project-name"
@@ -197,7 +197,7 @@ export default function CreateProjectPage() {
                       htmlFor="client-or-product"
                       className="text-sm font-medium leading-5 text-foreground cursor-pointer"
                     >
-                      Client or product
+                      Client or product <span className="text-destructive">*</span>
                     </label>
                     <input
                       id="client-or-product"

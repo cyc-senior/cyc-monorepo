@@ -158,7 +158,9 @@ function SignUpContent() {
               <form onSubmit={handleCreateAccount} className="space-y-4" noValidate>
                 {/* Full Name */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="fullName">Full name</Label>
+                  <Label htmlFor="fullName">
+                    Full name <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="fullName"
                     placeholder="Your name"
@@ -178,7 +180,9 @@ function SignUpContent() {
 
                 {/* Email */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -199,7 +203,9 @@ function SignUpContent() {
 
                 {/* Password with Eye Icon */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password">
+                    Password <span className="text-destructive">*</span>
+                  </Label>
                   <div className="relative">
                     <Input
                       id="signup-password"
