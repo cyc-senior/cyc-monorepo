@@ -104,7 +104,11 @@ describe('RoundsService', () => {
       await service.approve('p-1', 'r-2', 'user-1')
 
       expect(txMock.designRound.updateMany).toHaveBeenCalledWith({
-        where: { id: 'r-2', projectId: 'p-1', status: { notIn: ['APPROVED', 'ARCHIVED'] } },
+        where: {
+          id: 'r-2',
+          projectId: 'p-1',
+          status: { notIn: ['APPROVED', 'ARCHIVED'] },
+        },
         data: expect.objectContaining({
           status: 'APPROVED',
           approvedById: 'user-1',

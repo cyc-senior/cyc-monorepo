@@ -347,7 +347,9 @@ export class DesignGenerationProcessor
       signal,
       (thought) => {
         const now = Date.now()
-        if (now - lastSent < PROGRESS_THROTTLE_MS) return
+        if (now - lastSent < PROGRESS_THROTTLE_MS) {
+          return
+        }
         lastSent = now
         void job
           .updateProgress({

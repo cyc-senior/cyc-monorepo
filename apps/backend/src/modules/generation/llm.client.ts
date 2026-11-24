@@ -127,7 +127,7 @@ export class LlmClient {
         let chunkContent = delta.content
         if (inThinkTag) {
           const endIdx = chunkContent.indexOf('</think>')
-          if (endIdx !== -1) {
+          if (endIdx >= 0) {
             const thinkPart = chunkContent.slice(0, endIdx)
             thought += thinkPart
             options.onThoughtDelta?.(thinkPart, thought)
@@ -140,13 +140,13 @@ export class LlmClient {
           }
         } else {
           const startIdx = chunkContent.indexOf('<think>')
-          if (startIdx !== -1) {
+          if (startIdx >= 0) {
             const beforeThink = chunkContent.slice(0, startIdx)
             content += beforeThink
             chunkContent = chunkContent.slice(startIdx + 7) // '<think>'.length
             inThinkTag = true
             const endIdx = chunkContent.indexOf('</think>')
-            if (endIdx !== -1) {
+            if (endIdx >= 0) {
               const thinkPart = chunkContent.slice(0, endIdx)
               thought += thinkPart
               options.onThoughtDelta?.(thinkPart, thought)

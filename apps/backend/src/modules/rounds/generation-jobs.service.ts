@@ -176,9 +176,7 @@ export class GenerationJobsService {
       stories,
       prompt: dto.prompt,
       synthesizePersona:
-        dto.synthesizePersona !== undefined
-          ? dto.synthesizePersona
-          : !(dto.personaIds && dto.personaIds.length > 0),
+        dto.synthesizePersona ?? (dto.personaIds?.length ? false : true),
       baseDesign,
       feedbackThemes,
     }

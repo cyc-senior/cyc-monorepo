@@ -11,7 +11,7 @@ import {
   Query,
   Sse,
 } from '@nestjs/common'
-import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger'
+import { ApiProduces, ApiTags } from '@nestjs/swagger'
 import { Observable } from 'rxjs'
 
 import { NoCache } from '../../cache/no-cache.decorator'

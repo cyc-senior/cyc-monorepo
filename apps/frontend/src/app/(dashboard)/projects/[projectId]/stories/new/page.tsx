@@ -210,6 +210,12 @@ function NewUserStoryContent() {
         ? (await updateUserStory(projectId, existingStoryId, storyPayload)).id
         : (await createUserStory(projectId, storyPayload)).id;
 
+      // Update current browser history entry with ?storyId=... so if user hits Back from /rounds/new,
+      // it returns to /stories/new?storyId=... instead of creating another duplicate story!
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", `/projects/${projectId}/stories/new?storyId=${storyId}`);
+      }
+
       // Proceed to Screen 16: Review structured prompt
       router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
     } catch (err: unknown) {
