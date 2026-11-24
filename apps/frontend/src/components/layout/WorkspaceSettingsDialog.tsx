@@ -22,6 +22,17 @@ import {
   inviteWorkspaceMember,
 } from "@/services/workspace.service";
 import { useWorkspace } from "@/contexts/workspace-context";
+import axios from "axios";
+
+/** The API's reason an invitation failed, for showing next to its email. */
+function inviteErrorMessage(reason: unknown): string {
+  if (axios.isAxiosError<{ message?: string | string[] }>(reason)) {
+    const message = reason.response?.data?.message;
+    const text = Array.isArray(message) ? message[0] : message;
+    if (text) return text;
+  }
+  return reason instanceof Error ? reason.message : "unknown error";
+}
 
 export interface WorkspaceSettingsDialogProps {
   open: boolean;
@@ -118,6 +129,8 @@ function WorkspaceSettingsContent({
       // 2. Upload avatar if new file selected
       if (avatarFile) {
         await uploadWorkspacePicture(workspace.id, avatarFile);
+        // Uploaded: a retry after a failed invitation must not upload again.
+        setAvatarFile(null);
         if (avatarPreview) {
           setWorkspaceAvatar(workspace.id, avatarPreview);
         }
@@ -128,15 +141,31 @@ function WorkspaceSettingsContent({
         .map((em) => em.trim())
         .filter((em) => Boolean(em));
 
-      if (validEmails.length > 0) {
-        await Promise.allSettled(
-          validEmails.map((em) =>
-            inviteWorkspaceMember(workspace.id, em, "MEMBER")
-          )
+      const results = await Promise.allSettled(
+        validEmails.map((em) =>
+          inviteWorkspaceMember(workspace.id, em, "MEMBER")
+        )
+      );
+      const failed = validEmails
+        .map((email, i) => ({ email, result: results[i] }))
+        .filter(
+          (r): r is { email: string; result: PromiseRejectedResult } =>
+            r.result.status === "rejected"
         );
-      }
 
       await refreshWorkspaces();
+
+      if (failed.length > 0) {
+        // Keep the dialog open with only the emails that still need inviting.
+        setInviteEmails(failed.map((f) => f.email));
+        setServerError(
+          `Saved, but ${failed.length === 1 ? "this invitation" : "these invitations"} failed: ${failed
+            .map((f) => `${f.email} (${inviteErrorMessage(f.result.reason)})`)
+            .join(", ")}.`
+        );
+        return;
+      }
+
       setIsSuccess(true);
       setTimeout(() => {
         onOpenChange(false);
