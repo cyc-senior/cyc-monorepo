@@ -23,7 +23,8 @@ import {
   SparklesIcon,
   Loading03Icon,
 } from "@hugeicons/core-free-icons";
-import { Brain } from "lucide-react";
+import { Brain, RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   getUserStoryById,
   updateUserStory,
@@ -76,16 +77,23 @@ function ReviewStructuredPromptContent() {
     "Drafting your prompt with AI..."
   );
   const [thoughtText, setThoughtText] = React.useState<string>("");
+  const [retryCount, setRetryCount] = React.useState(0);
 
   const inFlightDraftRef = React.useRef<string | null>(null);
+
+  const handleRetry = () => {
+    inFlightDraftRef.current = null;
+    setError(null);
+    setRetryCount((prev) => prev + 1);
+  };
 
   React.useEffect(() => {
     let isCancelled = false;
     const abortController = new AbortController();
 
     async function loadData() {
-      if (!storyId || inFlightDraftRef.current === `${projectId}:${storyId}`) return;
-      inFlightDraftRef.current = `${projectId}:${storyId}`;
+      if (!storyId || inFlightDraftRef.current === `${projectId}:${storyId}:${retryCount}`) return;
+      inFlightDraftRef.current = `${projectId}:${storyId}:${retryCount}`;
       setIsLoading(true);
       setBackendStatus("Drafting your prompt with AI...");
 
@@ -216,7 +224,7 @@ function ReviewStructuredPromptContent() {
       inFlightDraftRef.current = null;
       abortController.abort();
     };
-  }, [projectId, storyId]);
+  }, [projectId, storyId, retryCount]);
 
   const handleSaveGoal = async () => {
     if (!isEditingGoal) {
@@ -335,7 +343,19 @@ function ReviewStructuredPromptContent() {
         <Alert variant="destructive">
           <HugeIcon icon={Alert02Icon} size={16} />
           <AlertTitle>Generation error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+            <span className="leading-relaxed">{error}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              disabled={isLoading}
+              className="h-8 gap-1.5 self-start sm:self-auto border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer shrink-0"
+            >
+              <RotateCcw className={cn("size-3.5", isLoading && "animate-spin")} />
+              <span>{isLoading ? "Retrying..." : "Try again"}</span>
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
