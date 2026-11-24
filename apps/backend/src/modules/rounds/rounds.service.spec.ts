@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
 
 import { PrismaService } from '../../prisma/prisma.service'
-import { LlmClient } from '../generation/llm.client'
-import { parseDraftPrompt, RoundsService } from './rounds.service'
+import { PromptDrafter } from '../generation/prompt-drafter'
+import { RoundsService } from './rounds.service'
 
 describe('RoundsService', () => {
   const txMock = {
@@ -25,14 +25,13 @@ describe('RoundsService', () => {
     },
     $transaction: jest.fn((cb) => cb(txMock)),
   }
-  const llm = {
+  const drafter = {
     configured: false,
-    analysisModel: 'test-model',
-    structured: jest.fn(),
+    draft: jest.fn(),
   }
   const service = new RoundsService(
     prisma as unknown as PrismaService,
-    llm as unknown as LlmClient,
+    drafter as unknown as PromptDrafter,
   )
   const round = (overrides = {}) => ({
     id: 'r-2',
@@ -125,46 +124,5 @@ describe('RoundsService', () => {
         service.approve('p-1', 'r-2', 'user-1'),
       ).rejects.toBeInstanceOf(ConflictException)
     })
-  })
-})
-
-describe('parseDraftPrompt', () => {
-  const answer = {
-    goal: 'Pay in two taps',
-    problem: 'Checkout takes too long',
-    mustUse: 'shadcn, WCAG 2.2 AA',
-    comparisonQuestion: 'Which one is faster to pay with?',
-    variantA: { name: 'Direct', description: 'Everything on one page' },
-    variantB: { name: 'Guided', description: 'One step at a time' },
-  }
-
-  it('returns a valid answer, trimmed', () => {
-    const parsed = parseDraftPrompt(
-      JSON.stringify({ ...answer, goal: '  Pay in two taps ' }),
-      'stop',
-    )
-    expect(parsed.goal).toBe('Pay in two taps')
-    expect(parsed.variantB.name).toBe('Guided')
-  })
-
-  it('rejects an answer that was cut off', () => {
-    expect(() => parseDraftPrompt('{"goal":"Pa', 'length')).toThrow('cut off')
-  })
-
-  it('rejects an answer that is not JSON', () => {
-    expect(() => parseDraftPrompt('Sure! Here is', 'stop')).toThrow(
-      'valid prompt',
-    )
-  })
-
-  it('rejects an answer with a missing or blank field', () => {
-    expect(() =>
-      parseDraftPrompt(JSON.stringify({ ...answer, goal: ' ' }), 'stop'),
-    ).toThrow('goal')
-    const withoutB: Partial<typeof answer> = { ...answer }
-    delete withoutB.variantB
-    expect(() => parseDraftPrompt(JSON.stringify(withoutB), 'stop')).toThrow(
-      'variantB',
-    )
   })
 })

@@ -7,15 +7,13 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Observable } from 'rxjs'
-import { z } from 'zod'
 
 import { recordDecision } from '../../common/decisions'
 import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
-import { llmJsonSchema } from '../../common/json-schema'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
-import { LlmClient } from '../generation/llm.client'
+import { PromptDrafter } from '../generation/prompt-drafter'
 import {
   CreateDesignRoundDto,
   DesignRoundDto,
@@ -24,78 +22,13 @@ import {
 } from './dto/design-round.dto'
 import { createNextRound } from './round-state'
 
-const text = (max: number, description: string) =>
-  z.string().trim().min(1).max(max).describe(description)
-
-const variantSchema = (description: string) =>
-  z
-    .object({
-      name: text(120, 'Short name of the variant'),
-      description: text(2000, description),
-    })
-    .strict()
-
-/** What the model must answer when drafting a structured prompt. */
-const draftPromptSchema = z
-  .object({
-    goal: text(2000, 'A clear, concise user goal to achieve in the interface'),
-    problem: text(2000, 'The core user problem or friction being addressed'),
-    mustUse: text(
-      2000,
-      'Design system, accessibility standards, brand colors, and guidelines',
-    ),
-    comparisonQuestion: text(
-      500,
-      'The evaluation question testers answer when comparing Variant A vs Variant B',
-    ),
-    variantA: variantSchema(
-      'One clear design thesis or UX strategy for Variant A',
-    ),
-    variantB: variantSchema(
-      'A distinct, contrasting UX strategy for Variant B',
-    ),
-  })
-  .strict()
-
-export type DraftPromptResult = z.infer<typeof draftPromptSchema>
-
-const DRAFT_PROMPT_JSON_SCHEMA = llmJsonSchema(draftPromptSchema)
-
-/**
- * Validates the model's answer. Throws a message fit to show the designer
- * when it was cut off, is not JSON, or misses a field.
- */
-export function parseDraftPrompt(
-  content: string,
-  finishReason: string | null,
-): DraftPromptResult {
-  if (finishReason === 'length') {
-    throw new Error('The drafted prompt was cut off by the model. Try again.')
-  }
-  let json: unknown
-  try {
-    json = JSON.parse(content)
-  } catch {
-    throw new Error('The model did not return a valid prompt. Try again.')
-  }
-  const parsed = draftPromptSchema.safeParse(json)
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0]
-    throw new Error(
-      `The drafted prompt was incomplete (${issue ? `${issue.path.join('.')}: ${issue.message}` : 'invalid'}). Try again.`,
-    )
-  }
-
-  return parsed.data
-}
-
 @Injectable()
 export class RoundsService {
   private readonly logger = new Logger(RoundsService.name)
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llm: LlmClient,
+    private readonly drafter: PromptDrafter,
   ) {}
 
   list(
@@ -280,7 +213,9 @@ export class RoundsService {
   }
 
   /**
-   * Streams the structured prompt drafting via LLM.
+   * Streams the drafting of a story's structured A/B prompt: loads the
+   * story, design intent and persona, and relays {@link PromptDrafter}'s
+   * progress as server-sent events.
    */
   streamDraftPrompt(
     projectId: string,
@@ -333,18 +268,6 @@ export class RoundsService {
             },
           })
 
-          const defaultGoal =
-            story.acceptanceCriteria ||
-            story.title ||
-            'Complete the primary user workflow successfully.'
-          const defaultProblem =
-            story.problemStatement ||
-            'Users need a more efficient way to accomplish this task.'
-          const ds = intent?.designSystem === 'MUI' ? 'Material UI' : 'shadcn'
-          const standard = intent?.designStandards?.[0] || 'WCAG 2.2 AA'
-          const color = intent?.primaryColor || '#F2652A'
-          const defaultMustUse = `Use ${ds} components only and meet ${standard}. Use ${color} for primary actions. Keep copy plain and friendly, and provide clear user feedback.`
-
           subscriber.next({
             data: {
               status: 'Drafting your prompt with AI...',
@@ -352,7 +275,7 @@ export class RoundsService {
             },
           })
 
-          if (!this.llm.configured) {
+          if (!this.drafter.configured) {
             subscriber.error(
               new BadRequestException(
                 'LLM provider is not configured on the backend. Please verify LLM_BASE_URL and LLM_API_KEY.',
@@ -361,91 +284,35 @@ export class RoundsService {
             return
           }
 
+          // Progress is relayed at most every THROTTLE_MS.
           let lastSent = 0
           const THROTTLE_MS = 400
+          const throttled = (data: Record<string, unknown>) => {
+            const now = Date.now()
+            if (now - lastSent < THROTTLE_MS) {
+              return
+            }
+            lastSent = now
+            subscriber.next({ data })
+          }
 
-          const completion = await this.llm.structured({
-            schemaName: 'StructuredPromptReview',
-            schema: DRAFT_PROMPT_JSON_SCHEMA,
-            signal: abortController.signal,
-            model: this.llm.analysisModel,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are an expert UX design strategist. Your task is to draft a structured prompt for A/B UI variant generation based on the user story, design intent, and persona. Keep Variant A and B differing in exactly one key dimension (e.g. single-page direct flow vs staged guided flow).',
-              },
-              {
-                role: 'user',
-                content: JSON.stringify({
-                  userStory: {
-                    title: story.title,
-                    description: story.description,
-                    problemStatement: story.problemStatement,
-                    acceptanceCriteria: story.acceptanceCriteria,
-                  },
-                  designIntent: intent
-                    ? {
-                        statement: intent.statement,
-                        designSystem: intent.designSystem,
-                        designStandards: intent.designStandards,
-                        primaryColor: intent.primaryColor,
-                        secondaryColor: intent.secondaryColor,
-                        accentColor: intent.accentColor,
-                        brandGuidelines: intent.brandGuidelines,
-                        toneOfVoice: intent.toneOfVoice,
-                      }
-                    : null,
-                  persona: persona
-                    ? {
-                        name: persona.name,
-                        age: persona.age,
-                        shortDescription: persona.shortDescription,
-                        frustrations: persona.frustrations,
-                        goals: persona.goals,
-                      }
-                    : null,
-                  defaults: {
-                    goal: defaultGoal,
-                    problem: defaultProblem,
-                    mustUse: defaultMustUse,
-                  },
-                }),
-              },
-            ],
-            onThoughtDelta: (_chunk, totalThought) => {
-              const now = Date.now()
-              if (now - lastSent < THROTTLE_MS) {
-                return
-              }
-              lastSent = now
-              subscriber.next({
-                data: {
+          const parsed = await this.drafter.draft(
+            { story, intent, persona },
+            {
+              signal: abortController.signal,
+              onThought: (thought) =>
+                throttled({
                   status: 'Reasoning about prompt strategy...',
                   stage: 'llm_streaming',
-                  thought: totalThought,
-                },
-              })
-            },
-            onDelta: (chars) => {
-              const now = Date.now()
-              if (now - lastSent < THROTTLE_MS) {
-                return
-              }
-              lastSent = now
-              subscriber.next({
-                data: {
+                  thought,
+                }),
+              onDelta: (charsReceived) =>
+                throttled({
                   status: 'Drafting your prompt with AI...',
                   stage: 'llm_streaming',
-                  charsReceived: chars,
-                },
-              })
+                  charsReceived,
+                }),
             },
-          })
-
-          const parsed = parseDraftPrompt(
-            completion.content,
-            completion.finishReason,
           )
           subscriber.next({
             data: {

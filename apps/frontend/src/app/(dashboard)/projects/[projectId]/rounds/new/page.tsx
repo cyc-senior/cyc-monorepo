@@ -26,33 +26,11 @@ import {
 import { Brain, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getUserStoryById,
   updateUserStory,
   createDesignRound,
   startGenerationJob,
-  getDesignIntent,
-  listPersonas,
-  UserStoryItem,
-  DesignIntentDetail,
-  PersonaItem,
 } from "@/lib/project-client";
-import { API_URL } from "@/lib/api-client";
-import { fetchSse, readSseStream, sseErrorMessage } from "@/lib/sse";
-
-/** One progress frame of `GET .../rounds/draft-prompt/events`. */
-interface DraftPromptEvent {
-  status?: string;
-  stage?: string;
-  thought?: string;
-  prompt?: {
-    goal?: string;
-    problem?: string;
-    mustUse?: string;
-    comparisonQuestion?: string;
-    variantA?: { name?: string; description?: string };
-    variantB?: { name?: string; description?: string };
-  };
-}
+import { useDraftPrompt } from "@/components/generation/use-draft-prompt";
 
 function ReviewStructuredPromptContent() {
   const params = useParams();
@@ -62,10 +40,6 @@ function ReviewStructuredPromptContent() {
   const projectId = params.projectId as string;
   const storyId = searchParams.get("storyId");
 
-  const [story, setStory] = React.useState<UserStoryItem | null>(null);
-  const [intent, setIntent] = React.useState<DesignIntentDetail | null>(null);
-  const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
-  const [selectedPersonaId, setSelectedPersonaId] = React.useState<string>("");
 
   // Editable prompt fields - strictly populated by backend AI response
   const [goalText, setGoalText] = React.useState("");
@@ -86,148 +60,33 @@ function ReviewStructuredPromptContent() {
   const [isEditingDiff, setIsEditingDiff] = React.useState(false);
 
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [backendStatus, setBackendStatus] = React.useState<string | null>(
-    "Drafting your prompt with AI..."
-  );
-  const [thoughtText, setThoughtText] = React.useState<string>("");
-
-  const retryRef = React.useRef<() => void>(() => {});
   /** The round made by an earlier "Approve & generate" whose job did not start. */
   const createdRoundIdRef = React.useRef<string | null>(null);
 
-  React.useEffect(() => {
-    let isCancelled = false;
-    let abortController = new AbortController();
-
-    async function loadData() {
-      if (!storyId || !projectId) return;
-
-      abortController.abort();
-      abortController = new AbortController();
-
-      setIsLoading(true);
-      setError(null);
-      setBackendStatus("Drafting your prompt with AI...");
-
-      try {
-        const [storyData, intentData, personaList] = await Promise.all([
-          getUserStoryById(projectId, storyId),
-          getDesignIntent(projectId).catch(() => null),
-          listPersonas(projectId).catch(() => []),
-        ]);
-
-        if (isCancelled || abortController.signal.aborted) return;
-
-        setStory(storyData);
-        setIntent(intentData);
-        setPersonas(personaList);
-
-        const initialPersona = personaList[0];
-        const personaIdToUse = initialPersona?.id || "";
-        setSelectedPersonaId(personaIdToUse);
-
-        // Start SSE stream from backend to draft prompt
-        const sseUrl = `${API_URL}/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
-          personaIdToUse ? `&personaId=${personaIdToUse}` : ""
-        }`;
-
-        try {
-          const res = await fetchSse(sseUrl, abortController.signal);
-
-          if (!res.ok || !res.body) {
-            const errText = await res.text().catch(() => "");
-            let errorMsg = `Backend stream failed (${res.status} ${res.statusText})`;
-            try {
-              const parsedErr = JSON.parse(errText);
-              if (parsedErr?.message) errorMsg = parsedErr.message;
-            } catch {
-              if (errText) errorMsg += `: ${errText}`;
-            }
-            setError(errorMsg);
-            setIsLoading(false);
-            setBackendStatus(null);
-            return;
-          }
-
-          // The backend reports a failure as an `event: error` frame whose
-          // data is the plain error message (not JSON): surface it.
-          const outcome: { drafted: boolean; error: string | null } = {
-            drafted: false,
-            error: null,
-          };
-          await readSseStream(res.body, (event) => {
-            if (event.type === "error") {
-              outcome.error = sseErrorMessage(event.data, "Drafting the prompt failed.");
-              return false;
-            }
-            const parsed = event.data as DraftPromptEvent;
-            if (!parsed || typeof parsed !== "object") return;
-            if (parsed.status) setBackendStatus(parsed.status);
-            if (parsed.thought) setThoughtText(parsed.thought);
-
-            if (parsed.prompt) {
-              const p = parsed.prompt;
-              if (p.goal) setGoalText(p.goal);
-              if (p.problem) setProblemText(p.problem);
-              if (p.mustUse) setMustUseText(p.mustUse);
-              if (p.comparisonQuestion) setComparisonQuestion(p.comparisonQuestion);
-              if (p.variantA?.name) setDesignAName(p.variantA.name);
-              if (p.variantA?.description) setDesignADesc(p.variantA.description);
-              if (p.variantB?.name) setDesignBName(p.variantB.name);
-              if (p.variantB?.description) setDesignBDesc(p.variantB.description);
-              outcome.drafted = true;
-              setIsLoading(false);
-              setBackendStatus(null);
-            }
-          });
-
-          if (!abortController.signal.aborted && !isCancelled) {
-            if (outcome.error) {
-              setError(outcome.error);
-            } else if (!outcome.drafted) {
-              setError("Drafting ended before the prompt was ready. Try again.");
-            }
-          }
-        } catch (fetchErr: unknown) {
-          if ((fetchErr as Error).name !== "AbortError") {
-            const msg = (fetchErr as Error).message || "Failed to connect to prompt drafting service.";
-            setError(msg);
-          }
-        } finally {
-          if (!isCancelled && !abortController.signal.aborted) {
-            setIsLoading(false);
-            setBackendStatus(null);
-          }
-        }
-      } catch (err: unknown) {
-        if (!isCancelled && !abortController.signal.aborted) {
-          const msg = (err as Error).message || "Failed to load project details for prompt drafting.";
-          setError(msg);
-          setIsLoading(false);
-          setBackendStatus(null);
-        }
-      }
-    }
-
-    retryRef.current = () => {
-      void loadData();
-    };
-
-    if (projectId && storyId) {
-      void loadData();
-    }
-
-    return () => {
-      isCancelled = true;
-      abortController.abort();
-    };
-  }, [projectId, storyId]);
-
-  const handleRetry = () => {
-    retryRef.current();
-  };
+  const {
+    story,
+    intent,
+    personas,
+    draftedPersonaId,
+    error,
+    setError,
+    isLoading,
+    backendStatus,
+    thoughtText,
+    retry: handleRetry,
+  } = useDraftPrompt(projectId, storyId, (p) => {
+    if (p.goal) setGoalText(p.goal);
+    if (p.problem) setProblemText(p.problem);
+    if (p.mustUse) setMustUseText(p.mustUse);
+    if (p.comparisonQuestion) setComparisonQuestion(p.comparisonQuestion);
+    if (p.variantA?.name) setDesignAName(p.variantA.name);
+    if (p.variantA?.description) setDesignADesc(p.variantA.description);
+    if (p.variantB?.name) setDesignBName(p.variantB.name);
+    if (p.variantB?.description) setDesignBDesc(p.variantB.description);
+  });
+  // The persona the designer picked, else the one the prompt was drafted for.
+  const [personaChoice, setSelectedPersonaId] = React.useState<string | null>(null);
+  const selectedPersonaId = personaChoice ?? draftedPersonaId;
 
   // The goal only shapes this prompt. It is not written back to the story:
   // the story's acceptance criteria are the designer's, not the AI's goal.

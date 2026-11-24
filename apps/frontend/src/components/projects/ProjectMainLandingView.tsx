@@ -4,9 +4,6 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -28,137 +25,16 @@ import {
   Analytics01Icon,
   Edit02Icon,
 } from "@hugeicons/core-free-icons";
-import {
-  getProjectById,
-  updateProject,
-  listUserStories,
-  listTestSessions,
-  listReports,
-  listAuditLogs,
-  ProjectDetails,
-  UserStoryItem,
-  TestSessionItem,
-  ReportItem,
-  AuditLogItem,
-} from "@/lib/project-client";
+import type { AuditLogItem } from "@/lib/project-client";
 import { localizeAuditLog } from "@/lib/audit-localization";
-import { getGenerationJob, getVariant } from "@/lib/generation-client";
+import {
+  ActivityButton,
+  formatRelativeTime,
+  getActivityButton,
+} from "@/lib/project-activity";
+import { EditProjectDialog } from "./EditProjectDialog";
+import { useProjectOverview } from "./use-project-overview";
 import { storyContinueHref } from "@/lib/design-cycle";
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} h ago`;
-  if (diffDays < 7) return `${diffDays} d ago`;
-  return date.toLocaleDateString();
-}
-
-interface ActivityButton {
-  label: string;
-  /** Known link, or… */
-  href?: string;
-  /** …a link that needs a lookup first (e.g. which round a variant is in). */
-  resolve?: () => Promise<string>;
-}
-
-function designLinks(projectId: string) {
-  const refine = (roundId: string) => `/projects/${projectId}/rounds/${roundId}/refine`;
-  const progress = (roundId: string, jobId: string) =>
-    `/projects/${projectId}/rounds/${roundId}/generate?job=${jobId}`;
-  return { refine, progress };
-}
-
-function getActivityButton(log: AuditLogItem, projectId: string): ActivityButton | null {
-  const { refine, progress } = designLinks(projectId);
-  const roundId = typeof log.changes?.roundId === "string" ? log.changes.roundId : null;
-
-  // Generated designs: open them, or the generation's progress page.
-  if (log.entityType === "GenerationJob" && log.entityId) {
-    const refinement =
-      log.changes?.refinement === true || Boolean(log.changes?.body?.baseVariantId);
-    if (log.action === "GenerationJob.complete" && roundId) {
-      return { label: "Refine", href: refine(roundId) };
-    }
-    // Refinements show their progress in the Refine page's chat; only the
-    // first A/B generation has its own Generating page.
-    if (refinement && roundId) {
-      return { label: "View", href: refine(roundId) };
-    }
-    if ((log.action === "GenerationJob.fail" || log.action === "GenerationJob.start") && roundId) {
-      return { label: "View", href: progress(roundId, log.entityId) };
-    }
-    const jobId = log.entityId;
-    return {
-      label: "View",
-      resolve: async () => {
-        const job = await getGenerationJob(projectId, jobId);
-        if (job.status === "CANCELLED") {
-          const storyId = job.inputSnapshot?.stories?.[0]?.id;
-          return storyId ? `/projects/${projectId}/rounds/new?storyId=${storyId}` : `/projects/${projectId}`;
-        }
-        return job.status === "SUCCEEDED" || job.baseVariantId
-          ? refine(job.roundId)
-          : progress(job.roundId, job.id);
-      },
-    };
-  }
-  if (log.entityType === "UIVariant" && log.entityId && log.action !== "UIVariant.delete") {
-    const variantId = log.entityId;
-    return {
-      label: "Preview",
-      resolve: async () => refine((await getVariant(projectId, variantId)).roundId),
-    };
-  }
-  if (log.action.startsWith("FeedbackTheme") || log.action.includes("cancel") || log.action.includes("reject")) {
-    return {
-      label: "Step in",
-      href: `/projects/${projectId}/sessions`,
-    };
-  }
-  if (log.entityType === "UserStory") {
-    return {
-      label: "View",
-      href: `/projects/${projectId}/stories`,
-    };
-  }
-  if (log.entityType === "TestSession") {
-    return {
-      label: "View",
-      href: `/projects/${projectId}/sessions`,
-    };
-  }
-  if (log.entityType === "Report") {
-    return {
-      label: "View",
-      href: `/projects/${projectId}/reports`,
-    };
-  }
-  if (log.entityType === "DesignIntent") {
-    return {
-      label: "View",
-      href: `/projects/${projectId}/setup/intent`,
-    };
-  }
-  return null;
-}
-
-interface ProjectDataCache {
-  project: ProjectDetails;
-  stories: UserStoryItem[];
-  sessions: TestSessionItem[];
-  reports: ReportItem[];
-  auditLogs: AuditLogItem[];
-  timestamp: number;
-}
-
-const projectDataCache = new Map<string, ProjectDataCache>();
 
 export function ProjectMainLandingView({
   initialTab,
@@ -187,33 +63,14 @@ export function ProjectMainLandingView({
     }
   };
 
-  const cachedData = projectDataCache.get(projectId);
+  const { project, stories, sessions, reports, auditLogs, isLoading, projectUpdated } =
+    useProjectOverview(projectId);
 
-  const [project, setProject] = React.useState<ProjectDetails | null>(
-    cachedData ? cachedData.project : null
-  );
-  const [stories, setStories] = React.useState<UserStoryItem[]>(
-    cachedData ? cachedData.stories : []
-  );
-  const [sessions, setSessions] = React.useState<TestSessionItem[]>(
-    cachedData ? cachedData.sessions : []
-  );
-  const [reports, setReports] = React.useState<ReportItem[]>(
-    cachedData ? cachedData.reports : []
-  );
-  const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>(
-    cachedData ? cachedData.auditLogs : []
-  );
   const [selectedActivity, setSelectedActivity] = React.useState<AuditLogItem | null>(null);
   const [activityError, setActivityError] = React.useState<string | null>(null);
 
-  // Edit project modal state
   const [isEditProjectOpen, setIsEditProjectOpen] = React.useState(false);
-  const [editName, setEditName] = React.useState("");
-  const [editClientOrProduct, setEditClientOrProduct] = React.useState("");
-  const [editDescription, setEditDescription] = React.useState("");
-  const [isUpdatingProject, setIsUpdatingProject] = React.useState(false);
-  const [editProjectError, setEditProjectError] = React.useState<string | null>(null);
+  const [editDialogKey, setEditDialogKey] = React.useState(0);
 
   /** Follows an activity button, looking its link up first when needed. */
   const openActivity = async (button: ActivityButton) => {
@@ -226,65 +83,11 @@ export function ProjectMainLandingView({
     }
   };
 
-  // Only show initial loading state if we have no cached data at all
-  const [isLoading, setIsLoading] = React.useState(!cachedData);
-
   const latestAuditLogs = React.useMemo(() => {
     return [...auditLogs]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 4);
   }, [auditLogs]);
-
-  React.useEffect(() => {
-    let active = true;
-
-    async function loadData() {
-      // Do not flash full-screen loading if we already have cached data
-      if (!projectDataCache.has(projectId)) {
-        setIsLoading(true);
-      }
-      try {
-        const [proj, userStories, testSessions, reportItems, logs] = await Promise.all([
-          getProjectById(projectId),
-          listUserStories(projectId).catch(() => []),
-          listTestSessions(projectId).catch(() => []),
-          listReports(projectId).catch(() => []),
-          listAuditLogs(projectId).catch(() => []),
-        ]);
-
-        if (!active) return;
-
-        projectDataCache.set(projectId, {
-          project: proj,
-          stories: userStories,
-          sessions: testSessions,
-          reports: reportItems,
-          auditLogs: logs,
-          timestamp: Date.now(),
-        });
-
-        setProject(proj);
-        setStories(userStories);
-        setSessions(testSessions);
-        setReports(reportItems);
-        setAuditLogs(logs);
-      } catch (err) {
-        console.error("Failed to load project:", err);
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    if (projectId) {
-      loadData();
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [projectId]);
 
   if (isLoading) {
     return (
@@ -306,50 +109,8 @@ export function ProjectMainLandingView({
   }
 
   const openEditModal = () => {
-    if (!project) return;
-    setEditName(project.name);
-    setEditClientOrProduct(project.clientOrProduct || "");
-    setEditDescription(project.description || "");
-    setEditProjectError(null);
+    setEditDialogKey((key) => key + 1);
     setIsEditProjectOpen(true);
-  };
-
-  const handleSaveProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editName.trim()) {
-      setEditProjectError("Project title is required.");
-      return;
-    }
-    if (!editClientOrProduct.trim()) {
-      setEditProjectError("Target user or client is required.");
-      return;
-    }
-
-    setIsUpdatingProject(true);
-    setEditProjectError(null);
-    try {
-      const updated = await updateProject(projectId, {
-        name: editName.trim(),
-        clientOrProduct: editClientOrProduct.trim(),
-        description: editDescription.trim() || undefined,
-      });
-      setProject(updated);
-      const existing = projectDataCache.get(projectId);
-      if (existing) {
-        projectDataCache.set(projectId, {
-          ...existing,
-          project: updated,
-        });
-      }
-      setIsEditProjectOpen(false);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to update project.";
-      setEditProjectError(msg);
-    } finally {
-      setIsUpdatingProject(false);
-    }
   };
 
   const latestReport = reports.length > 0 ? reports[0] : null;
@@ -1266,94 +1027,14 @@ export function ProjectMainLandingView({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Project Dialog */}
-      <Dialog open={isEditProjectOpen} onOpenChange={setIsEditProjectOpen}>
-        <DialogContent className="max-w-md sm:max-w-lg rounded-[14px] p-6">
-          <form onSubmit={handleSaveProject} className="space-y-4">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-heading font-medium text-foreground">
-                Edit project details
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Update the project title, target users, or context description.
-              </DialogDescription>
-            </DialogHeader>
-
-            {editProjectError && (
-              <div className="rounded-[10px] bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-                {editProjectError}
-              </div>
-            )}
-
-            <div className="space-y-4 py-1">
-              <div className="space-y-1.5">
-                <Label htmlFor="project-title" className="text-sm font-medium text-foreground">
-                  Project title <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="project-title"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="e.g. Acme Bank mobile app"
-                  maxLength={160}
-                  className="rounded-[10px] text-sm"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="project-client" className="text-sm font-medium text-foreground">
-                  Target user or client <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="project-client"
-                  value={editClientOrProduct}
-                  onChange={(e) => setEditClientOrProduct(e.target.value)}
-                  placeholder="e.g. Students, young adults, retail shoppers"
-                  maxLength={160}
-                  className="rounded-[10px] text-sm"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="project-description" className="text-sm font-medium text-foreground">
-                  Description
-                </Label>
-                <Textarea
-                  id="project-description"
-                  rows={3}
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="What is this project aiming to solve?"
-                  maxLength={5000}
-                  className="rounded-[10px] text-sm leading-relaxed"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditProjectOpen(false)}
-                className="rounded-[10px] cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isUpdatingProject}
-                className="rounded-[10px] bg-primary text-primary-foreground hover:bg-primary-hover font-medium cursor-pointer"
-              >
-                {isUpdatingProject ? "Saving..." : "Save changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditProjectDialog
+        // A new key per opening starts the form from the current project.
+        key={editDialogKey}
+        open={isEditProjectOpen}
+        onOpenChange={setIsEditProjectOpen}
+        project={project}
+        onSaved={projectUpdated}
+      />
     </div>
   );
 }
