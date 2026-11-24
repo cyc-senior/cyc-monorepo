@@ -1,9 +1,5 @@
-import {
-  API_URL,
-  apiFetch,
-  getAccessToken,
-  refreshAccessToken,
-} from "@/lib/api-client";
+import { API_URL, apiFetch } from "@/lib/api-client";
+import { fetchSse, readSseStream } from "@/lib/sse";
 
 /** Backend generation job lifecycle. */
 export type GenerationJobStatus =
@@ -269,63 +265,36 @@ export async function followJobEvents(
   signal: AbortSignal
 ): Promise<void> {
   const url = `${API_URL}/projects/${projectId}/generation-jobs/${jobId}/events`;
-  let refreshed = false;
 
   while (!signal.aborted) {
     let finished = false;
     try {
-      const res = await fetch(url, {
-        headers: {
-          Accept: "text/event-stream",
-          Authorization: `Bearer ${getAccessToken() ?? ""}`,
-        },
-        credentials: "include",
-        signal,
-      });
-      if (res.status === 401 && !refreshed) {
-        refreshed = true;
-        if (await refreshAccessToken()) continue;
+      const res = await fetchSse(url, signal);
+      if (res.status >= 400 && res.status < 410) {
+        // Bad request, still unauthorized, forbidden, not found: retrying
+        // will not help. (Rate limits and server errors reconnect.)
+        throw new JobStreamError(res.status);
       }
       if (!res.ok || !res.body) {
         throw new Error(`Event stream failed (${res.status})`);
       }
-      refreshed = false;
-
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += value;
-        let split: number;
-        while ((split = buffer.indexOf("\n\n")) !== -1) {
-          const event = parseEvent(buffer.slice(0, split));
-          buffer = buffer.slice(split + 2);
-          if (!event) continue;
-          onEvent(event);
-          if (FINAL_EVENTS.has(event.type)) finished = true;
-        }
-      }
+      await readSseStream(res.body, (event) => {
+        if (typeof event.data !== "object" || event.data === null) return;
+        onEvent(event as JobEvent);
+        if (FINAL_EVENTS.has(event.type)) finished = true;
+      });
     } catch (error) {
       if (signal.aborted) return;
-      if (error instanceof Error && error.message.includes("(40")) throw error;
+      if (error instanceof JobStreamError) throw error;
     }
     if (finished) return;
     await new Promise((resolve) => setTimeout(resolve, RECONNECT_MS));
   }
 }
 
-function parseEvent(raw: string): JobEvent | null {
-  let type = "message";
-  const data: string[] = [];
-  for (const line of raw.split("\n")) {
-    if (line.startsWith("event:")) type = line.slice(6).trim();
-    else if (line.startsWith("data:")) data.push(line.slice(5).trim());
-  }
-  if (type === "heartbeat" || data.length === 0) return null;
-  try {
-    return { type, data: JSON.parse(data.join("\n")) } as JobEvent;
-  } catch {
-    return null;
+/** The job stream was refused (4xx); reconnecting will not help. */
+export class JobStreamError extends Error {
+  constructor(readonly status: number) {
+    super(`Event stream failed (${status})`);
   }
 }

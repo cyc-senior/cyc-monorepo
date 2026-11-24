@@ -36,8 +36,8 @@ import {
   DesignIntentDetail,
   PersonaItem,
 } from "@/lib/project-client";
-import { API_URL, getAccessToken, refreshAccessToken } from "@/lib/api-client";
-import { readSseStream, sseErrorMessage } from "@/lib/sse";
+import { API_URL } from "@/lib/api-client";
+import { fetchSse, readSseStream, sseErrorMessage } from "@/lib/sse";
 
 /** One progress frame of `GET .../rounds/draft-prompt/events`. */
 interface DraftPromptEvent {
@@ -134,15 +134,7 @@ function ReviewStructuredPromptContent() {
         }`;
 
         try {
-          const token = getAccessToken() || (await refreshAccessToken());
-          const res = await fetch(sseUrl, {
-            signal: abortController.signal,
-            headers: {
-              Accept: "text/event-stream",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            credentials: "include",
-          });
+          const res = await fetchSse(sseUrl, abortController.signal);
 
           if (!res.ok || !res.body) {
             const errText = await res.text().catch(() => "");

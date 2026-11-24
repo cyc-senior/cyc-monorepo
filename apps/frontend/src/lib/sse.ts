@@ -2,6 +2,28 @@
  * Minimal Server-Sent Events reader for `fetch` responses. The browser's
  * EventSource cannot send a bearer token, so streams are read with fetch.
  */
+import { getAccessToken, refreshAccessToken } from "@/lib/api-client";
+
+/**
+ * Opens an authenticated SSE stream. On a 401 the access token is refreshed
+ * once and the request repeated, like the axios client does.
+ */
+export async function fetchSse(url: string, signal: AbortSignal): Promise<Response> {
+  const open = (token: string | null) =>
+    fetch(url, {
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: "include",
+      signal,
+    });
+
+  const res = await open(getAccessToken() ?? (await refreshAccessToken()));
+  if (res.status !== 401) return res;
+  const refreshed = await refreshAccessToken();
+  return refreshed ? open(refreshed) : res;
+}
 
 export interface SseEvent {
   /** The `event:` field; `message` when the server sent none. */
