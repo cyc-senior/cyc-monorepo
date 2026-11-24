@@ -29,18 +29,20 @@ function BreadcrumbPathnameSync({
   onSetProject: (proj: ProjectDetails | null) => void;
 }) {
   const pathname = usePathname();
-  const [prevPathname, setPrevPathname] = useState("");
+  const prevPathnameRef = React.useRef(pathname);
 
   const match = pathname.match(/\/projects\/([a-zA-Z0-9-]+)/);
   const projectId = match && match[1] !== "new" ? match[1] : null;
 
-  if (prevPathname !== pathname) {
-    setPrevPathname(pathname);
-    onResetCustom();
-    if (!projectId) {
-      onSetProject(null);
+  useEffect(() => {
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      onResetCustom();
+      if (!projectId) {
+        onSetProject(null);
+      }
     }
-  }
+  }, [pathname, projectId, onResetCustom, onSetProject]);
 
   useEffect(() => {
     if (!projectId) {

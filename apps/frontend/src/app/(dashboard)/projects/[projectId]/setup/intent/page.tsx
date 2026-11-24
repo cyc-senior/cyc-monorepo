@@ -56,6 +56,7 @@ export default function DesignIntentStep2Page() {
   const [personas, setPersonas] = React.useState<PersonaItem[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = React.useState(false);
 
   // Modal 12C: Add brand colour State matching Figma Node 915:20674
   const [isAddColorModalOpen, setIsAddColorModalOpen] = React.useState(false);
@@ -87,6 +88,7 @@ export default function DesignIntentStep2Page() {
           listPersonas(projectId).catch(() => []),
         ]);
         if (intent) {
+          setIsEditMode(true);
           if (intent.statement) setToneNotes(intent.statement);
           if (intent.brandGuidelines) setCiGuideline(intent.brandGuidelines);
           if (intent.toneOfVoice) {
@@ -226,7 +228,11 @@ export default function DesignIntentStep2Page() {
         toneOfVoice: toneTags.join(", ") || undefined,
       });
 
-      router.push(`/projects/${projectId}/setup/team`);
+      if (isEditMode) {
+        router.push(`/projects/${projectId}`);
+      } else {
+        router.push(`/projects/${projectId}/setup/team`);
+      }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -728,8 +734,7 @@ export default function DesignIntentStep2Page() {
             asChild
             className="gap-2 rounded-[10px] h-8 px-3 font-medium text-sm border-border cursor-pointer hover:bg-muted"
           >
-            {/* TODO : 404 Not Found */}
-            <Link href={`/projects/${projectId}/setup/story`}>
+            <Link href={`/projects/${projectId}`}>
               <HugeIcon icon={ArrowLeft01Icon} size={16} />
               <span>Back</span>
             </Link>
@@ -740,8 +745,14 @@ export default function DesignIntentStep2Page() {
             disabled={isSubmitting}
             className="gap-2 rounded-[10px] h-8 px-3.5 font-medium text-sm bg-primary text-primary-foreground hover:bg-primary-hover cursor-pointer"
           >
-            <span>{isSubmitting ? "Saving..." : "Next: team & roles"}</span>
-            <HugeIcon icon={ArrowRight01Icon} size={16} />
+            <span>
+              {isSubmitting
+                ? "Saving..."
+                : isEditMode
+                ? "Save design intent"
+                : "Next: team & roles"}
+            </span>
+            <HugeIcon icon={isEditMode ? Tick02Icon : ArrowRight01Icon} size={16} />
           </Button>
         </div>
       </form>

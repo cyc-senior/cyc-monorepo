@@ -207,6 +207,16 @@ export async function getProjectById(projectId: string): Promise<ProjectDetails>
   return getProject(projectId);
 }
 
+export async function updateProject(
+  projectId: string,
+  payload: Partial<CreateProjectPayload>
+): Promise<ProjectDetails> {
+  return apiFetch<ProjectDetails>(`/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 /** Design intent API calls */
 export async function getDesignIntent(
   projectId: string

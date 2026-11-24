@@ -35,7 +35,7 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
       key: "story",
       label: "User story",
       state: "done",
-      href: `/projects/${projectId}?tab=stories`,
+      href: `/projects/${projectId}/stories`,
     },
     {
       key: "prompt",
@@ -54,7 +54,7 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
       key: "test",
       label: "Test setup",
       state: approved ? "current" : "todo",
-      href: approved ? `/projects/${projectId}?tab=sessions` : undefined,
+      href: approved ? `/projects/${projectId}/sessions` : undefined,
     },
   ];
 }

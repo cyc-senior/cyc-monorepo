@@ -231,8 +231,8 @@ export function ProjectsNav() {
                     <span className="truncate">Overview</span>
                   </Link>
                   <Link
-                    href={`${base}?tab=stories`}
-                    className={itemClass(here && ((pathname === base && tab === "stories") || pathname === `${base}/stories/new`))}
+                    href={`${base}/stories`}
+                    className={itemClass(here && (pathname === `${base}/stories` || pathname === `${base}/stories/new`))}
                   >
                     <span className="truncate">User stories</span>
                   </Link>

@@ -4,6 +4,9 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -23,9 +26,11 @@ import {
   ViewIcon,
   UserGroupIcon,
   Analytics01Icon,
+  Edit02Icon,
 } from "@hugeicons/core-free-icons";
 import {
   getProjectById,
+  updateProject,
   listUserStories,
   listTestSessions,
   listReports,
@@ -110,25 +115,25 @@ function getActivityButton(log: AuditLogItem, projectId: string): ActivityButton
   if (log.action.startsWith("FeedbackTheme") || log.action.includes("cancel") || log.action.includes("reject")) {
     return {
       label: "Step in",
-      href: `/projects/${projectId}?tab=sessions`,
+      href: `/projects/${projectId}/sessions`,
     };
   }
   if (log.entityType === "UserStory") {
     return {
       label: "View",
-      href: `/projects/${projectId}?tab=stories`,
+      href: `/projects/${projectId}/stories`,
     };
   }
   if (log.entityType === "TestSession") {
     return {
       label: "View",
-      href: `/projects/${projectId}?tab=sessions`,
+      href: `/projects/${projectId}/sessions`,
     };
   }
   if (log.entityType === "Report") {
     return {
       label: "View",
-      href: `/projects/${projectId}?tab=reports`,
+      href: `/projects/${projectId}/reports`,
     };
   }
   if (log.entityType === "DesignIntent") {
@@ -140,41 +145,71 @@ function getActivityButton(log: AuditLogItem, projectId: string): ActivityButton
   return null;
 }
 
-function ProjectMainLandingView() {
+interface ProjectDataCache {
+  project: ProjectDetails;
+  stories: UserStoryItem[];
+  sessions: TestSessionItem[];
+  reports: ReportItem[];
+  auditLogs: AuditLogItem[];
+  timestamp: number;
+}
+
+const projectDataCache = new Map<string, ProjectDataCache>();
+
+export function ProjectMainLandingView({
+  initialTab,
+}: {
+  initialTab?: "overview" | "stories" | "sessions" | "reports";
+}) {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const projectId = params.projectId as string;
 
-  // Active tab synchronized with URL query parameter ?tab=...
-  const tabFromUrl = searchParams.get("tab");
   const validTabs = ["overview", "stories", "sessions", "reports"] as const;
   type TabType = (typeof validTabs)[number];
 
-  const activeTab: TabType = (
-    validTabs.includes(tabFromUrl as TabType) ? tabFromUrl : "overview"
-  ) as TabType;
+  // Active tab prefers explicit initialTab prop, then query param ?tab=, then defaults to "overview"
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab: TabType =
+    initialTab ||
+    (validTabs.includes(tabFromUrl as TabType) ? (tabFromUrl as TabType) : "overview");
 
   const setActiveTab = (tab: TabType) => {
-    const sp = new URLSearchParams(searchParams.toString());
     if (tab === "overview") {
-      sp.delete("tab");
+      router.push(`/projects/${projectId}`);
     } else {
-      sp.set("tab", tab);
+      router.push(`/projects/${projectId}/${tab}`);
     }
-    const query = sp.toString();
-    router.replace(query ? `/projects/${projectId}?${query}` : `/projects/${projectId}`, {
-      scroll: false,
-    });
   };
 
-  const [project, setProject] = React.useState<ProjectDetails | null>(null);
-  const [stories, setStories] = React.useState<UserStoryItem[]>([]);
-  const [sessions, setSessions] = React.useState<TestSessionItem[]>([]);
-  const [reports, setReports] = React.useState<ReportItem[]>([]);
-  const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>([]);
+  const cachedData = projectDataCache.get(projectId);
+
+  const [project, setProject] = React.useState<ProjectDetails | null>(
+    cachedData ? cachedData.project : null
+  );
+  const [stories, setStories] = React.useState<UserStoryItem[]>(
+    cachedData ? cachedData.stories : []
+  );
+  const [sessions, setSessions] = React.useState<TestSessionItem[]>(
+    cachedData ? cachedData.sessions : []
+  );
+  const [reports, setReports] = React.useState<ReportItem[]>(
+    cachedData ? cachedData.reports : []
+  );
+  const [auditLogs, setAuditLogs] = React.useState<AuditLogItem[]>(
+    cachedData ? cachedData.auditLogs : []
+  );
   const [selectedActivity, setSelectedActivity] = React.useState<AuditLogItem | null>(null);
   const [activityError, setActivityError] = React.useState<string | null>(null);
+
+  // Edit project modal state
+  const [isEditProjectOpen, setIsEditProjectOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState("");
+  const [editClientOrProduct, setEditClientOrProduct] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [isUpdatingProject, setIsUpdatingProject] = React.useState(false);
+  const [editProjectError, setEditProjectError] = React.useState<string | null>(null);
 
   /** Follows an activity button, looking its link up first when needed. */
   const openActivity = async (button: ActivityButton) => {
@@ -186,7 +221,9 @@ function ProjectMainLandingView() {
       setActivityError("That item is no longer available.");
     }
   };
-  const [isLoading, setIsLoading] = React.useState(true);
+
+  // Only show initial loading state if we have no cached data at all
+  const [isLoading, setIsLoading] = React.useState(!cachedData);
 
   const latestAuditLogs = React.useMemo(() => {
     return [...auditLogs]
@@ -195,8 +232,13 @@ function ProjectMainLandingView() {
   }, [auditLogs]);
 
   React.useEffect(() => {
+    let active = true;
+
     async function loadData() {
-      setIsLoading(true);
+      // Do not flash full-screen loading if we already have cached data
+      if (!projectDataCache.has(projectId)) {
+        setIsLoading(true);
+      }
       try {
         const [proj, userStories, testSessions, reportItems, logs] = await Promise.all([
           getProjectById(projectId),
@@ -205,6 +247,18 @@ function ProjectMainLandingView() {
           listReports(projectId).catch(() => []),
           listAuditLogs(projectId).catch(() => []),
         ]);
+
+        if (!active) return;
+
+        projectDataCache.set(projectId, {
+          project: proj,
+          stories: userStories,
+          sessions: testSessions,
+          reports: reportItems,
+          auditLogs: logs,
+          timestamp: Date.now(),
+        });
+
         setProject(proj);
         setStories(userStories);
         setSessions(testSessions);
@@ -213,12 +267,19 @@ function ProjectMainLandingView() {
       } catch (err) {
         console.error("Failed to load project:", err);
       } finally {
-        setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     }
+
     if (projectId) {
       loadData();
     }
+
+    return () => {
+      active = false;
+    };
   }, [projectId]);
 
   if (isLoading) {
@@ -240,6 +301,53 @@ function ProjectMainLandingView() {
     );
   }
 
+  const openEditModal = () => {
+    if (!project) return;
+    setEditName(project.name);
+    setEditClientOrProduct(project.clientOrProduct || "");
+    setEditDescription(project.description || "");
+    setEditProjectError(null);
+    setIsEditProjectOpen(true);
+  };
+
+  const handleSaveProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim()) {
+      setEditProjectError("Project title is required.");
+      return;
+    }
+    if (!editClientOrProduct.trim()) {
+      setEditProjectError("Target user or client is required.");
+      return;
+    }
+
+    setIsUpdatingProject(true);
+    setEditProjectError(null);
+    try {
+      const updated = await updateProject(projectId, {
+        name: editName.trim(),
+        clientOrProduct: editClientOrProduct.trim(),
+        description: editDescription.trim() || undefined,
+      });
+      setProject(updated);
+      const existing = projectDataCache.get(projectId);
+      if (existing) {
+        projectDataCache.set(projectId, {
+          ...existing,
+          project: updated,
+        });
+      }
+      setIsEditProjectOpen(false);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to update project.";
+      setEditProjectError(msg);
+    } finally {
+      setIsUpdatingProject(false);
+    }
+  };
+
   const latestReport = reports.length > 0 ? reports[0] : null;
 
   return (
@@ -247,9 +355,24 @@ function ProjectMainLandingView() {
       {/* Page Header matching Figma Node 815:11865 (14A) & 815:12248 (14) */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="space-y-1.5 max-w-3xl">
-          <h1 className="text-3xl sm:text-4xl font-heading font-medium tracking-tight text-foreground">
-            {project.name}
-          </h1>
+          <div className="group flex items-center gap-2.5">
+            <h1
+              onClick={openEditModal}
+              className="text-3xl sm:text-4xl font-heading font-medium tracking-tight text-foreground cursor-pointer hover:underline hover:decoration-muted-foreground/40 underline-offset-4 transition-all"
+              title="Click to edit project details"
+            >
+              {project.name}
+            </h1>
+            <button
+              type="button"
+              onClick={openEditModal}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-[8px] hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label="Edit project details"
+              title="Edit project details"
+            >
+              <HugeIcon icon={Edit02Icon} size={20} />
+            </button>
+          </div>
           <p className="text-base text-muted-foreground leading-relaxed">
             {project.description || "Help students book a group study room without checking every room."}
           </p>
@@ -1136,6 +1259,95 @@ function ProjectMainLandingView() {
               </>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={isEditProjectOpen} onOpenChange={setIsEditProjectOpen}>
+        <DialogContent className="max-w-md sm:max-w-lg rounded-[14px] p-6">
+          <form onSubmit={handleSaveProject} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-heading font-medium text-foreground">
+                Edit project details
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Update the project title, target users, or context description.
+              </DialogDescription>
+            </DialogHeader>
+
+            {editProjectError && (
+              <div className="rounded-[10px] bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
+                {editProjectError}
+              </div>
+            )}
+
+            <div className="space-y-4 py-1">
+              <div className="space-y-1.5">
+                <Label htmlFor="project-title" className="text-sm font-medium text-foreground">
+                  Project title <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="project-title"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Acme Bank mobile app"
+                  maxLength={160}
+                  className="rounded-[10px] text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="project-client" className="text-sm font-medium text-foreground">
+                  Target user or client <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="project-client"
+                  value={editClientOrProduct}
+                  onChange={(e) => setEditClientOrProduct(e.target.value)}
+                  placeholder="e.g. Students, young adults, retail shoppers"
+                  maxLength={160}
+                  className="rounded-[10px] text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="project-description" className="text-sm font-medium text-foreground">
+                  Description
+                </Label>
+                <Textarea
+                  id="project-description"
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="What is this project aiming to solve?"
+                  maxLength={5000}
+                  className="rounded-[10px] text-sm leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditProjectOpen(false)}
+                className="rounded-[10px] cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isUpdatingProject}
+                className="rounded-[10px] bg-primary text-primary-foreground hover:bg-primary-hover font-medium cursor-pointer"
+              >
+                {isUpdatingProject ? "Saving..." : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
