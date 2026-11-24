@@ -15,6 +15,7 @@ export const API_URL = rawApiUrl.endsWith("/api")
 
 let inMemoryToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let initialRefreshAttempted = false;
 
 // Queue of pending requests waiting for an ongoing token refresh
 let pendingQueue: Array<(token: string | null) => void> = [];
@@ -121,6 +122,16 @@ api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig & { skipAuth?: boolean }) => {
     if (config.skipAuth) {
       return config;
+    }
+
+    // On browser page load/refresh, obtain the initial access token before firing requests
+    if (
+      !inMemoryToken &&
+      !initialRefreshAttempted &&
+      typeof window !== "undefined"
+    ) {
+      initialRefreshAttempted = true;
+      await refreshAccessToken();
     }
 
     // If an initial refresh or token rotation is in flight, wait for it

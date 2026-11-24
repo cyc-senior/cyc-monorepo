@@ -75,12 +75,15 @@ function ReviewStructuredPromptContent() {
     "Drafting your prompt with AI..."
   );
 
+  const inFlightDraftRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     let isCancelled = false;
     const abortController = new AbortController();
 
     async function loadData() {
-      if (!storyId) return;
+      if (!storyId || inFlightDraftRef.current === `${projectId}:${storyId}`) return;
+      inFlightDraftRef.current = `${projectId}:${storyId}`;
       setIsLoading(true);
       setBackendStatus("Drafting your prompt with AI...");
 
@@ -107,8 +110,8 @@ function ReviewStructuredPromptContent() {
         }`;
 
         try {
-          let token = getAccessToken();
-          let res = await fetch(sseUrl, {
+          const token = getAccessToken() || (await refreshAccessToken());
+          const res = await fetch(sseUrl, {
             signal: abortController.signal,
             headers: {
               Accept: "text/event-stream",
@@ -116,21 +119,6 @@ function ReviewStructuredPromptContent() {
             },
             credentials: "include",
           });
-
-          if (res.status === 401) {
-            const refreshed = await refreshAccessToken();
-            if (refreshed) {
-              token = getAccessToken();
-              res = await fetch(sseUrl, {
-                signal: abortController.signal,
-                headers: {
-                  Accept: "text/event-stream",
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                credentials: "include",
-              });
-            }
-          }
 
           if (!res.ok || !res.body) {
             const errText = await res.text().catch(() => "");
@@ -220,6 +208,7 @@ function ReviewStructuredPromptContent() {
 
     return () => {
       isCancelled = true;
+      inFlightDraftRef.current = null;
       abortController.abort();
     };
   }, [projectId, storyId]);
