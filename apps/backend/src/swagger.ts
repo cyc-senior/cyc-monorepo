@@ -16,7 +16,7 @@ const TAGS: Array<[string, string]> = [
   ],
   [
     'projects',
-    'The workspace inside a workspace: name, client or product, description, platforms, and the caller’s role.',
+    'A project inside a workspace: name, client or product, description, platforms, and the caller’s role.',
   ],
   ['members', 'The project team, and each member’s role.'],
   [

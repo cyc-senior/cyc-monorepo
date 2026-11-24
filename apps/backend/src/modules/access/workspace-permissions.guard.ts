@@ -58,7 +58,7 @@ export class WorkspacePermissionsGuard implements CanActivate {
     if (!access) {
       this.logger.warn(
         logEvent('access.denied', {
-          reason: 'not_an_workspace_member',
+          reason: 'not_a_workspace_member',
           permission,
           user: request.user.id,
           workspace: workspaceId,

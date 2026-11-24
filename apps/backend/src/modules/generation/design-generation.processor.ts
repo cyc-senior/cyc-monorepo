@@ -404,7 +404,8 @@ export class DesignGenerationProcessor
       } satisfies GenerationProgress)
       let lastSent = 0
       let lastStage: string | undefined = 'thinking'
-      let result: VariantResult | undefined
+      // Assigned by the first run: the loop below always runs at least once.
+      let result!: VariantResult
       // Every run is paid for, so tokens and attempts add up across restarts.
       const spent = { promptTokens: 0, completionTokens: 0 }
       let attempts = 0
@@ -412,7 +413,7 @@ export class DesignGenerationProcessor
       // its repairs is started over (told what failed) before it is dropped.
       for (let run = 0; run <= this.restarts; run++) {
         const avoid =
-          result && 'issues' in result
+          run > 0 && 'issues' in result
             ? result.issues
                 .slice(0, 8)
                 .map(
@@ -463,9 +464,6 @@ export class DesignGenerationProcessor
         if (result.passed) {
           break
         }
-      }
-      if (!result) {
-        continue
       }
       result = { ...result, usage: spent, attempts }
       results.push(result)

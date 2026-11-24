@@ -244,8 +244,10 @@ export class RoundsService {
               ? this.prisma.userPersona.findFirst({
                   where: { id: personaId, projectId },
                 })
-              : this.prisma.userPersona.findFirst({
+              : // Default: the project's first persona, the one the page preselects.
+                this.prisma.userPersona.findFirst({
                   where: { projectId },
+                  orderBy: { createdAt: 'asc' },
                 }),
           ])
 

@@ -415,9 +415,9 @@ model DesignRound {
   acknowledgements RoundAcknowledgement[]
   reports          Report[]
 
+  /// Target of composite foreign keys that keep a round's children in its project.
   @@unique([id, projectId])
   @@unique([projectId, roundNumber])
-  /// Target of composite foreign keys that keep a round's children in its project.
   @@index([storyId])
   @@index([parentRoundId])
   @@index([approvedById])
