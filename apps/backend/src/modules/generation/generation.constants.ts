@@ -24,7 +24,7 @@ export interface GenerationProgress {
   attempt?: number
   /** Characters of model output received so far in this attempt. */
   receivedChars?: number
-  /** Live reasoning or thinking text emitted by the model. */
+  /** The latest part of the model's live reasoning (see {@link thoughtTail}). */
   thought?: string
   /** Errors found by the last check. */
   errors?: number
@@ -42,4 +42,24 @@ export const DESIGN_JOB_OPTIONS: JobsOptions = {
   backoff: { type: 'exponential', delay: 15_000 },
   removeOnComplete: { age: 24 * 3600, count: 1000 },
   removeOnFail: { age: 7 * 24 * 3600 },
+}
+
+/** Live reasoning relayed per progress event: the latest characters only. */
+export const LIVE_THOUGHT_CHARS = 4_000
+/** Reasoning kept per design in a job's `outputMetadata`. */
+export const STORED_THOUGHT_CHARS = 8_000
+
+/**
+ * The end of a model's reasoning, at most `max` characters (marked with a
+ * leading "…" when cut). Reasoning grows with every token; resending or
+ * storing all of it makes each progress event and job row ever larger.
+ */
+export function thoughtTail(
+  thought: string | undefined,
+  max: number = LIVE_THOUGHT_CHARS,
+): string | undefined {
+  if (!thought) {
+    return undefined
+  }
+  return thought.length <= max ? thought : `…${thought.slice(-(max - 1))}`
 }

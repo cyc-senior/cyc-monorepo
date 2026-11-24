@@ -13,6 +13,7 @@ import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
+import { thoughtTail } from '../generation/generation.constants'
 import { PromptDrafter } from '../generation/prompt-drafter'
 import {
   CreateDesignRoundDto,
@@ -304,7 +305,7 @@ export class RoundsService {
                 throttled({
                   status: 'Reasoning about prompt strategy...',
                   stage: 'llm_streaming',
-                  thought,
+                  thought: thoughtTail(thought),
                 }),
               onDelta: (charsReceived) =>
                 throttled({

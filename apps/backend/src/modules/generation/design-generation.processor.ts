@@ -21,6 +21,8 @@ import {
   DESIGN_GENERATION_QUEUE,
   DesignGenerationJobData,
   GenerationProgress,
+  STORED_THOUGHT_CHARS,
+  thoughtTail,
 } from './generation.constants'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmNotConfiguredError } from './llm-not-configured.error'
@@ -355,7 +357,7 @@ export class DesignGenerationProcessor
           .updateProgress({
             stage: 'persona',
             of: 1,
-            thought,
+            thought: thoughtTail(thought),
           } satisfies GenerationProgress)
           .catch(() => undefined)
       },
@@ -447,6 +449,7 @@ export class DesignGenerationProcessor
               void job
                 .updateProgress({
                   ...progress,
+                  thought: thoughtTail(progress.thought),
                   variant: index,
                   of: total,
                 } satisfies GenerationProgress)
@@ -473,7 +476,7 @@ export class DesignGenerationProcessor
         variant: i + 1,
         passed: r.passed,
         attempts: r.attempts,
-        thought: r.thought,
+        thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
         ...(r.passed
           ? {
               title: r.title,
@@ -517,7 +520,7 @@ export class DesignGenerationProcessor
       variant: i + 1,
       passed: r.passed,
       attempts: r.attempts,
-      thought: r.thought,
+      thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
       ...('issues' in r
         ? { issues: r.issues.slice(0, 20) }
         : {
@@ -530,7 +533,8 @@ export class DesignGenerationProcessor
     const metadata = {
       usage,
       personaId: artifact?.id ?? null,
-      personaThought: artifact?.thought ?? null,
+      personaThought:
+        thoughtTail(artifact?.thought, STORED_THOUGHT_CHARS) ?? null,
       variants: summary,
     } as Prisma.InputJsonObject
     const passed = results.filter(
