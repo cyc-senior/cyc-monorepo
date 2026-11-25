@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StepProgress } from "@/components/wizard/StepProgress";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Tick02Icon,
@@ -922,69 +923,35 @@ function DesignIntentStep2Content() {
             </DialogHeader>
 
             <div className="space-y-4">
-              {/* Native / interactive color picker */}
-              <div className="rounded-[10px] border border-border p-3 flex flex-col gap-3 bg-muted/20">
-                <div
-                  className="h-32 w-full rounded-[8px] border border-border relative overflow-hidden flex items-center justify-center cursor-pointer shadow-inner"
-                  style={{ backgroundColor: customHex }}
-                >
-                  <input
-                    type="color"
-                    value={customHex.startsWith("#") && customHex.length === 7 ? customHex : "#1A73E8"}
-                    onChange={(e) => setCustomHex(e.target.value.toUpperCase())}
-                    className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                  />
-                  <span className="bg-black/50 text-white text-xs px-2.5 py-1 rounded backdrop-blur-xs font-mono select-none">
-                    Click to pick shade
-                  </span>
-                </div>
-
-                {/* Preset Swatches for quick selection */}
-                <div className="flex items-center justify-between gap-1.5 pt-1">
-                  {[
-                    "#1A73E8",
-                    "#0F172A",
-                    "#F59E0B",
-                    "#10B981",
-                    "#8B5CF6",
-                    "#EC4899",
-                    "#EF4444",
-                    "#06B6D4",
-                  ].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setCustomHex(preset)}
-                      className={`size-7 rounded-[6px] border border-border shrink-0 cursor-pointer transition-transform hover:scale-110 ${
-                        customHex.toUpperCase() === preset ? "ring-2 ring-primary ring-offset-1" : ""
-                      }`}
-                      style={{ backgroundColor: preset }}
-                    />
-                  ))}
-                </div>
-              </div>
+              <ColorPicker value={customHex} onChange={setCustomHex} />
 
               {/* Hex Row matching Figma Node 915:20839 */}
               <div className="space-y-1.5">
-                <Label htmlFor="hex-code" className="text-sm font-medium text-foreground">
-                  Hex
-                </Label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-end gap-3">
                   <div
-                    className="size-10 rounded-[10px] border border-border shrink-0 shadow-2xs"
-                    style={{ backgroundColor: customHex }}
-                  />
-                  <Input
-                    id="hex-code"
-                    value={customHex}
-                    onChange={(e) => {
-                      const val = e.target.value.trim();
-                      setCustomHex(val.startsWith("#") ? val : `#${val}`);
+                    className="size-9 rounded-[8px] border border-border shrink-0"
+                    style={{
+                      backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(customHex)
+                        ? customHex
+                        : "transparent",
                     }}
-                    placeholder="#1A73E8"
-                    maxLength={7}
-                    className="font-mono uppercase text-sm rounded-[10px]"
                   />
+                  <div className="flex-1 space-y-1.5">
+                    <Label htmlFor="hex-code" className="text-sm font-medium text-foreground">
+                      Hex code
+                    </Label>
+                    <Input
+                      id="hex-code"
+                      value={customHex}
+                      onChange={(e) => {
+                        const val = e.target.value.trim().toUpperCase();
+                        setCustomHex(val.startsWith("#") ? val : `#${val}`);
+                      }}
+                      placeholder="#1A73E8"
+                      maxLength={7}
+                      className="font-mono uppercase text-sm rounded-[10px]"
+                    />
+                  </div>
                 </div>
                 {!/^#[0-9A-Fa-f]{6}$/.test(customHex) && (
                   <p className="text-xs text-destructive">Must be a 6-digit hex color like #1A73E8</p>
