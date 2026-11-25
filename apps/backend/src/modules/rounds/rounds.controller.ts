@@ -69,6 +69,7 @@ export class RoundsController {
       projectId,
       query.storyId,
       query.personaId,
+      query.refresh,
     )
   }
 

@@ -222,6 +222,7 @@ export class RoundsService {
     projectId: string,
     storyId: string,
     personaId?: string,
+    refresh = false,
   ): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
       const abortController = new AbortController()
@@ -271,6 +272,27 @@ export class RoundsService {
             },
           })
 
+          if (
+            !refresh &&
+            story.draftPrompt &&
+            typeof story.draftPrompt === 'object' &&
+            !Array.isArray(story.draftPrompt)
+          ) {
+            const saved = story.draftPrompt as Record<string, unknown>
+            subscriber.next({
+              data: {
+                status: 'Loaded saved prompt',
+                stage: 'completed',
+                prompt: saved,
+                ...(typeof saved.thought === 'string'
+                  ? { thought: saved.thought }
+                  : {}),
+              },
+            })
+            subscriber.complete()
+            return
+          }
+
           subscriber.next({
             data: {
               status: 'Drafting your prompt with AI...',
@@ -299,16 +321,19 @@ export class RoundsService {
             subscriber.next({ data })
           }
 
+          let lastThought = ''
           const parsed = await this.drafter.draft(
             { story, intent, persona },
             {
               signal: abortController.signal,
-              onThought: (thought) =>
+              onThought: (thought) => {
+                lastThought = thought
                 throttled({
                   status: 'Reasoning about prompt strategy...',
                   stage: 'llm_streaming',
                   thought: thoughtTail(thought),
-                }),
+                })
+              },
               onDelta: (charsReceived) =>
                 throttled({
                   status: 'Drafting your prompt with AI...',
@@ -317,11 +342,27 @@ export class RoundsService {
                 }),
             },
           )
+          const savedDraft = {
+            ...parsed,
+            ...(persona?.id ? { personaId: persona.id } : {}),
+            ...(lastThought ? { thought: thoughtTail(lastThought) } : {}),
+          }
+          await this.prisma.userStory
+            .update({
+              where: { id: story.id },
+              data: { draftPrompt: savedDraft as Prisma.InputJsonValue },
+            })
+            .catch((err) => {
+              this.logger.warn(
+                'Failed to persist draftPrompt on UserStory',
+                err,
+              )
+            })
           subscriber.next({
             data: {
               status: 'Drafting complete',
               stage: 'completed',
-              prompt: parsed,
+              prompt: savedDraft,
             },
           })
           subscriber.complete()

@@ -102,14 +102,14 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-sidebar-accent transition-colors focus:outline-none flex items-center justify-center">
-                    <Avatar className="h-8 w-8 rounded-md border shrink-0">
+                    <Avatar className="h-8 w-8 rounded-[10px] border shrink-0">
                       {currentWorkspace?.avatarUrl ? (
                         <AvatarImage
                           src={currentWorkspace.avatarUrl}
                           alt={currentWorkspace.name}
                         />
                       ) : null}
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold rounded-md">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold rounded-[10px]">
                         {workspaceInitials}
                       </AvatarFallback>
                     </Avatar>
@@ -128,9 +128,19 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                   <DropdownMenuItem
                     key={ws.id}
                     onClick={() => setCurrentWorkspace(ws)}
-                    className="flex items-center justify-between cursor-pointer"
+                    className="flex items-center justify-between gap-2 cursor-pointer"
                   >
-                    <span className="truncate">{ws.name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar className="h-6 w-6 rounded-[7px] border shrink-0">
+                        {ws.avatarUrl ? (
+                          <AvatarImage src={ws.avatarUrl} alt={ws.name} />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold rounded-[7px]">
+                          {(ws.name || "W").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{ws.name}</span>
+                    </div>
                     {ws.id === currentWorkspace?.id && (
                       <HugeIcon
                         icon={Tick02Icon}
@@ -289,14 +299,14 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-sidebar-accent transition-colors text-left focus:outline-none">
               <div className="flex items-center gap-3 overflow-hidden">
-                <Avatar className="h-8 w-8 rounded-md border shrink-0">
+                <Avatar className="h-8 w-8 rounded-[10px] border shrink-0">
                   {currentWorkspace?.avatarUrl ? (
                     <AvatarImage
                       src={currentWorkspace.avatarUrl}
                       alt={currentWorkspace.name}
                     />
                   ) : null}
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold rounded-md">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold rounded-[10px]">
                     {workspaceInitials}
                   </AvatarFallback>
                 </Avatar>
@@ -324,9 +334,19 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                 <DropdownMenuItem
                   key={ws.id}
                   onClick={() => setCurrentWorkspace(ws)}
-                  className="flex items-center justify-between cursor-pointer"
+                  className="flex items-center justify-between gap-2 cursor-pointer"
                 >
-                  <span className="truncate">{ws.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar className="h-6 w-6 rounded-[7px] border shrink-0">
+                      {ws.avatarUrl ? (
+                        <AvatarImage src={ws.avatarUrl} alt={ws.name} />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold rounded-[7px]">
+                        {(ws.name || "W").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{ws.name}</span>
+                  </div>
                   {ws.id === currentWorkspace?.id && (
                     <HugeIcon icon={Tick02Icon} size={16} className="text-primary shrink-0" />
                   )}

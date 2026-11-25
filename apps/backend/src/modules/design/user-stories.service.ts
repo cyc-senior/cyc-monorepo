@@ -115,10 +115,21 @@ export class UserStoriesService {
   ): Promise<UserStoryDto> {
     await this.get(projectId, id)
 
+    const { draftPrompt, ...rest } = dto
     return toDto(
       await this.prisma.userStory.update({
         where: { id },
-        data: dto,
+        data: {
+          ...rest,
+          ...(draftPrompt === undefined
+            ? {}
+            : {
+                draftPrompt:
+                  draftPrompt === null
+                    ? Prisma.JsonNull
+                    : (draftPrompt as Prisma.InputJsonValue),
+              }),
+        },
         include: WITH_CYCLE,
       }),
     )

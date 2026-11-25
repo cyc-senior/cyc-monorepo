@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
@@ -15,7 +16,19 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { workspaces, isLoading: workspaceLoading } = useWorkspace();
+  const { mode } = useSidebar();
+  const [prevMode, setPrevMode] = useState(mode);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [overlayPinned, setOverlayPinned] = useState(false);
+  const [overlayHovered, setOverlayHovered] = useState(false);
+
+  const isOverlayMode = mode === "overlay";
+
+  if (mode !== prevMode) {
+    setPrevMode(mode);
+    setOverlayPinned(false);
+    setOverlayHovered(false);
+  }
 
   const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
   const isPreWorkspaceRoute =
@@ -42,14 +55,42 @@ function InnerShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Active workspace state: 256px collapsible AppSidebar
+  const handleToggleSidebar = () => {
+    if (isOverlayMode) {
+      setOverlayPinned((prev) => !prev);
+      setOverlayHovered(false);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex bg-background">
-      <AppSidebar collapsed={sidebarCollapsed} />
+    <div className="min-h-screen flex bg-background relative">
+      {isOverlayMode ? (
+        overlayPinned ? (
+          <AppSidebar collapsed={false} />
+        ) : (
+          <>
+            <div
+              onMouseEnter={() => setOverlayHovered(true)}
+              className="fixed inset-y-0 left-0 z-40 w-3"
+              aria-hidden="true"
+            />
+            {overlayHovered && (
+              <div
+                onMouseLeave={() => setOverlayHovered(false)}
+                className="fixed inset-y-0 left-0 z-50 shadow-2xl"
+              >
+                <AppSidebar collapsed={false} />
+              </div>
+            )}
+          </>
+        )
+      ) : (
+        <AppSidebar collapsed={sidebarCollapsed} />
+      )}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <SidebarHeader
-          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
-        />
+        <SidebarHeader onToggleSidebar={handleToggleSidebar} />
         <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>
     </div>
@@ -84,7 +125,9 @@ export function DashboardShell({
 
   return (
     <WorkspaceProvider initialWorkspaces={initialWorkspaces}>
-      <InnerShell>{children}</InnerShell>
+      <SidebarProvider>
+        <InnerShell>{children}</InnerShell>
+      </SidebarProvider>
     </WorkspaceProvider>
   );
 }

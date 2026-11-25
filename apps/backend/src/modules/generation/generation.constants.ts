@@ -24,6 +24,8 @@ export interface GenerationProgress {
   attempt?: number
   /** Characters of model output received so far in this attempt. */
   receivedChars?: number
+  /** Total characters of reasoning received so far in this attempt. */
+  thoughtChars?: number
   /** The latest part of the model's live reasoning (see {@link thoughtTail}). */
   thought?: string
   /** Errors found by the last check. */

@@ -361,6 +361,7 @@ model UserStory {
   description        String?
   acceptanceCriteria String?
   problemStatement   String?
+  draftPrompt        Json?
   status             UserStoryStatus @default(DRAFT)
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt

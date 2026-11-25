@@ -4,6 +4,14 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Alert02Icon,
@@ -23,7 +31,6 @@ import {
 import { Brain, CheckCircle2, FileCode, ShieldCheck, Wrench } from "lucide-react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import {
-  PHASE_ORDER,
   useJobStream,
   VariantTraceItem,
 } from "@/components/generation/use-job-stream";
@@ -277,15 +284,12 @@ function getVariantTraces(
   const effectiveThought = thought ?? outputVariant?.thought;
 
   if (liveTraces.length > 0) {
-    const list = liveTraces.map((item) => {
-      if (item.phase === "thinking" && !item.thought && effectiveThought) {
+    return liveTraces.map((item) => {
+      if (item.phase === "thinking" && (item.attempt ?? 1) === 1 && !item.thought && effectiveThought) {
         return { ...item, thought: effectiveThought };
       }
       return item;
     });
-    return list.sort(
-      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-    );
   }
 
   if (stepState === "done" || Boolean(outputVariant)) {
@@ -293,27 +297,35 @@ function getVariantTraces(
     const estimatedSeconds = effectiveThought
       ? Math.max(3, Math.min(15, Math.round(effectiveThought.length / 300)))
       : 5;
+    const estimatedTokens = effectiveThought
+      ? Math.max(1, Math.round(effectiveThought.length / 4))
+      : 0;
+    const label = String.fromCharCode(64 + variantIdx);
 
     if (effectiveThought) {
       list.push({
-        id: "thinking",
+        id: "thinking-1",
         phase: "thinking",
         status: "done",
-        title: `Thought for ${estimatedSeconds} seconds`,
+        attempt: 1,
+        title: `Thought for ${estimatedSeconds} seconds${estimatedTokens > 0 ? ` (${estimatedTokens.toLocaleString()} tokens)` : ""}`,
         thought: effectiveThought,
         thoughtDurationSeconds: estimatedSeconds,
+        thoughtTokens: estimatedTokens,
       });
     }
     list.push({
-      id: "generating",
+      id: "generating-1",
       phase: "generating",
       status: "done",
-      title: "Drafted HTML component hierarchy",
+      attempt: 1,
+      title: `Generated Variant ${label} HTML`,
     });
     list.push({
-      id: "checking",
+      id: "checking-1",
       phase: "checking",
       status: "done",
+      attempt: 1,
       title: `Validated ${standard} contrast & design system rules`,
     });
     if (outputVariant?.attempts && outputVariant.attempts > 1) {
@@ -321,10 +333,8 @@ function getVariantTraces(
         id: `repairing-${outputVariant.attempts}`,
         phase: "repairing",
         status: "done",
-        title: `Thought for 3 seconds (Attempt ${outputVariant.attempts})`,
-        thoughtDurationSeconds: 3,
+        title: `Refined Variant ${label} HTML (Attempt ${outputVariant.attempts})`,
         attempt: outputVariant.attempts,
-        thought: `Auto-adjusted contrast ratios and component slot attributes to pass ${standard} checks.`,
       });
     }
     list.push({
@@ -333,17 +343,16 @@ function getVariantTraces(
       status: "done",
       title: "Variant markup verified & saved",
     });
-    return list.sort(
-      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-    );
+    return list;
   }
 
   if (stepState === "active") {
     return [
       {
-        id: "thinking",
+        id: "thinking-1",
         phase: "thinking",
         status: "running",
+        attempt: 1,
         title: "Thinking...",
         thought: effectiveThought,
       },
@@ -441,10 +450,15 @@ function VariantCard({
           {variantTraces.map((item) => {
             if (item.phase === "thinking") {
               const isRunning = item.status === "running";
+              const liveTokens = item.thoughtTokens;
+              const runningBase =
+                (item.attempt ?? 1) > 1
+                  ? `Thinking about fixes (Attempt ${item.attempt})...`
+                  : "Thinking...";
               const displayTitle = isRunning
-                ? "Thinking..."
-                : `Thought for ${item.thoughtDurationSeconds ?? 5} seconds`;
-              const thoughtKey = `v${index}-thinking`;
+                ? `${runningBase}${liveTokens ? ` (${liveTokens.toLocaleString()} tokens)` : ""}`
+                : item.title;
+              const thoughtKey = `v${index}-${item.id}`;
               const isOpen = openThoughtKey === thoughtKey;
 
               return (
@@ -496,62 +510,6 @@ function VariantCard({
                           </div>
                         </TraceCollapsibleContent>
                       )}
-                    </TraceCollapsible>
-                  </div>
-                </TraceLine>
-              );
-            }
-
-            if (item.phase === "repairing") {
-              const isRunning = item.status === "running";
-              const displayTitle = isRunning
-                ? `Thinking about repairs (Attempt ${item.attempt || 2})...`
-                : `Thought for ${item.thoughtDurationSeconds ?? 3} seconds (Attempt ${item.attempt || 2})`;
-
-              const thoughtKey = `v${index}-${item.id}`;
-              const isOpen = openThoughtKey === thoughtKey;
-
-              return (
-                <TraceLine
-                  key={item.id}
-                  status={isRunning ? "running" : "finished"}
-                >
-                  <TraceIcon>
-                    <Wrench className="size-4 shrink-0 text-amber-500 animate-pulse" />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible
-                      open={isOpen}
-                      onOpenChange={(open) =>
-                        onToggleThought(thoughtKey, open)
-                      }
-                      className="w-full"
-                    >
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{displayTitle}</span>
-                        </TraceCollapsibleTrigger>
-                        {isRunning && (
-                          <HugeIcon
-                            icon={Loading02Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {!isRunning && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      <TraceCollapsibleContent>
-                        <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                          {item.thought ||
-                            `Auto-adjusting contrast & element slots to pass ${standard} checks.`}
-                        </div>
-                      </TraceCollapsibleContent>
                     </TraceCollapsible>
                   </div>
                 </TraceLine>
@@ -640,6 +598,15 @@ function VariantCard({
                           : "text-muted-foreground"
                       )}
                     />
+                  ) : item.phase === "repairing" ? (
+                    <Wrench
+                      className={cn(
+                        "size-4 shrink-0",
+                        item.status === "running"
+                          ? "text-amber-500 animate-pulse"
+                          : "text-muted-foreground"
+                      )}
+                    />
                   ) : (
                     <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
                   )}
@@ -654,10 +621,10 @@ function VariantCard({
                     )}
                   >
                     {item.title}
-                    {item.phase === "generating" &&
-                    item.receivedChars &&
+                    {(item.phase === "generating" || item.phase === "repairing") &&
+                    item.outputTokens &&
                     item.status === "running"
-                      ? ` (${(item.receivedChars / 1024).toFixed(1)} KB)`
+                      ? ` (${item.outputTokens.toLocaleString()} tokens)`
                       : null}
                   </span>
                   {item.status === "running" && (
@@ -697,6 +664,7 @@ function GeneratingContent() {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [busyAction, setBusyAction] = React.useState<"cancel" | "retry" | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
 
   // The job to follow: ?job=…, else the latest job of the round.
   React.useEffect(() => {
@@ -743,22 +711,10 @@ function GeneratingContent() {
     if (progress?.stage === "persona") {
       return "persona";
     }
-    const v = progress?.variant;
-    if (v && progress) {
-      if (progress.stage === "thinking") {
-        return `v${v}-thinking`;
-      }
-      if (progress.stage === "repairing") {
-        const attempt = progress.attempt ?? 2;
-        return `v${v}-repairing-${attempt}`;
-      }
-    }
     for (let idx = 1; idx <= (job?.variantCount ?? 2); idx++) {
       const traces = live.tracesByVariant[idx] ?? [];
       const running = traces.find(
-        (t) =>
-          (t.phase === "thinking" || t.phase === "repairing") &&
-          t.status === "running"
+        (t) => t.phase === "thinking" && t.status === "running"
       );
       if (running) {
         return `v${idx}-${running.id}`;
@@ -977,13 +933,45 @@ function GeneratingContent() {
         ) : (
           <Button
             variant="ghost"
-            onClick={handleCancel}
+            onClick={() => setCancelDialogOpen(true)}
             disabled={busyAction !== null || status === "SUCCEEDED"}
           >
             {busyAction === "cancel" ? "Cancelling…" : "Cancel"}
           </Button>
         )}
       </div>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Cancel generation?</DialogTitle>
+            <DialogDescription>
+              This will stop generating Variant A and B and return you to your structured prompt.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={busyAction === "cancel"}
+            >
+              Keep generating
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setCancelDialogOpen(false);
+                void handleCancel();
+              }}
+              disabled={busyAction === "cancel"}
+            >
+              {busyAction === "cancel" ? "Cancelling…" : "Cancel generation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

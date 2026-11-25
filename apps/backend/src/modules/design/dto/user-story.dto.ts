@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import {
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -11,6 +12,7 @@ import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
 import {
   DesignRoundStatus,
   GenerationJobStatus,
+  Prisma,
   StoryOrigin,
   UserStoryStatus,
 } from '../../../generated/prisma/client'
@@ -43,7 +45,17 @@ export class CreateUserStoryDto {
   status?: UserStoryStatus
 }
 
-export class UpdateUserStoryDto extends PartialType(CreateUserStoryDto) {}
+export class UpdateUserStoryDto extends PartialType(CreateUserStoryDto) {
+  /** Saved structured A/B prompt draft for this story. */
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsObject()
+  draftPrompt?: Record<string, unknown> | null
+}
 
 export class UserStoryQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
@@ -98,6 +110,9 @@ export class UserStoryDto {
   acceptanceCriteria: string | null
 
   problemStatement: string | null
+
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  draftPrompt: Prisma.JsonValue | null
 
   @ApiProperty({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
   status: UserStoryStatus

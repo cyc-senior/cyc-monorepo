@@ -237,7 +237,7 @@ export function ProjectsNav() {
                     <span className="truncate">User stories</span>
                   </Link>
                   {list.length > 0 && (
-                    <div className="flex w-full flex-col gap-0.5 border-l border-border pb-1 pl-2.5 pt-0.5">
+                    <div className="ml-2.5 flex w-[calc(100%-0.625rem)] flex-col gap-0.5 border-l border-border pb-1 pl-2.5 pt-0.5">
                       {list.map((story) => (
                         <StoryCycle
                           key={story.id}

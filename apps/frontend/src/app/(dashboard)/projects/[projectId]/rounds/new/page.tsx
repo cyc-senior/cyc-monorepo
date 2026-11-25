@@ -131,6 +131,21 @@ function ReviewStructuredPromptContent() {
     setIsGenerating(true);
 
     try {
+      // Persist any manual prompt edits to the UserStory before starting generation
+      // so cancelling or navigating back restores the exact reviewed prompt.
+      await updateUserStory(projectId, storyId, {
+        draftPrompt: {
+          goal: goalText,
+          problem: problemText,
+          mustUse: mustUseText,
+          comparisonQuestion,
+          variantA: { name: designAName, description: designADesc },
+          variantB: { name: designBName, description: designBDesc },
+          ...(selectedPersonaId ? { personaId: selectedPersonaId } : {}),
+          ...(thoughtText ? { thought: thoughtText } : {}),
+        },
+      }).catch(() => {});
+
       const roundTitle = story?.title
         ? `Design Round: ${story.title.length > 50 ? story.title.slice(0, 47) + "..." : story.title}`
         : "Design Round";

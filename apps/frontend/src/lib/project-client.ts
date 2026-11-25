@@ -118,6 +118,7 @@ export interface UserStoryItem {
   description?: string | null;
   acceptanceCriteria?: string | null;
   problemStatement?: string | null;
+  draftPrompt?: Record<string, unknown> | null;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -335,7 +336,9 @@ export async function createUserStory(
 export async function updateUserStory(
   projectId: string,
   storyId: string,
-  payload: Partial<CreateUserStoryPayload>
+  payload: Partial<CreateUserStoryPayload> & {
+    draftPrompt?: Record<string, unknown> | null;
+  }
 ): Promise<UserStoryItem> {
   return apiFetch<UserStoryItem>(`/projects/${projectId}/user-stories/${storyId}`, {
     method: "PATCH",

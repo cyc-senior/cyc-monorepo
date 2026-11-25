@@ -20,6 +20,8 @@ export interface DraftedPrompt {
   comparisonQuestion?: string;
   variantA?: { name?: string; description?: string };
   variantB?: { name?: string; description?: string };
+  personaId?: string;
+  thought?: string;
 }
 
 /** One progress frame of `GET .../rounds/draft-prompt/events`. */
@@ -62,7 +64,7 @@ export function useDraftPrompt(
     let isCancelled = false;
     let abortController = new AbortController();
 
-    async function loadData() {
+    async function loadData(refresh = false) {
       if (!storyId || !projectId) return;
 
       abortController.abort();
@@ -85,6 +87,26 @@ export function useDraftPrompt(
         setIntent(intentData);
         setPersonas(personaList);
 
+        const savedDraft =
+          !refresh &&
+          storyData.draftPrompt &&
+          typeof storyData.draftPrompt === "object"
+            ? (storyData.draftPrompt as DraftedPrompt)
+            : null;
+
+        if (savedDraft) {
+          const restoredPersonaId =
+            savedDraft.personaId || personaList[0]?.id || "";
+          setDraftedPersonaId(restoredPersonaId);
+          if (savedDraft.thought) {
+            setThoughtText(savedDraft.thought);
+          }
+          onPromptRef.current(savedDraft);
+          setIsLoading(false);
+          setBackendStatus(null);
+          return;
+        }
+
         const initialPersona = personaList[0];
         const personaIdToUse = initialPersona?.id || "";
         setDraftedPersonaId(personaIdToUse);
@@ -92,7 +114,7 @@ export function useDraftPrompt(
         // Start SSE stream from backend to draft prompt
         const sseUrl = `${API_URL}/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
           personaIdToUse ? `&personaId=${personaIdToUse}` : ""
-        }`;
+        }${refresh ? "&refresh=true" : ""}`;
 
         try {
           const res = await fetchSse(sseUrl, abortController.signal);
@@ -165,7 +187,7 @@ export function useDraftPrompt(
     }
 
     retryRef.current = () => {
-      void loadData();
+      void loadData(true);
     };
 
     if (projectId && storyId) {

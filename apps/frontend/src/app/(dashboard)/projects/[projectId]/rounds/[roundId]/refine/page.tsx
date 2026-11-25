@@ -27,6 +27,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
+import { useSidebarMode } from "@/contexts/sidebar-context";
 import { useJobStream } from "@/components/generation/use-job-stream";
 import {
   DEFAULT_VIEWPORT,
@@ -209,6 +210,7 @@ function RefineContent() {
   const params = useParams();
   const router = useRouter();
   const { project, setBreadcrumbs } = useBreadcrumbs();
+  useSidebarMode("overlay");
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
 
@@ -454,9 +456,9 @@ function RefineContent() {
         </Alert>
       )}
 
-      <div className="flex min-h-0 w-full flex-1 items-stretch gap-8">
+      <div className="flex min-h-0 w-full flex-1 flex-col lg:flex-row items-stretch gap-8">
         {/* Refine panel */}
-        <section className="flex w-[400px] shrink-0 flex-col gap-4 rounded-[14px] border border-border bg-card p-6">
+        <section className="flex w-full lg:w-[640px] shrink-0 flex-col gap-4 rounded-[14px] border border-border bg-card p-6">
           {rightTab === "components" ? (
             <Tabs value="code" className="flex min-h-0 flex-1 flex-col gap-4">
               <TabsList variant="line" className="w-auto gap-0 border-b-0">
