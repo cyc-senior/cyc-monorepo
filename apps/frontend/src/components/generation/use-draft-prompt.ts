@@ -11,6 +11,7 @@ import {
 } from "@/lib/project-client";
 import { API_URL } from "@/lib/api-client";
 import { fetchSse, readSseStream, sseErrorMessage } from "@/lib/sse";
+import { estimateTokens } from "@/components/generation/use-job-stream";
 
 /** The structured prompt the drafter returns (every field may be missing). */
 export interface DraftedPrompt {
@@ -22,6 +23,8 @@ export interface DraftedPrompt {
   variantB?: { name?: string; description?: string };
   personaId?: string;
   thought?: string;
+  thoughtChars?: number;
+  thoughtDurationSeconds?: number;
 }
 
 /** One progress frame of `GET .../rounds/draft-prompt/events`. */
@@ -29,6 +32,9 @@ interface DraftPromptEvent {
   status?: string;
   stage?: string;
   thought?: string;
+  thoughtChars?: number;
+  charsReceived?: number;
+  thoughtDurationSeconds?: number;
   prompt?: DraftedPrompt;
 }
 
@@ -53,6 +59,9 @@ export function useDraftPrompt(
     "Drafting your prompt with AI..."
   );
   const [thoughtText, setThoughtText] = React.useState<string>("");
+  const [thoughtTokens, setThoughtTokens] = React.useState<number>(0);
+  const [outputTokens, setOutputTokens] = React.useState<number>(0);
+  const [thoughtDurationSeconds, setThoughtDurationSeconds] = React.useState<number | null>(null);
 
   const onPromptRef = React.useRef(onPrompt);
   React.useEffect(() => {
@@ -73,6 +82,10 @@ export function useDraftPrompt(
       setIsLoading(true);
       setError(null);
       setBackendStatus("Drafting your prompt with AI...");
+      setThoughtText("");
+      setThoughtTokens(0);
+      setOutputTokens(0);
+      setThoughtDurationSeconds(null);
 
       try {
         const [storyData, intentData, personaList] = await Promise.all([
@@ -100,6 +113,13 @@ export function useDraftPrompt(
           setDraftedPersonaId(restoredPersonaId);
           if (savedDraft.thought) {
             setThoughtText(savedDraft.thought);
+          }
+          const tokens = estimateTokens(
+            savedDraft.thoughtChars ?? savedDraft.thought?.length
+          );
+          if (tokens > 0) setThoughtTokens(tokens);
+          if (typeof savedDraft.thoughtDurationSeconds === "number") {
+            setThoughtDurationSeconds(savedDraft.thoughtDurationSeconds);
           }
           onPromptRef.current(savedDraft);
           setIsLoading(false);
@@ -149,8 +169,24 @@ export function useDraftPrompt(
             if (!parsed || typeof parsed !== "object") return;
             if (parsed.status) setBackendStatus(parsed.status);
             if (parsed.thought) setThoughtText(parsed.thought);
+            const tTokens = estimateTokens(
+              parsed.thoughtChars ?? parsed.thought?.length
+            );
+            if (tTokens > 0) setThoughtTokens(tTokens);
+            const oTokens = estimateTokens(parsed.charsReceived);
+            if (oTokens > 0) setOutputTokens(oTokens);
+            if (typeof parsed.thoughtDurationSeconds === "number") {
+              setThoughtDurationSeconds(parsed.thoughtDurationSeconds);
+            }
 
             if (parsed.prompt) {
+              const pTokens = estimateTokens(
+                parsed.prompt.thoughtChars ?? parsed.prompt.thought?.length
+              );
+              if (pTokens > 0) setThoughtTokens(pTokens);
+              if (typeof parsed.prompt.thoughtDurationSeconds === "number") {
+                setThoughtDurationSeconds(parsed.prompt.thoughtDurationSeconds);
+              }
               onPromptRef.current(parsed.prompt);
               outcome.drafted = true;
               setIsLoading(false);
@@ -212,6 +248,9 @@ export function useDraftPrompt(
     isLoading,
     backendStatus,
     thoughtText,
+    thoughtTokens,
+    outputTokens,
+    thoughtDurationSeconds,
     retry,
   };
 }

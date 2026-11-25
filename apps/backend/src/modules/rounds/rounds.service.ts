@@ -284,8 +284,11 @@ export class RoundsService {
                 status: 'Loaded saved prompt',
                 stage: 'completed',
                 prompt: saved,
-                ...(typeof saved.thought === 'string'
-                  ? { thought: saved.thought }
+                ...(typeof saved.thoughtChars === 'number'
+                  ? { thoughtChars: saved.thoughtChars }
+                  : {}),
+                ...(typeof saved.thoughtDurationSeconds === 'number'
+                  ? { thoughtDurationSeconds: saved.thoughtDurationSeconds }
                   : {}),
               },
             })
@@ -322,30 +325,56 @@ export class RoundsService {
           }
 
           let lastThought = ''
+          let thoughtStartedAt = 0
+          let thoughtDurationSeconds: number | undefined
           const parsed = await this.drafter.draft(
             { story, intent, persona },
             {
               signal: abortController.signal,
               onThought: (thought) => {
+                if (!thoughtStartedAt) {
+                  thoughtStartedAt = Date.now()
+                }
                 lastThought = thought
                 throttled({
                   status: 'Reasoning about prompt strategy...',
                   stage: 'llm_streaming',
                   thought: thoughtTail(thought),
+                  thoughtChars: thought.length,
                 })
               },
-              onDelta: (charsReceived) =>
+              onDelta: (charsReceived) => {
+                if (thoughtStartedAt && thoughtDurationSeconds === undefined) {
+                  thoughtDurationSeconds = Math.max(
+                    1,
+                    Math.round((Date.now() - thoughtStartedAt) / 1000),
+                  )
+                }
                 throttled({
                   status: 'Drafting your prompt with AI...',
                   stage: 'llm_streaming',
                   charsReceived,
-                }),
+                  ...(lastThought ? { thoughtChars: lastThought.length } : {}),
+                  ...(thoughtDurationSeconds === undefined
+                    ? {}
+                    : { thoughtDurationSeconds }),
+                })
+              },
             },
           )
+          if (thoughtStartedAt && thoughtDurationSeconds === undefined) {
+            thoughtDurationSeconds = Math.max(
+              1,
+              Math.round((Date.now() - thoughtStartedAt) / 1000),
+            )
+          }
           const savedDraft = {
             ...parsed,
             ...(persona?.id ? { personaId: persona.id } : {}),
-            ...(lastThought ? { thought: thoughtTail(lastThought) } : {}),
+            ...(lastThought ? { thoughtChars: lastThought.length } : {}),
+            ...(thoughtDurationSeconds === undefined
+              ? {}
+              : { thoughtDurationSeconds }),
           }
           await this.prisma.userStory
             .update({

@@ -73,6 +73,9 @@ function ReviewStructuredPromptContent() {
     isLoading,
     backendStatus,
     thoughtText,
+    thoughtTokens,
+    outputTokens,
+    thoughtDurationSeconds,
     retry: handleRetry,
   } = useDraftPrompt(projectId, storyId, (p) => {
     if (p.goal) setGoalText(p.goal);
@@ -142,7 +145,8 @@ function ReviewStructuredPromptContent() {
           variantA: { name: designAName, description: designADesc },
           variantB: { name: designBName, description: designBDesc },
           ...(selectedPersonaId ? { personaId: selectedPersonaId } : {}),
-          ...(thoughtText ? { thought: thoughtText } : {}),
+          ...(thoughtTokens > 0 ? { thoughtChars: thoughtTokens * 4 } : {}),
+          ...(thoughtDurationSeconds !== null ? { thoughtDurationSeconds } : {}),
         },
       }).catch(() => {});
 
@@ -534,7 +538,13 @@ function ReviewStructuredPromptContent() {
                   <Brain className="size-5 text-violet-500 shrink-0" />
                 )}
                 <span className="text-sm font-medium text-foreground">
-                  {backendStatus || "AI strategy reasoning"}
+                  {isLoading
+                    ? outputTokens > 0
+                      ? `${backendStatus || "Drafting your prompt with AI..."} (${outputTokens.toLocaleString()} tokens)`
+                      : `${backendStatus || "Reasoning about prompt strategy..."}${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`
+                    : thoughtDurationSeconds
+                      ? `Thought for ${thoughtDurationSeconds} second${thoughtDurationSeconds === 1 ? "" : "s"}${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`
+                      : `AI strategy reasoning${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`}
                 </span>
               </div>
               {thoughtText && (
