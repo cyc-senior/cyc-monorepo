@@ -42,6 +42,7 @@ import {
   startGenerationJob,
 } from "@/lib/project-client";
 import { useDraftPrompt } from "@/components/generation/use-draft-prompt";
+import { useStoryBreadcrumbs } from "@/components/layout/use-story-breadcrumbs";
 
 function ReviewStructuredPromptContent() {
   const params = useParams();
@@ -50,6 +51,7 @@ function ReviewStructuredPromptContent() {
 
   const projectId = params.projectId as string;
   const storyId = searchParams.get("storyId");
+  useStoryBreadcrumbs(projectId, storyId, "Review prompt");
 
 
   // Editable prompt fields - strictly populated by backend AI response

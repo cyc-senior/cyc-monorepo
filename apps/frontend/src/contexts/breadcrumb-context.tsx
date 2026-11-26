@@ -7,6 +7,8 @@ import { getProjectById, ProjectDetails } from "@/lib/project-client";
 export interface BreadcrumbSegment {
   label: string;
   href?: string;
+  /** Full text shown on hover when the label is a short key ("US1"). */
+  title?: string;
 }
 
 interface BreadcrumbContextType {

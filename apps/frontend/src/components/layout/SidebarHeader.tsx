@@ -68,19 +68,27 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
         // Screen 14 & 14A: overview
         return [{ label: projectName }];
       }
-      if (subpath.startsWith("/setup")) {
-        // Screen 12 & 13: Setup
-        return [
-          { label: projectName, href: `/projects/${projectId}` },
-          { label: "Setup" },
-        ];
-      }
+      const projectCrumb = { label: projectName, href: `/projects/${projectId}` };
+      // Pages named as in the sidebar's project tree.
+      const pages: Array<[string, string]> = [
+        ["/setup/intent", "Design intent"],
+        ["/setup/team", "Team & roles"],
+        ["/overview", "Overview"],
+        ["/sessions", "Test sessions"],
+        ["/reports", "Reports"],
+      ];
+      const page = pages.find(([path]) => subpath.startsWith(path));
+      if (page) return [projectCrumb, { label: page[1] }];
       if (subpath.startsWith("/stories/new")) {
         // Screen 15: New user story
         return [
-          { label: projectName, href: `/projects/${projectId}` },
+          projectCrumb,
+          { label: "User stories", href: `/projects/${projectId}/stories` },
           { label: "New user story" },
         ];
+      }
+      if (subpath.startsWith("/stories")) {
+        return [projectCrumb, { label: "User stories" }];
       }
       if (subpath.startsWith("/rounds/new")) {
         // Screen 16: Review structured prompt
@@ -90,10 +98,8 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
         ];
       }
 
-      return [
-        { label: projectName, href: `/projects/${projectId}` },
-        { label: "Overview" },
-      ];
+      // Design-cycle pages set their own trail; never guess a page name.
+      return [{ label: projectName, href: `/projects/${projectId}` }];
     }
 
     return [{ label: "Projects", href: "/projects" }];
@@ -126,12 +132,14 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
                 {idx > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem className="truncate">
                   {isLast || !seg.href ? (
-                    <BreadcrumbPage className="truncate max-w-[240px]">
+                    <BreadcrumbPage className="truncate max-w-[240px]" title={seg.title}>
                       {seg.label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild className="truncate max-w-[200px]">
-                      <Link href={seg.href}>{seg.label}</Link>
+                      <Link href={seg.href} title={seg.title}>
+                        {seg.label}
+                      </Link>
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>

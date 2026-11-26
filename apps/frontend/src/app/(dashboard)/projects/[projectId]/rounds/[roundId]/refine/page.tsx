@@ -26,7 +26,7 @@ import {
   ViewIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
+import { useStoryBreadcrumbs } from "@/components/layout/use-story-breadcrumbs";
 import { useSidebarMode } from "@/contexts/sidebar-context";
 import { useJobStream } from "@/components/generation/use-job-stream";
 import {
@@ -234,7 +234,6 @@ function useSessionState<T>(key: string, initial: T) {
 function RefineContent() {
   const params = useParams();
   const router = useRouter();
-  const { project, setBreadcrumbs } = useBreadcrumbs();
   useSidebarMode("rail");
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
@@ -362,13 +361,7 @@ function RefineContent() {
   const shown = findVersion(lines, previewed[label]) ?? current;
   const shownIndex = shown ? line.indexOf(shown) : -1;
 
-  React.useEffect(() => {
-    const storyTitle = jobs[0]?.inputSnapshot?.stories?.[0]?.title;
-    setBreadcrumbs([
-      { label: project?.name ?? "Project", href: `/projects/${projectId}` },
-      { label: storyTitle ?? "Refine A/B" },
-    ]);
-  }, [setBreadcrumbs, project?.name, projectId, jobs]);
+  useStoryBreadcrumbs(projectId, jobs[0]?.inputSnapshot?.stories?.[0]?.id, "Refine UI");
 
   const shownHtml = shown?.variant.html ?? null;
   const components = React.useMemo<DesignComponent[]>(

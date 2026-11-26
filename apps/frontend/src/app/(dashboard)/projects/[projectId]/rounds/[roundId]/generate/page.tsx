@@ -37,7 +37,7 @@ import {
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
 } from "@/components/ui/trace";
-import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
+import { useStoryBreadcrumbs } from "@/components/layout/use-story-breadcrumbs";
 import {
   useJobStream,
   VariantTraceItem,
@@ -659,7 +659,6 @@ function GeneratingContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { project, setBreadcrumbs } = useBreadcrumbs();
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
   const jobParam = searchParams.get("job");
@@ -760,13 +759,7 @@ function GeneratingContent() {
     }
   }, [status, router, projectId, roundId, job]);
 
-  React.useEffect(() => {
-    const storyTitle = job?.inputSnapshot?.stories?.[0]?.title;
-    setBreadcrumbs([
-      { label: project?.name ?? "Project", href: `/projects/${projectId}` },
-      { label: storyTitle ?? "Generating A/B" },
-    ]);
-  }, [setBreadcrumbs, project?.name, projectId, job]);
+  useStoryBreadcrumbs(projectId, job?.inputSnapshot?.stories?.[0]?.id, "Generating");
 
   const handleCancel = async () => {
     if (!job) return;
