@@ -629,7 +629,7 @@ function RefineContent() {
 
       <div className="flex min-h-0 w-full flex-1 flex-col items-stretch lg:flex-row">
         {/* Refine panel: fixed 640px chat column */}
-        <section className="flex min-h-[560px] w-full shrink-0 flex-col gap-4 border-b border-border bg-background px-6 pt-4 pb-4 lg:min-h-0 lg:w-[640px] lg:border-r lg:border-b-0">
+        <section className="flex min-h-[560px] w-full shrink-0 flex-col gap-4 border-b border-border bg-background p-6 lg:min-h-0 lg:w-[640px] lg:border-r lg:border-b-0">
           {rightTab === "components" ? (
             <Tabs value="code" className="flex min-h-0 flex-1 flex-col gap-4">
               <TabsList variant="line" className="w-auto gap-0 border-b-0">
@@ -705,7 +705,8 @@ function RefineContent() {
         </section>
 
         {/* Canvas column */}
-        <section className="flex min-h-[640px] min-w-0 flex-1 flex-col gap-4 bg-background px-4 pt-4 pb-4 lg:min-h-0">
+        {/* Canvas column: full-height card with 20px corners (Figma 18 · Canvas column) */}
+        <section className="flex min-h-[640px] min-w-0 flex-1 flex-col gap-4 bg-background p-4 lg:min-h-0 lg:rounded-[20px] lg:border lg:border-border">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex min-h-0 flex-1 flex-col gap-4">
             <TabsList variant="line" className="gap-0">
               <TabsTrigger value="preview" className={cn(TAB_TRIGGER, "flex-1")}>

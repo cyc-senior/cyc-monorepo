@@ -282,7 +282,7 @@ export function ChatPanel({
           ) : (
             <div key={m.id} className="flex flex-col items-end gap-1">
               {m.elementKind && (
-                <span className="rounded-[6px] border border-brand-500 bg-background px-1.5 text-xs leading-5 text-brand-500">
+                <span className="rounded-[6px] border border-brand-500 bg-brand-50 px-[7px] py-[3px] text-sm leading-5 text-brand-700">
                   {m.elementKind}
                 </span>
               )}
