@@ -19,15 +19,30 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   const { mode } = useSidebar();
   const [prevMode, setPrevMode] = useState(mode);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [overlayPinned, setOverlayPinned] = useState(false);
-  const [overlayHovered, setOverlayHovered] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
 
-  const isOverlayMode = mode === "overlay";
+  const isRailMode = mode === "rail";
 
   if (mode !== prevMode) {
     setPrevMode(mode);
-    setOverlayPinned(false);
-    setOverlayHovered(false);
+    setOverlayOpen(false);
+  }
+
+  // Esc closes the overlay sidebar of rail mode.
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverlayOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlayOpen]);
+
+  // Navigating away from the page closes the overlay.
+  const [prevPath, setPrevPath] = useState(pathname);
+  if (pathname !== prevPath) {
+    setPrevPath(pathname);
+    setOverlayOpen(false);
   }
 
   const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
@@ -56,9 +71,8 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   }
 
   const handleToggleSidebar = () => {
-    if (isOverlayMode) {
-      setOverlayPinned((prev) => !prev);
-      setOverlayHovered(false);
+    if (isRailMode) {
+      setOverlayOpen((prev) => !prev);
     } else {
       setSidebarCollapsed((prev) => !prev);
     }
@@ -66,30 +80,26 @@ function InnerShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background relative">
-      {isOverlayMode ? (
-        overlayPinned ? (
-          <AppSidebar collapsed={false} />
-        ) : (
-          <>
-            <div
-              onMouseEnter={() => setOverlayHovered(true)}
-              className="fixed inset-y-0 left-0 z-40 w-3"
-              aria-hidden="true"
-            />
-            {overlayHovered && (
+      {isRailMode ? (
+        <>
+          <AppSidebar collapsed />
+          {overlayOpen && (
+            <>
               <div
-                onMouseLeave={() => setOverlayHovered(false)}
-                className="fixed inset-y-0 left-0 z-50 shadow-2xl"
-              >
+                onClick={() => setOverlayOpen(false)}
+                className="fixed inset-0 z-40 bg-foreground/10"
+                aria-hidden="true"
+              />
+              <div className="fixed inset-y-0 left-0 z-50 shadow-2xl">
                 <AppSidebar collapsed={false} />
               </div>
-            )}
-          </>
-        )
+            </>
+          )}
+        </>
       ) : (
         <AppSidebar collapsed={sidebarCollapsed} />
       )}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <SidebarHeader onToggleSidebar={handleToggleSidebar} />
         <main className="flex-1 overflow-y-auto w-full">{children}</main>
       </div>

@@ -2,7 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type SidebarMode = "default" | "overlay";
+/**
+ * "default": full sidebar, the toggle collapses it to the icon rail.
+ * "rail": icon rail by default (screen 18), the toggle opens the full
+ * sidebar as an overlay so the page layout never reflows.
+ */
+export type SidebarMode = "default" | "rail";
 
 interface SidebarContextValue {
   mode: SidebarMode;

@@ -24,6 +24,7 @@ import { AccountSettingsDialog } from "./AccountSettingsDialog";
 import { InviteWorkspaceDialog } from "@/components/projects/InviteWorkspaceDialog";
 import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
 import { ProjectsNav } from "./ProjectsNav";
+import { listWorkspaceProjects } from "@/services/project.service";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Folder01Icon,
@@ -52,6 +53,20 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
   const [accountDialogOpen, setAccountDialogOpen] = React.useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
   const [workspaceSettingsOpen, setWorkspaceSettingsOpen] = React.useState(false);
+  const [projectCount, setProjectCount] = React.useState<number | null>(null);
+
+  // Project count shown under the workspace name (Figma workspace switcher).
+  const workspaceId = currentWorkspace?.id;
+  React.useEffect(() => {
+    if (!workspaceId || collapsed) return;
+    let active = true;
+    listWorkspaceProjects(workspaceId)
+      .then((list) => active && setProjectCount(list.length))
+      .catch(() => active && setProjectCount(null));
+    return () => {
+      active = false;
+    };
+  }, [workspaceId, collapsed]);
 
   // Top Nav Items
   const navItems = [
@@ -301,10 +316,10 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
   return (
     <>
       <aside className="w-64 border-r bg-sidebar flex flex-col h-screen shrink-0 text-sidebar-foreground">
-        {/* Workspace Switcher Header */}
-        <div className="p-3 border-b">
+        {/* Workspace Switcher (Figma: bordered card, name + project count) */}
+        <div className="p-4 pb-2">
           <DropdownMenu>
-            <DropdownMenuTrigger className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-sidebar-accent transition-colors text-left focus:outline-none">
+            <DropdownMenuTrigger className="w-full flex items-center justify-between gap-2 rounded-[10px] border border-border bg-background p-4 text-left shadow-xs transition-colors hover:bg-sidebar-accent focus:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 cursor-pointer">
               <div className="flex items-center gap-3 overflow-hidden">
                 <Avatar className="h-8 w-8 rounded-[10px] border shrink-0">
                   {currentWorkspace?.avatarUrl ? (
@@ -322,7 +337,9 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                     {currentWorkspace?.name || "Select Workspace"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    Workspace
+                    {projectCount === null
+                      ? "Workspace"
+                      : `${projectCount} ${projectCount === 1 ? "project" : "projects"}`}
                   </p>
                 </div>
               </div>

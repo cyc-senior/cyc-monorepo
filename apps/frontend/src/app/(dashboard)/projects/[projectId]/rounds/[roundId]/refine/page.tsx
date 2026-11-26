@@ -211,7 +211,7 @@ function RefineContent() {
   const params = useParams();
   const router = useRouter();
   const { project, setBreadcrumbs } = useBreadcrumbs();
-  useSidebarMode("overlay");
+  useSidebarMode("rail");
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
 

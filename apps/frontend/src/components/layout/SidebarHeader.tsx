@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { ProjectRole } from "@/types/project";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import { SidebarLeft01Icon } from "@hugeicons/core-free-icons";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
@@ -15,6 +17,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
+const ROLE_LABELS: Record<ProjectRole, string> = {
+  DESIGNER: "Designer",
+  PROJECT_MANAGER: "Project manager",
+  PRODUCT_OWNER: "Product owner",
+  DEVELOPER: "Developer",
+  CLIENT: "Client",
+};
 
 interface SidebarHeaderProps {
   onToggleSidebar?: () => void;
@@ -130,6 +140,13 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+
+      {/* The viewer's role on the open project (Figma header badge) */}
+      {project?.role && pathname.startsWith(`/projects/${project.id}`) && (
+        <Badge variant="outline" className="ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+          {ROLE_LABELS[project.role] ?? project.role}
+        </Badge>
+      )}
     </header>
   );
 }

@@ -26,6 +26,8 @@ export interface ProjectDetails {
   description?: string | null;
   targetAudience?: string | null;
   status: string;
+  /** The viewer's role on this project. */
+  role?: ProjectRole;
   createdAt: string;
   updatedAt: string;
 }
