@@ -80,11 +80,26 @@ export interface PickedElement {
   html: string;
 }
 
+/** Where a pin sits: an element (by CSS path) and a point inside its box (0–1). */
+export interface PinAnchor {
+  path: string;
+  x: number;
+  y: number;
+}
+
 /** One pinned element comment queued to be sent in a batch refinement. */
 export interface PinnedComment {
   id: string;
   element: PickedElement;
   comment: string;
+  anchor: PinAnchor;
+}
+
+/** Pins sent with one refinement, kept on the base version as resolved. */
+export interface SentPins {
+  jobId: string;
+  pins: PinnedComment[];
+  status: "sent" | "applied" | "failed";
 }
 
 /** Adds the picked element to the prompt so the model changes that part. */

@@ -35,7 +35,7 @@ import {
   MOBILE_PRESET,
   PreviewCanvas,
   RESPONSIVE,
-  Selection,
+  CanvasPin,
   ViewportState,
 } from "@/components/generation/PreviewCanvas";
 import {
@@ -57,7 +57,9 @@ import {
   encodeBatchRefinePrompt,
   findVersion,
   PickedElement,
+  PinAnchor,
   PinnedComment,
+  SentPins,
   versionName,
   versionSummary,
 } from "@/components/generation/versions";
@@ -207,6 +209,28 @@ function buildMessages(
   return messages;
 }
 
+/**
+ * `useState` mirrored to sessionStorage: survives a reload of this tab, and is
+ * gone when the tab closes. Reads and writes never throw.
+ */
+function useSessionState<T>(key: string, initial: T) {
+  const [value, setValue] = React.useState<T>(() => {
+    if (typeof window === "undefined") return initial;
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : initial;
+    } catch {
+      return initial;
+    }
+  });
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  }, [key, value]);
+  return [value, setValue] as const;
+}
+
 function RefineContent() {
   const params = useParams();
   const router = useRouter();
@@ -226,21 +250,26 @@ function RefineContent() {
   const [rightTab, setRightTab] = React.useState("preview");
   const [viewport, setViewport] = React.useState<ViewportState>(DEFAULT_VIEWPORT);
   const [pickMode, setPickMode] = React.useState(false);
-  const [picked, setPicked] = React.useState<{ element: PickedElement; selection: Selection } | null>(null);
-  const [pinsByVariant, setPinsByVariant] = React.useState<Record<string, PinnedComment[]>>(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      const raw = localStorage.getItem(`refine_pins:${roundId}`);
-      return raw ? (JSON.parse(raw) as Record<string, PinnedComment[]>) : {};
-    } catch {
-      return {};
-    }
-  });
+  /** A pin dropped on the design whose comment is being written. */
+  const [draftPin, setDraftPin] = React.useState<{ element: PickedElement; anchor: PinAnchor } | null>(null);
+  const [activePinId, setActivePinId] = React.useState<string | null>(null);
+  // Unsent comments live in this tab only (sessionStorage): what was sent is
+  // kept by the refinement job itself, so nothing piles up on the device.
+  const [pinsByVariant, setPinsByVariant] = useSessionState<Record<string, PinnedComment[]>>(
+    `refine_pins:${roundId}`,
+    {}
+  );
+  /** Pins already sent, per base version: shown there as resolved. */
+  const [sentByVariant, setSentByVariant] = useSessionState<Record<string, SentPins[]>>(
+    `refine_sent:${roundId}`,
+    {}
+  );
   React.useEffect(() => {
+    // Pins were kept in localStorage before; drop that copy.
     try {
-      localStorage.setItem(`refine_pins:${roundId}`, JSON.stringify(pinsByVariant));
+      localStorage.removeItem(`refine_pins:${roundId}`);
     } catch {}
-  }, [roundId, pinsByVariant]);
+  }, [roundId]);
   const [componentId, setComponentId] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
   const [restoringId, setRestoringId] = React.useState<string | null>(null);
@@ -296,9 +325,33 @@ function RefineContent() {
     if (!activeJob || !liveStatus || ACTIVE.has(liveStatus)) return;
     if (settledJob.current === activeJob.id) return;
     settledJob.current = activeJob.id;
+    const jobId = activeJob.id;
+    const applied = liveStatus === "SUCCEEDED";
+    // Sent comments become "Applied in vN" on their version; if the
+    // refinement failed they go back to the unsent list to send again.
+    const restore: Record<string, PinnedComment[]> = {};
+    const nextSent: Record<string, SentPins[]> = {};
+    for (const [variantId, entries] of Object.entries(sentByVariant)) {
+      nextSent[variantId] = entries.flatMap((entry) => {
+        if (entry.jobId !== jobId || entry.status !== "sent") return [entry];
+        if (applied) return [{ ...entry, status: "applied" as const }];
+        restore[variantId] = entry.pins;
+        return [];
+      });
+    }
+    setSentByVariant(nextSent);
+    if (Object.keys(restore).length > 0) {
+      setPinsByVariant((pins) => {
+        const next = { ...pins };
+        for (const [variantId, back] of Object.entries(restore)) {
+          next[variantId] = [...back, ...(next[variantId] ?? [])];
+        }
+        return next;
+      });
+    }
     // The refinement finished: show the newest version (or keep the old one if it failed).
     void load().then(() => setPreviewed({}));
-  }, [activeJob, liveStatus, load]);
+  }, [activeJob, liveStatus, load, sentByVariant, setPinsByVariant, setSentByVariant]);
 
   const lines = React.useMemo(() => buildVersions(variants), [variants]);
   const labels = React.useMemo(() => Object.keys(lines).sort(), [lines]);
@@ -342,20 +395,23 @@ function RefineContent() {
   const showVersion = (version: DesignVersion) => {
     setLabel(version.label);
     setPreviewed((prev) => ({ ...prev, [version.label]: version.variant.id }));
-    setPicked(null);
+    setDraftPin(null);
+    setActivePinId(null);
     setComponentId(null);
   };
 
   const switchLabel = (next: string) => {
     setLabel(next);
-    setPicked(null);
+    setDraftPin(null);
+    setActivePinId(null);
     setPickMode(false);
     setComponentId(null);
   };
 
-  const handlePick = React.useCallback((element: PickedElement, selection: Selection) => {
-    setPicked({ element, selection });
-    setPickMode(false);
+  /** Comment mode: a click on the design drops a pin and opens its comment box. */
+  const handlePick = React.useCallback((element: PickedElement, anchor: PinAnchor) => {
+    setDraftPin({ element, anchor });
+    setActivePinId(null);
     setLeftTab("chat");
   }, []);
 
@@ -389,22 +445,22 @@ function RefineContent() {
     [pinsByVariant, shownVariantId]
   );
 
-  const handlePinPicked = React.useCallback(
+  const handleSaveDraft = React.useCallback(
     (comment: string) => {
-      if (!picked || !shownVariantId) return;
+      if (!draftPin || !shownVariantId) return;
       const pin: PinnedComment = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        element: picked.element,
+        element: draftPin.element,
+        anchor: draftPin.anchor,
         comment,
       };
       setPinsByVariant((prev) => ({
         ...prev,
         [shownVariantId]: [...(prev[shownVariantId] ?? []), pin],
       }));
-      setPicked(null);
-      setPickMode(true);
+      setDraftPin(null);
     },
-    [picked, shownVariantId]
+    [draftPin, shownVariantId, setPinsByVariant]
   );
 
   const handleRemovePin = React.useCallback(
@@ -414,9 +470,65 @@ function RefineContent() {
         ...prev,
         [shownVariantId]: (prev[shownVariantId] ?? []).filter((p) => p.id !== pinId),
       }));
+      setActivePinId((id) => (id === pinId ? null : id));
     },
-    [shownVariantId]
+    [shownVariantId, setPinsByVariant]
   );
+
+  // Esc: close the comment box first, then leave comment mode.
+  React.useEffect(() => {
+    if (!pickMode && !draftPin && !activePinId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (draftPin) setDraftPin(null);
+      else if (activePinId) setActivePinId(null);
+      else setPickMode(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pickMode, draftPin, activePinId]);
+
+  // Unsent comments are lost with the tab: ask before it closes or reloads.
+  const hasUnsent = Boolean(draftPin) || Object.values(pinsByVariant).some((pins) => pins.length > 0);
+  React.useEffect(() => {
+    if (!hasUnsent) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsent]);
+
+  /** Pins drawn on the shown version: unsent ones, then sent ones as resolved. */
+  const canvasPins = React.useMemo<CanvasPin[]>(() => {
+    const unsent = currentPins.map((pin, idx) => ({
+      id: pin.id,
+      number: idx + 1,
+      kind: pin.element.kind,
+      comment: pin.comment,
+      anchor: pin.anchor,
+    }));
+    const sent = (sentByVariant[shownVariantId] ?? []).flatMap((entry) => {
+      const made = variants.find((v) => v.generationJobId === entry.jobId);
+      const madeVersion = made ? findVersion(lines, made.id) : undefined;
+      const resolvedLabel =
+        entry.status === "applied"
+          ? madeVersion
+            ? `Applied in ${versionName(madeVersion)}`
+            : "Applied"
+          : "Sent to Designer";
+      return entry.pins.map((pin, idx) => ({
+        id: `${entry.jobId}-${pin.id}`,
+        number: idx + 1,
+        kind: pin.element.kind,
+        comment: pin.comment,
+        anchor: pin.anchor,
+        resolvedLabel,
+      }));
+    });
+    return [...unsent, ...sent];
+  }, [currentPins, sentByVariant, shownVariantId, variants, lines]);
 
   const handleSend = async (text: string): Promise<boolean> => {
     if (!shown) return false;
@@ -424,13 +536,21 @@ function RefineContent() {
     setError(null);
     try {
       const job = await startRefinement(projectId, roundId, {
-        prompt: encodeBatchRefinePrompt(text, picked?.element ?? null, currentPins),
+        prompt: encodeBatchRefinePrompt(text, null, currentPins),
         baseVariantId: shown.variant.id,
         storyIds: shown.variant.storyIds,
       });
       setJobs((prev) => [...prev, job]);
-      setPicked(null);
+      setDraftPin(null);
+      setActivePinId(null);
       setPickMode(false);
+      if (currentPins.length > 0) {
+        const baseId = shown.variant.id;
+        setSentByVariant((prev) => ({
+          ...prev,
+          [baseId]: [...(prev[baseId] ?? []), { jobId: job.id, pins: currentPins, status: "sent" }],
+        }));
+      }
       setPinsByVariant((prev) => {
         const next = { ...prev };
         delete next[shown.variant.id];
@@ -558,15 +678,18 @@ function RefineContent() {
                 <ChatPanel
                   messages={messages}
                   label={label}
-                  picked={picked?.element ?? null}
                   pins={currentPins}
+                  activePinId={activePinId}
                   pickMode={pickMode}
                   onTogglePick={() => {
                     setPickMode((on) => !on);
                     setRightTab("preview");
                   }}
-                  onClearPicked={() => setPicked(null)}
-                  onPinPicked={handlePinPicked}
+                  onFocusPin={(id) => {
+                    setRightTab("preview");
+                    setDraftPin(null);
+                    setActivePinId(id);
+                  }}
                   onRemovePin={handleRemovePin}
                   onSend={handleSend}
                   onAction={handleAction}
@@ -684,7 +807,16 @@ function RefineContent() {
                 onViewportChange={setViewport}
                 pickMode={pickMode}
                 onPick={handlePick}
-                selection={picked?.selection ?? null}
+                pins={canvasPins}
+                draft={draftPin ? { kind: draftPin.element.kind, anchor: draftPin.anchor } : null}
+                activePinId={activePinId}
+                onSaveDraft={handleSaveDraft}
+                onCancelDraft={() => setDraftPin(null)}
+                onActivatePin={(id) => {
+                  setDraftPin(null);
+                  setActivePinId(id);
+                }}
+                onRemovePin={handleRemovePin}
                 canGoBack={shownIndex > 0}
                 canGoForward={shownIndex >= 0 && shownIndex < line.length - 1}
                 onBack={() => shownIndex > 0 && showVersion(line[shownIndex - 1])}

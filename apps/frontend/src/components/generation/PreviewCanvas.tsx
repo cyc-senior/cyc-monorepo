@@ -16,13 +16,14 @@ import {
   ArrowDown01Icon,
   ArrowLeft02Icon,
   ArrowRight02Icon,
+  Delete02Icon,
   RefreshIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { toPickedElement } from "./html-components";
+import { elementPath, toPickedElement } from "./html-components";
 import { designDocument } from "./design-document";
-import type { PickedElement } from "./versions";
+import type { PickedElement, PinAnchor } from "./versions";
 
 export interface DevicePreset {
   id: string;
@@ -94,15 +95,47 @@ export interface Selection {
   rect: { x: number; y: number; width: number; height: number };
 }
 
+/** A comment pin drawn on the design, Figma style. */
+export interface CanvasPin {
+  id: string;
+  /** 1-based number shown in the marker. */
+  number: number;
+  kind: string;
+  comment: string;
+  anchor: PinAnchor;
+  /** Set once the pin was sent: "Applied in A v2", "Sending…". */
+  resolvedLabel?: string;
+}
+
+/** A pin being written: the element was clicked, the comment not saved yet. */
+export interface DraftPin {
+  kind: string;
+  anchor: PinAnchor;
+}
+
+interface PinPosition {
+  /** The pin point, in the design's CSS pixels relative to the frame. */
+  x: number;
+  y: number;
+  rect: Selection["rect"];
+}
+
 interface PreviewCanvasProps {
   html: string;
   /** Changes when another version is shown. */
   documentKey: string;
   viewport: ViewportState;
   onViewportChange: (next: ViewportState) => void;
+  /** Comment mode: a click on the design drops a pin instead of interacting. */
   pickMode: boolean;
-  onPick: (element: PickedElement, selection: Selection) => void;
-  selection: Selection | null;
+  onPick: (element: PickedElement, anchor: PinAnchor) => void;
+  pins: CanvasPin[];
+  draft: DraftPin | null;
+  activePinId: string | null;
+  onSaveDraft: (comment: string) => void;
+  onCancelDraft: () => void;
+  onActivatePin: (pinId: string | null) => void;
+  onRemovePin: (pinId: string) => void;
   canGoBack: boolean;
   canGoForward: boolean;
   onBack: () => void;
@@ -167,12 +200,164 @@ function NumberField({
   );
 }
 
+const POPOVER_WIDTH = 260;
+
+/** Crosshair over the design while comment mode is on. */
+function setCursor(doc: Document | null | undefined, picking: boolean) {
+  if (doc?.body) doc.body.style.cursor = picking ? "crosshair" : "";
+}
+
+/** Left offset of a popover next to a pin, flipped when it would overflow. */
+function popoverLeft(left: number, frameWidth: number): number {
+  return left + 16 + POPOVER_WIDTH > frameWidth ? -POPOVER_WIDTH - 8 : 16;
+}
+
+function PinBubble({
+  label,
+  resolved,
+  active,
+}: {
+  label: React.ReactNode;
+  resolved?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex size-6 items-center justify-center rounded-full rounded-bl-none border-2 border-white text-[11px] font-semibold shadow-md",
+        resolved ? "bg-muted text-muted-foreground" : "bg-brand-500 text-white",
+        active && "ring-2 ring-brand-500/40"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function PinMarker({
+  pin,
+  left,
+  top,
+  active,
+  frameWidth,
+  onToggle,
+  onRemove,
+}: {
+  pin: CanvasPin;
+  left: number;
+  top: number;
+  active: boolean;
+  frameWidth: number;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const resolved = Boolean(pin.resolvedLabel);
+  return (
+    <div className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={`Comment ${pin.number}: ${pin.comment}`}
+        aria-expanded={active}
+        className="cursor-pointer"
+      >
+        <PinBubble label={resolved ? <HugeIcon icon={Tick02Icon} size={12} /> : pin.number} resolved={resolved} active={active} />
+      </button>
+      {active && (
+        <div
+          role="dialog"
+          aria-label={`Comment ${pin.number}`}
+          className="absolute top-0 z-10 flex flex-col gap-2 rounded-[10px] border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+          style={{ width: POPOVER_WIDTH, left: popoverLeft(left, frameWidth) }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="rounded-[6px] border border-brand-500 px-1.5 text-xs leading-5 text-brand-500">
+              {pin.kind}
+            </span>
+            {pin.resolvedLabel ? (
+              <span className="text-xs text-muted-foreground">{pin.resolvedLabel}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={onRemove}
+                aria-label={`Delete comment ${pin.number}`}
+                className="cursor-pointer text-muted-foreground hover:text-destructive"
+              >
+                <HugeIcon icon={Delete02Icon} size={14} />
+              </button>
+            )}
+          </div>
+          <p className="whitespace-pre-line text-sm leading-5">{pin.comment}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DraftComposer({
+  number,
+  left,
+  top,
+  frameWidth,
+  onSave,
+  onCancel,
+}: {
+  number: number;
+  left: number;
+  top: number;
+  frameWidth: number;
+  onSave: (comment: string) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = React.useState("");
+  const save = () => {
+    if (text.trim()) onSave(text.trim());
+  };
+  return (
+    <div className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
+      <PinBubble label={number} active />
+      <div
+        role="dialog"
+        aria-label="New comment"
+        className="absolute top-0 z-10 flex flex-col gap-2 rounded-[10px] border border-border bg-popover p-2 shadow-lg"
+        style={{ width: POPOVER_WIDTH, left: popoverLeft(left, frameWidth) }}
+      >
+        <textarea
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              save();
+            }
+            if (e.key === "Escape") onCancel();
+          }}
+          rows={2}
+          maxLength={1000}
+          placeholder="What should change here?"
+          aria-label="Comment"
+          className="min-h-14 w-full resize-none rounded-[6px] bg-transparent px-1 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
+        />
+        <div className="flex justify-end gap-1.5">
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="h-7 rounded-[8px] px-2 text-xs">
+            Cancel
+          </Button>
+          <Button type="button" size="sm" onClick={save} disabled={!text.trim()} className="h-7 rounded-[8px] px-2.5 text-xs">
+            Comment
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * A browser-like frame around a generated design: device presets, size,
  * zoom, reload and resize handles. The design is a sanitized, script-free
- * document in a sandboxed iframe. Only while picking an element does the
- * sandbox add `allow-same-origin` (still no `allow-scripts`, so nothing in
- * the design can run) so this page can see which element was clicked.
+ * document in a sandboxed iframe with `allow-same-origin` but never
+ * `allow-scripts`, so nothing in the design can run while this page reads its
+ * DOM to drop and follow comment pins.
  */
 export function PreviewCanvas({
   html,
@@ -181,7 +366,13 @@ export function PreviewCanvas({
   onViewportChange,
   pickMode,
   onPick,
-  selection,
+  pins,
+  draft,
+  activePinId,
+  onSaveDraft,
+  onCancelDraft,
+  onActivatePin,
+  onRemovePin,
   canGoBack,
   canGoForward,
   onBack,
@@ -222,36 +413,92 @@ export function PreviewCanvas({
   const setSize = (next: Partial<Pick<ViewportState, "width" | "height">>) =>
     onViewportChange({ ...viewport, presetId: CUSTOM, width, height, ...next });
 
-  // Element picking: read the design's DOM (same origin only while picking).
-  const attachPicker = React.useCallback(() => {
+  // The design document is same-origin (still no `allow-scripts`, so nothing
+  // in it can run) so this page can find pinned elements and follow scroll.
+  const pickModeRef = React.useRef(pickMode);
+  const onPickRef = React.useRef(onPick);
+  React.useEffect(() => {
+    pickModeRef.current = pickMode;
+    onPickRef.current = onPick;
+    setCursor(iframeRef.current?.contentDocument, pickMode);
+  }, [pickMode, onPick]);
+
+  const [positions, setPositions] = React.useState<Record<string, PinPosition>>({});
+  const anchors = React.useMemo(() => {
+    const list: Array<[string, PinAnchor]> = pins.map((p) => [p.id, p.anchor]);
+    if (draft) list.push(["draft", draft.anchor]);
+    return list;
+  }, [pins, draft]);
+  const anchorsRef = React.useRef(anchors);
+
+  /** Where every pin is now: elements move with scroll, resize and reload. */
+  const measure = React.useCallback(() => {
     const doc = iframeRef.current?.contentDocument;
-    if (!pickMode || !doc?.body) return;
-    doc.body.style.cursor = "crosshair";
+    if (!doc?.body) return;
+    const next: Record<string, PinPosition> = {};
+    for (const [id, anchor] of anchorsRef.current) {
+      let el: Element | null = null;
+      try {
+        el = doc.querySelector(anchor.path);
+      } catch {
+        el = null;
+      }
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      next[id] = {
+        x: r.left + anchor.x * r.width,
+        y: r.top + anchor.y * r.height,
+        rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+      };
+    }
+    setPositions(next);
+  }, []);
+
+  React.useEffect(() => {
+    anchorsRef.current = anchors;
+    measure();
+  }, [anchors, measure, width, height]);
+
+  const attachDocument = React.useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc?.body) return;
+    setCursor(doc, pickModeRef.current);
     // The iframe has its own realm, so `instanceof Element` would be false.
     const asElement = (target: EventTarget | null): Element | null =>
       target && (target as Node).nodeType === Node.ELEMENT_NODE ? (target as Element) : null;
-    const toSelection = (el: Element): Selection => {
-      const r = el.getBoundingClientRect();
-      return { kind: toPickedElement(el).kind, rect: { x: r.left, y: r.top, width: r.width, height: r.height } };
-    };
+    const isContent = (el: Element | null): el is Element =>
+      Boolean(el) && el !== doc.body && el !== doc.documentElement;
     doc.addEventListener("mousemove", (e) => {
+      if (!pickModeRef.current) return;
       const el = asElement(e.target);
-      setHover(el && el !== doc.body && el !== doc.documentElement ? toSelection(el) : null);
+      if (!isContent(el)) return setHover(null);
+      const r = el.getBoundingClientRect();
+      setHover({ kind: toPickedElement(el).kind, rect: { x: r.left, y: r.top, width: r.width, height: r.height } });
     });
     doc.addEventListener("mouseleave", () => setHover(null));
     doc.addEventListener(
       "click",
       (e) => {
+        if (!pickModeRef.current) return;
         e.preventDefault();
         e.stopPropagation();
         const el = asElement(e.target);
-        if (!el || el === doc.body || el === doc.documentElement) return;
+        if (!isContent(el)) return;
+        const r = el.getBoundingClientRect();
+        const clamp = (n: number) => Math.min(1, Math.max(0, n));
         setHover(null);
-        onPick(toPickedElement(el), toSelection(el));
+        onPickRef.current(toPickedElement(el), {
+          path: elementPath(el),
+          x: r.width > 0 ? clamp((e.clientX - r.left) / r.width) : 0.5,
+          y: r.height > 0 ? clamp((e.clientY - r.top) / r.height) : 0.5,
+        });
       },
       true
     );
-  }, [pickMode, onPick]);
+    doc.addEventListener("scroll", measure, { capture: true, passive: true });
+    doc.defaultView?.addEventListener("resize", measure);
+    measure();
+  }, [measure]);
 
   const startResize = (edge: "right" | "bottom" | "corner") => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -393,36 +640,76 @@ export function PreviewCanvas({
             >
               <iframe
                 // A new document per version, pick mode and reload.
-                key={`${documentKey}-${pickMode}-${reloads}`}
+                key={`${documentKey}-${reloads}`}
                 ref={iframeRef}
                 title="Design preview"
                 srcDoc={previewHtml}
-                sandbox={pickMode ? "allow-same-origin" : ""}
-                onLoad={attachPicker}
+                sandbox="allow-same-origin"
+                onLoad={attachDocument}
                 className={cn(
                   "absolute left-0 top-0 origin-top-left border-0 bg-white",
                   dragging && "pointer-events-none"
                 )}
                 style={{ width, height, transform: `scale(${scale})` }}
               />
-              {hover && (
+              {pickMode && hover && (
                 <div
                   className="pointer-events-none absolute rounded-[2px] border border-brand-500 bg-brand-500/10"
                   style={box(hover)}
                   aria-hidden="true"
                 />
               )}
-              {selection && (
-                <div
-                  className="pointer-events-none absolute rounded-[4px] border-2 border-brand-500"
-                  style={box(selection)}
-                  aria-hidden="true"
-                >
-                  <span className="absolute -top-[18px] left-0 rounded-[3px] bg-brand-500 px-1 text-[10px] leading-4 text-white">
-                    {selection.kind}
-                  </span>
-                </div>
-              )}
+              {/* Outline of the pin being written, or the focused pin. */}
+              {(() => {
+                const focus = draft ? positions.draft : activePinId ? positions[activePinId] : undefined;
+                const kind = draft?.kind ?? pins.find((p) => p.id === activePinId)?.kind;
+                if (!focus) return null;
+                return (
+                  <div
+                    className="pointer-events-none absolute rounded-[4px] border-2 border-brand-500"
+                    style={box({ kind: kind ?? "", rect: focus.rect })}
+                    aria-hidden="true"
+                  >
+                    {kind && (
+                      <span className="absolute -top-[18px] left-0 rounded-[3px] bg-brand-500 px-1 text-[10px] leading-4 text-white">
+                        {kind}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Pin markers */}
+              <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                {pins.map((pin) => {
+                  const pos = positions[pin.id];
+                  if (!pos) return null;
+                  const active = pin.id === activePinId;
+                  return (
+                    <PinMarker
+                      key={pin.id}
+                      pin={pin}
+                      left={pos.x * scale}
+                      top={pos.y * scale}
+                      active={active}
+                      frameWidth={width * scale}
+                      onToggle={() => onActivatePin(active ? null : pin.id)}
+                      onRemove={() => onRemovePin(pin.id)}
+                    />
+                  );
+                })}
+                {draft && positions.draft && (
+                  <DraftComposer
+                    key={`${draft.anchor.path}-${draft.anchor.x}-${draft.anchor.y}`}
+                    number={pins.filter((p) => !p.resolvedLabel).length + 1}
+                    left={positions.draft.x * scale}
+                    top={positions.draft.y * scale}
+                    frameWidth={width * scale}
+                    onSave={onSaveDraft}
+                    onCancel={onCancelDraft}
+                  />
+                )}
+              </div>
             </div>
             <div className="flex w-full justify-center p-[3px]">
               <div
