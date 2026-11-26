@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { HugeIcon } from "@/components/ui/huge-icon";
+import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import {
   ArrowUp02Icon,
   BracketsIcon,
@@ -12,6 +13,7 @@ import {
   Copy01Icon,
   CommentAdd01Icon,
   Loading02Icon,
+  Loading03Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
@@ -248,21 +250,21 @@ export function ChatPanel({
             <div key={m.id} className="flex items-start gap-2">
               <AiMark />
               <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-                <p
-                  className={cn(
-                    "text-sm leading-5 text-foreground",
-                    m.pending && "text-muted-foreground"
-                  )}
-                >
-                  {m.pending && (
-                    <HugeIcon
-                      icon={Loading02Icon}
-                      size={14}
-                      className="mr-1.5 inline animate-spin align-[-2px]"
-                    />
-                  )}
-                  {m.text}
-                </p>
+                {m.pending ? (
+                  // Live refinement stage, shown like the generation trace.
+                  <Trace>
+                    <div>
+                      <TraceLine status="running">
+                        <TraceIcon>
+                          <HugeIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                        </TraceIcon>
+                        <TraceTitle>{m.text}</TraceTitle>
+                      </TraceLine>
+                    </div>
+                  </Trace>
+                ) : (
+                  <p className="text-sm leading-5 text-foreground">{m.text}</p>
+                )}
                 {m.action && onAction && (
                   <Button
                     type="button"

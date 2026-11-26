@@ -267,6 +267,74 @@ function SharedIntentBanner({
   );
 }
 
+/**
+ * What the markup check found. The check reads static markup only (no
+ * contrast, focus order or zoom), so it never claims more than that.
+ */
+function CheckResults({
+  running,
+  standard,
+  designSystem,
+  outputVariant,
+}: {
+  running: boolean;
+  standard: string;
+  designSystem: string;
+  outputVariant?: GenerationOutputVariant;
+}) {
+  if (running || !outputVariant) {
+    return (
+      <p>
+        Checking the markup against {standard} rules and {designSystem}{" "}
+        components…
+      </p>
+    );
+  }
+  if (!outputVariant.passed) {
+    const issues = outputVariant.issues ?? [];
+    return (
+      <>
+        <p className="text-destructive">
+          Still failing after {outputVariant.attempts} attempt
+          {outputVariant.attempts === 1 ? "" : "s"}:
+        </p>
+        <ul className="list-disc space-y-0.5 pl-4">
+          {issues.slice(0, 6).map((issue, i) => (
+            <li key={i}>
+              {issue.criterion ? `WCAG ${issue.criterion}: ` : ""}
+              {issue.message}
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+  const warnings = outputVariant.warnings ?? 0;
+  const removed = outputVariant.removed ?? [];
+  return (
+    <>
+      <p>
+        Passed {standard} markup rules and {designSystem} component checks
+        {outputVariant.attempts > 1
+          ? ` after ${outputVariant.attempts} attempts`
+          : ""}
+        .
+      </p>
+      <p>
+        {warnings === 0
+          ? "No warnings."
+          : `${warnings} warning${warnings === 1 ? "" : "s"} left to review.`}
+      </p>
+      {removed.length > 0 && (
+        <p>Removed for safety: {removed.slice(0, 4).join(", ")}.</p>
+      )}
+      <p className="text-muted-foreground/70">
+        Static markup only: contrast, focus order and zoom are not checked here.
+      </p>
+    </>
+  );
+}
+
 type TraceState = "running" | "done" | "error" | "pending";
 
 /** Phase icon of a trace step; every running step shows the same spinner. */
@@ -333,14 +401,14 @@ function getVariantTraces(
   }
 
   if (stepState === "done" || Boolean(outputVariant)) {
+    // Only measured values from the job: older jobs did not record timings,
+    // so they show no duration rather than a guess.
     const list: VariantTraceItem[] = [];
-    const estimatedSeconds = effectiveThought
-      ? Math.max(3, Math.min(15, Math.round(effectiveThought.length / 300)))
-      : 5;
-    const estimatedTokens = effectiveThought
-      ? Math.max(1, Math.round(effectiveThought.length / 4))
-      : 0;
     const label = String.fromCharCode(64 + variantIdx);
+    const thinkingSeconds =
+      outputVariant?.thinkingMs !== undefined
+        ? Math.max(1, Math.round(outputVariant.thinkingMs / 1000))
+        : undefined;
 
     if (effectiveThought) {
       list.push({
@@ -348,10 +416,12 @@ function getVariantTraces(
         phase: "thinking",
         status: "done",
         attempt: 1,
-        title: `Thought for ${estimatedSeconds} seconds${estimatedTokens > 0 ? ` (${estimatedTokens.toLocaleString()} tokens)` : ""}`,
+        title:
+          thinkingSeconds !== undefined
+            ? `Thought for ${thinkingSeconds} second${thinkingSeconds === 1 ? "" : "s"}`
+            : "Thought",
         thought: effectiveThought,
-        thoughtDurationSeconds: estimatedSeconds,
-        thoughtTokens: estimatedTokens,
+        thoughtDurationSeconds: thinkingSeconds,
       });
     }
     list.push({
@@ -360,13 +430,14 @@ function getVariantTraces(
       status: "done",
       attempt: 1,
       title: `Generated Variant ${label} HTML`,
+      outputTokens: outputVariant?.completionTokens,
     });
     list.push({
       id: "checking-1",
       phase: "checking",
-      status: "done",
+      status: outputVariant && !outputVariant.passed ? "error" : "done",
       attempt: 1,
-      title: `Validated ${standard} contrast & design system rules`,
+      title: `Checked markup against ${standard} & the UI kit`,
     });
     if (outputVariant?.attempts && outputVariant.attempts > 1) {
       list.push({
@@ -510,7 +581,7 @@ function VariantCard({
                   <TraceTitle>{title}</TraceTitle>
                   {tokens ? (
                     <TraceDescription>
-                      {tokens.toLocaleString()} tokens
+                      ~{tokens.toLocaleString()} tokens
                     </TraceDescription>
                   ) : null}
                 </TraceLine>
@@ -540,21 +611,24 @@ function VariantCard({
                     </TraceLine>
                   </TraceCollapsibleTrigger>
                   <TraceCollapsibleContent className="space-y-1 text-xs">
-                    <p>
-                      {standard}: contrast thresholds (4.5:1 text, 3:1
-                      graphical elements).
-                    </p>
-                    <p>UI kit: component markup against {designSystem}.</p>
-                    <p>DOM structure: slot attributes and tag nesting.</p>
+                    <CheckResults
+                      running={state === "running"}
+                      standard={standard}
+                      designSystem={designSystem}
+                      outputVariant={outputVariant}
+                    />
                   </TraceCollapsibleContent>
                 </TraceCollapsible>
               );
             }
 
             const tokens =
-              (item.phase === "generating" || item.phase === "repairing") &&
-              state === "running"
+              item.phase === "generating" || item.phase === "repairing"
                 ? item.outputTokens
+                : undefined;
+            const durationSeconds =
+              item.phase === "ready" && outputVariant?.durationMs !== undefined
+                ? Math.max(1, Math.round(outputVariant.durationMs / 1000))
                 : undefined;
             return (
               <div key={item.id}>
@@ -563,9 +637,14 @@ function VariantCard({
                   <TraceTitle>{item.title}</TraceTitle>
                   {tokens ? (
                     <TraceDescription>
+                      {/* Live counts are estimated from streamed text. */}
+                      {state === "running" ? "~" : ""}
                       {tokens.toLocaleString()} tokens
                     </TraceDescription>
                   ) : null}
+                  {durationSeconds !== undefined && (
+                    <TraceDescription>{durationSeconds}s total</TraceDescription>
+                  )}
                 </TraceLine>
               </div>
             );
