@@ -503,18 +503,20 @@ function RefineContent() {
   const mobile = isMobileViewport(viewport);
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col gap-4 px-10 py-10">
+    // Screen 18F: flush, full-height panels under the header; only the chat
+    // list and the canvas scroll, never the page.
+    <div className="flex min-h-full w-full flex-col lg:h-full">
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="m-4 mb-0 w-auto">
           <HugeIcon icon={Alert02Icon} size={16} />
           <AlertTitle>Something went wrong</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="flex min-h-0 w-full flex-1 flex-col lg:flex-row items-stretch gap-8">
-        {/* Refine panel */}
-        <section className="flex w-full lg:w-[640px] shrink-0 flex-col gap-4 rounded-[14px] border border-border bg-card p-6">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-stretch lg:flex-row">
+        {/* Refine panel: fixed 640px chat column */}
+        <section className="flex min-h-[560px] w-full shrink-0 flex-col gap-4 border-b border-border bg-background px-6 pt-4 pb-4 lg:min-h-0 lg:w-[640px] lg:border-r lg:border-b-0">
           {rightTab === "components" ? (
             <Tabs value="code" className="flex min-h-0 flex-1 flex-col gap-4">
               <TabsList variant="line" className="w-auto gap-0 border-b-0">
@@ -587,9 +589,9 @@ function RefineContent() {
         </section>
 
         {/* Canvas column */}
-        <section className="flex min-w-0 flex-1 flex-col gap-4 rounded-[12px] border border-border bg-card px-4 pb-4">
+        <section className="flex min-h-[640px] min-w-0 flex-1 flex-col gap-4 bg-background px-4 pt-4 pb-4 lg:min-h-0">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex min-h-0 flex-1 flex-col gap-4">
-            <TabsList variant="line" className="gap-0 pt-2">
+            <TabsList variant="line" className="gap-0">
               <TabsTrigger value="preview" className={cn(TAB_TRIGGER, "flex-1")}>
                 <HugeIcon icon={ViewIcon} size={16} />
                 Preview

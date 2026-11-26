@@ -248,8 +248,10 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col justify-end gap-4">
-      <div ref={listRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-live="polite">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-4">
+      {/* Only the message list scrolls; messages sit at its bottom. */}
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" aria-live="polite">
+        <div className="mt-auto" aria-hidden="true" />
         {messages.map((m) =>
           m.role === "ai" ? (
             <div key={m.id} className="flex items-start gap-2">
