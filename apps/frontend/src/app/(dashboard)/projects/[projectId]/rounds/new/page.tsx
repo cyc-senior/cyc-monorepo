@@ -108,6 +108,15 @@ function ReviewStructuredPromptContent() {
     setThoughtOpen(isLoading);
   }
 
+  // Designer-written personas come before AI-drafted ones when none is picked.
+  const personasByPriority = React.useMemo(
+    () =>
+      [...personas].sort(
+        (a, b) => Number(a.origin === "AI") - Number(b.origin === "AI")
+      ),
+    [personas]
+  );
+
   // The persona the designer picked, else the one the prompt was drafted for.
   const [personaChoice, setSelectedPersonaId] = React.useState<string | null>(null);
   const selectedPersonaId = personaChoice ?? draftedPersonaId;
@@ -192,7 +201,7 @@ function ReviewStructuredPromptContent() {
       const job = await startGenerationJob(projectId, roundId, {
         prompt: `Goal: ${goalText}. User: ${personaSummary}. Problem: ${problemText}. Constraints: ${mustUseText}. Variant A: ${designAName} (${designADesc}). Variant B: ${designBName} (${designBDesc}). Evaluation: ${comparisonQuestion}.`,
         storyIds: [storyId],
-        personaIds: selectedPersonaId ? [selectedPersonaId] : personas.slice(0, 5).map((p) => p.id),
+        personaIds: selectedPersonaId ? [selectedPersonaId] : personasByPriority.slice(0, 5).map((p) => p.id),
         synthesizePersona: Boolean(!selectedPersonaId && personas.length === 0),
       });
 
@@ -219,10 +228,11 @@ function ReviewStructuredPromptContent() {
   }
 
   const selectedPersonaObj = personas.find((p) => p.id === selectedPersonaId);
+  const fallbackPersona = personasByPriority[0];
   const personaDisplay = selectedPersonaObj
     ? `${selectedPersonaObj.name}${selectedPersonaObj.age ? `, ${selectedPersonaObj.age}` : ""}`
-    : personas[0]
-    ? `${personas[0].name}${personas[0].age ? `, ${personas[0].age}` : ""}`
+    : fallbackPersona
+    ? `${fallbackPersona.name}${fallbackPersona.age ? `, ${fallbackPersona.age}` : ""}`
     : "Primary persona";
 
   return (

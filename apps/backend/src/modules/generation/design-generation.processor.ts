@@ -358,6 +358,22 @@ export class DesignGenerationProcessor
         usage: { promptTokens: 0, completionTokens: 0 },
       }
     }
+    // Another job of this project drafted one while this job was queued:
+    // reuse it so the project keeps a single AI persona.
+    const drafted = await this.prisma.userPersona.findFirst({
+      where: { projectId, origin: 'AI' },
+      orderBy: { createdAt: 'asc' },
+    })
+    if (drafted) {
+      this.logger.log(
+        logEvent('persona.reused', { job: id, persona: drafted.id }),
+      )
+      return {
+        id: drafted.id,
+        persona: drafted,
+        usage: { promptTokens: 0, completionTokens: 0 },
+      }
+    }
     await job.updateProgress({
       stage: 'persona',
       of: 1,

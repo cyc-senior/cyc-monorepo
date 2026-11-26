@@ -147,7 +147,24 @@ export class GenerationJobsService {
         data: { storyId: stories[0].id },
       })
     }
-    const personas = await this.personas(projectId, dto.personaIds)
+    // One AI persona per project: when a round asks for one but an earlier
+    // round (e.g. started at the same time) already drafted it, reuse it
+    // instead of adding a duplicate to the project.
+    let personaIds = dto.personaIds
+    let synthesizePersona =
+      dto.synthesizePersona ?? (personaIds?.length ? false : true)
+    if (synthesizePersona) {
+      const drafted = await this.prisma.userPersona.findFirst({
+        where: { projectId, origin: 'AI' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      })
+      if (drafted) {
+        personaIds = [drafted.id]
+        synthesizePersona = false
+      }
+    }
+    const personas = await this.personas(projectId, personaIds)
     const baseDesign = await this.baseDesign(projectId, dto.baseVariantId)
     const feedbackThemes = await this.feedbackThemes(roundId)
     const input: GenerationInput = {
@@ -175,8 +192,7 @@ export class GenerationJobsService {
       personas,
       stories,
       prompt: dto.prompt,
-      synthesizePersona:
-        dto.synthesizePersona ?? (dto.personaIds?.length ? false : true),
+      synthesizePersona,
       baseDesign,
       feedbackThemes,
     }

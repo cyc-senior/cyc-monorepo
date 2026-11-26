@@ -37,9 +37,9 @@ import {
 
 export function CodeEmptyState() {
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 rounded-[10px] bg-[var(--cyc-bg-brand)] px-8 text-center">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 rounded-[10px] bg-cyc-bg-brand px-8 text-center">
       <HugeIcon icon={BracketsIcon} size={24} className="text-primary" />
-      <p className="font-heading text-xl font-medium leading-7 text-white">
+      <p className="font-heading text-xl font-medium leading-7 text-brand-foreground">
         Pick any component to see source code.
       </p>
     </div>
