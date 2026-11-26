@@ -1,206 +1,161 @@
-import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+"use client"
 
-const traceLineVariants = cva(
-  "flex items-start gap-2.5 py-2 px-1 text-sm transition-colors rounded-md",
-  {
-    variants: {
-      status: {
-        default: "text-card-foreground",
-        finished: "text-card-foreground font-medium",
-        running: "text-card-foreground font-medium",
-        pending: "text-muted-foreground opacity-60",
-        error: "text-destructive font-medium",
-      },
-    },
-    defaultVariants: {
-      status: "default",
-    },
-  }
-);
+/**
+ * shadcn/ui Trace (registry: radix-nova/trace).
+ * Local changes: `cn` from "@/lib/utils", hugeicons chevron, and Radix
+ * `data-[state=…]` selectors instead of the registry's `data-open`/`data-closed` variants.
+ */
+import * as React from "react"
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
-type TraceProps = React.HTMLAttributes<HTMLDivElement>;
+import { cn } from "@/lib/utils"
+import { HugeIcon } from "@/components/ui/huge-icon"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
-const Trace = React.forwardRef<HTMLDivElement, TraceProps>(
-  ({ className, ...props }, ref) => (
+function Trace({ className, ...props }: React.ComponentProps<"div">) {
+  return (
     <div
-      ref={ref}
-      role="list"
-      className={cn("flex flex-col gap-0.5 w-full", className)}
-      {...props}
-    />
-  )
-);
-Trace.displayName = "Trace";
-
-type TraceLineProps = React.HTMLAttributes<HTMLDivElement> &
-  VariantProps<typeof traceLineVariants>;
-
-const TraceLine = React.forwardRef<HTMLDivElement, TraceLineProps>(
-  ({ className, status = "default", ...props }, ref) => (
-    <div
-      ref={ref}
-      role="listitem"
-      data-status={status}
-      className={cn(traceLineVariants({ status }), className)}
-      {...props}
-    />
-  )
-);
-TraceLine.displayName = "TraceLine";
-
-type TraceIconProps = React.HTMLAttributes<HTMLSpanElement>;
-
-const TraceIcon = React.forwardRef<HTMLSpanElement, TraceIconProps>(
-  ({ className, ...props }, ref) => (
-    <span
-      ref={ref}
+      data-slot="trace"
       className={cn(
-        "flex size-5 shrink-0 items-center justify-center text-muted-foreground mt-0.5",
+        "flex w-full min-w-0 flex-col gap-2 *:has-[>[data-slot=trace-line]]:flex *:has-[>[data-slot=trace-line]]:w-fit *:has-[>[data-slot=trace-line]]:max-w-full *:has-[>[data-slot=trace-line]]:min-w-0 *:has-[>[data-slot=trace-line]]:rounded-md *:has-[>[data-slot=trace-line]]:text-left *:has-[>[data-slot=trace-line]]:outline-none *:has-[>[data-slot=trace-line]]:focus-visible:ring-3 *:has-[>[data-slot=trace-line]]:focus-visible:ring-ring/50",
         className
       )}
       {...props}
     />
   )
-);
-TraceIcon.displayName = "TraceIcon";
+}
 
-type TraceTitleProps = React.HTMLAttributes<HTMLSpanElement>;
-
-const TraceTitle = React.forwardRef<HTMLSpanElement, TraceTitleProps>(
-  ({ className, ...props }, ref) => (
+function TraceLine({
+  className,
+  status,
+  ...props
+}: React.ComponentProps<"span"> & {
+  status?: "running" | "error" | "pending"
+}) {
+  return (
     <span
-      ref={ref}
-      className={cn("text-sm leading-5 flex-1 min-w-0 truncate", className)}
+      data-slot="trace-line"
+      data-status={status}
+      className={cn(
+        "flex w-fit max-w-full min-w-0 items-center gap-2 text-sm text-muted-foreground transition-colors in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
+        className
+      )}
       {...props}
     />
   )
-);
-TraceTitle.displayName = "TraceTitle";
-
-type TraceDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>;
-
-const TraceDescription = React.forwardRef<
-  HTMLParagraphElement,
-  TraceDescriptionProps
->(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn("text-xs text-muted-foreground leading-normal mt-0.5", className)}
-    {...props}
-  />
-));
-TraceDescription.displayName = "TraceDescription";
-
-interface TraceCollapsibleContextValue {
-  open: boolean;
-  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
-}
-const TraceCollapsibleContext = React.createContext<TraceCollapsibleContextValue | null>(null);
-
-function useTraceCollapsible() {
-  const context = React.useContext(TraceCollapsibleContext);
-  if (!context) {
-    throw new Error("TraceCollapsible subcomponents must be used within a TraceCollapsible");
-  }
-  return context;
 }
 
-interface TraceCollapsibleProps extends React.HTMLAttributes<HTMLDivElement> {
-  defaultOpen?: boolean;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+function TraceIcon({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="trace-icon"
+      aria-hidden="true"
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [[data-slot=trace-title]~&]:-ml-1",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-const TraceCollapsible = React.forwardRef<HTMLDivElement, TraceCollapsibleProps>(
-  ({ className, defaultOpen = false, open: controlledOpen, onOpenChange, children, ...props }, ref) => {
-    const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
-    const isOpen = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen;
+function TraceTitle({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="trace-title"
+      className={cn("min-w-0 truncate motion-reduce:shimmer-none", className)}
+      {...props}
+    />
+  )
+}
 
-    const setOpen = React.useCallback(
-      (value: React.SetStateAction<boolean>) => {
-        const nextValue = typeof value === "function" ? value(isOpen) : value;
-        if (controlledOpen === undefined) {
-          setUncontrolledOpen(nextValue);
-        }
-        onOpenChange?.(nextValue);
-      },
-      [controlledOpen, isOpen, onOpenChange]
-    );
+function TraceDescription({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="trace-description"
+      className={cn(
+        "shrink-0 text-muted-foreground/70 tabular-nums",
+        className
+      )}
+      {...props}
+    />
+  )
+}
 
-    return (
-      <TraceCollapsibleContext.Provider value={{ open: isOpen, setOpen }}>
-        <div
-          ref={ref}
-          data-state={isOpen ? "open" : "closed"}
-          className={cn("w-full", className)}
-          {...props}
+function TraceCollapsible({
+  className,
+  ...props
+}: Omit<React.ComponentProps<typeof Collapsible>, "asChild" | "open"> &
+  (
+    | { open?: undefined }
+    | {
+        open: boolean
+        onOpenChange: NonNullable<
+          React.ComponentProps<typeof Collapsible>["onOpenChange"]
         >
-          {children}
-        </div>
-      </TraceCollapsibleContext.Provider>
-    );
-  }
-);
-TraceCollapsible.displayName = "TraceCollapsible";
+      }
+  )) {
+  return (
+    <Collapsible
+      data-slot="trace-collapsible"
+      className={cn("flex w-full min-w-0 flex-col", className)}
+      {...props}
+    />
+  )
+}
 
-type TraceCollapsibleTriggerProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
+function TraceCollapsibleTrigger({
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof CollapsibleTrigger>, "asChild">) {
+  return (
+    <CollapsibleTrigger
+      data-slot="trace-collapsible-trigger"
+      className={cn(
+        "group/trace-collapsible-trigger flex w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-md text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 has-[[data-status=error]]:text-destructive",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
+        <HugeIcon icon={ArrowRight01Icon} size={16} />
+      </TraceIcon>
+    </CollapsibleTrigger>
+  )
+}
 
-const TraceCollapsibleTrigger = React.forwardRef<HTMLButtonElement, TraceCollapsibleTriggerProps>(
-  ({ className, children, onClick, ...props }, ref) => {
-    const { open, setOpen } = useTraceCollapsible();
-
-    return (
-      <button
-        ref={ref}
-        type="button"
-        aria-expanded={open}
-        onClick={(e) => {
-          setOpen((prev) => !prev);
-          onClick?.(e);
-        }}
+function TraceCollapsibleContent({
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof CollapsibleContent>, "asChild">) {
+  return (
+    <CollapsibleContent
+      data-slot="trace-collapsible-content"
+      className="min-w-0 overflow-hidden duration-200 data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up"
+      {...props}
+    >
+      <div
+        data-slot="trace-collapsible-content-inner"
         className={cn(
-          "flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 font-medium select-none group",
+          "mt-2 mb-1 ml-[calc(--spacing(2)-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
           className
         )}
-        {...props}
-      >
-        <ChevronDown
-          className={cn(
-            "size-3.5 transition-transform duration-200 shrink-0 text-muted-foreground group-hover:text-foreground",
-            open ? "rotate-0" : "-rotate-90"
-          )}
-        />
-        {children}
-      </button>
-    );
-  }
-);
-TraceCollapsibleTrigger.displayName = "TraceCollapsibleTrigger";
-
-type TraceCollapsibleContentProps = React.HTMLAttributes<HTMLDivElement>;
-
-const TraceCollapsibleContent = React.forwardRef<HTMLDivElement, TraceCollapsibleContentProps>(
-  ({ className, children, ...props }, ref) => {
-    const { open } = useTraceCollapsible();
-
-    if (!open) return null;
-
-    return (
-      <div
-        ref={ref}
-        data-state={open ? "open" : "closed"}
-        className={cn("mt-1.5 overflow-hidden transition-all text-xs", className)}
-        {...props}
       >
         {children}
       </div>
-    );
-  }
-);
-TraceCollapsibleContent.displayName = "TraceCollapsibleContent";
+    </CollapsibleContent>
+  )
+}
 
 export {
   Trace,
@@ -211,5 +166,4 @@ export {
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
-  traceLineVariants,
-};
+}

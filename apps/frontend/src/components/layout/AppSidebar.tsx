@@ -91,6 +91,13 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
     .slice(0, 2)
     .toUpperCase();
 
+  const handleSelectWorkspace = (ws: (typeof workspaces)[number]) => {
+    setCurrentWorkspace(ws);
+    if (pathname !== "/projects") {
+      router.push("/projects");
+    }
+  };
+
   // COLLAPSED VIEW (Figma Node 949:13416: width 48px, icons centered)
   if (collapsed) {
     return (
@@ -127,7 +134,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
                 {workspaces.map((ws) => (
                   <DropdownMenuItem
                     key={ws.id}
-                    onClick={() => setCurrentWorkspace(ws)}
+                    onClick={() => handleSelectWorkspace(ws)}
                     className="flex items-center justify-between gap-2 cursor-pointer"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -333,7 +340,7 @@ export function AppSidebar({ collapsed = false }: AppSidebarProps) {
               {workspaces.map((ws) => (
                 <DropdownMenuItem
                   key={ws.id}
-                  onClick={() => setCurrentWorkspace(ws)}
+                  onClick={() => handleSelectWorkspace(ws)}
                   className="flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <div className="flex items-center gap-2 min-w-0">

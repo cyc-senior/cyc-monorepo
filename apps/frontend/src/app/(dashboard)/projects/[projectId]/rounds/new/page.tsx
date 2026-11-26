@@ -22,8 +22,19 @@ import {
   ArrowLeft01Icon,
   SparklesIcon,
   Loading03Icon,
+  AiBrain01Icon,
+  RefreshIcon,
 } from "@hugeicons/core-free-icons";
-import { Brain, RotateCcw } from "lucide-react";
+import {
+  Trace,
+  TraceLine,
+  TraceIcon,
+  TraceTitle,
+  TraceDescription,
+  TraceCollapsible,
+  TraceCollapsibleTrigger,
+  TraceCollapsibleContent,
+} from "@/components/ui/trace";
 import { cn } from "@/lib/utils";
 import {
   updateUserStory,
@@ -87,6 +98,14 @@ function ReviewStructuredPromptContent() {
     if (p.variantB?.name) setDesignBName(p.variantB.name);
     if (p.variantB?.description) setDesignBDesc(p.variantB.description);
   });
+  // Reasoning stays open while it streams and folds away once drafting ends.
+  const [thoughtOpen, setThoughtOpen] = React.useState(true);
+  const [prevLoading, setPrevLoading] = React.useState(isLoading);
+  if (prevLoading !== isLoading) {
+    setPrevLoading(isLoading);
+    setThoughtOpen(isLoading);
+  }
+
   // The persona the designer picked, else the one the prompt was drafted for.
   const [personaChoice, setSelectedPersonaId] = React.useState<string | null>(null);
   const selectedPersonaId = personaChoice ?? draftedPersonaId;
@@ -234,7 +253,7 @@ function ReviewStructuredPromptContent() {
               disabled={isLoading}
               className="h-8 gap-1.5 self-start sm:self-auto border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer shrink-0"
             >
-              <RotateCcw className={cn("size-3.5", isLoading && "animate-spin")} />
+              <HugeIcon icon={isLoading ? Loading03Icon : RefreshIcon} size={14} className={cn(isLoading && "animate-spin")} />
               <span>{isLoading ? "Retrying..." : "Try again"}</span>
             </Button>
           </AlertDescription>
@@ -524,34 +543,46 @@ function ReviewStructuredPromptContent() {
 
         {/* Right Column */}
         <div className="w-full lg:w-[400px] shrink-0 space-y-4 lg:sticky lg:top-6 self-start">
-          {/* Live Status Card while drafting */}
+          {/* Live AI trace while drafting (shadcn Trace) */}
           {(backendStatus || thoughtText) && (
-            <div className="rounded-[14px] border border-border bg-card p-4 shadow-xs flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                {isLoading ? (
-                  <HugeIcon
-                    icon={Loading03Icon}
-                    size={20}
-                    className="animate-spin text-muted-foreground shrink-0"
-                  />
-                ) : (
-                  <Brain className="size-5 text-violet-500 shrink-0" />
-                )}
-                <span className="text-sm font-medium text-foreground">
-                  {isLoading
-                    ? outputTokens > 0
-                      ? `${backendStatus || "Drafting your prompt with AI..."} (${outputTokens.toLocaleString()} tokens)`
-                      : `${backendStatus || "Reasoning about prompt strategy..."}${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`
-                    : thoughtDurationSeconds
-                      ? `Thought for ${thoughtDurationSeconds} second${thoughtDurationSeconds === 1 ? "" : "s"}${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`
-                      : `AI strategy reasoning${thoughtTokens > 0 ? ` (${thoughtTokens.toLocaleString()} tokens)` : ""}`}
-                </span>
-              </div>
-              {thoughtText && (
-                <div className="rounded-md border border-border/70 bg-muted/40 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-56 overflow-y-auto select-text shadow-inner">
-                  {thoughtText}
-                </div>
-              )}
+            <div className="rounded-[14px] border border-border bg-card p-4 shadow-xs">
+              <Trace>
+                <TraceCollapsible open={thoughtOpen} onOpenChange={setThoughtOpen}>
+                  <TraceCollapsibleTrigger disabled={!thoughtText}>
+                    <TraceLine status={isLoading ? "running" : undefined}>
+                      <TraceIcon>
+                        <HugeIcon
+                          icon={isLoading ? Loading03Icon : AiBrain01Icon}
+                          size={16}
+                          className={cn(isLoading && "animate-spin")}
+                        />
+                      </TraceIcon>
+                      <TraceTitle>
+                        {isLoading
+                          ? backendStatus ||
+                            (outputTokens > 0
+                              ? "Drafting your prompt with AI…"
+                              : "Reasoning about prompt strategy…")
+                          : thoughtDurationSeconds
+                            ? `Thought for ${thoughtDurationSeconds} second${thoughtDurationSeconds === 1 ? "" : "s"}`
+                            : "AI strategy reasoning"}
+                      </TraceTitle>
+                      {(isLoading ? outputTokens || thoughtTokens : thoughtTokens) > 0 && (
+                        <TraceDescription>
+                          {(isLoading ? outputTokens || thoughtTokens : thoughtTokens).toLocaleString()} tokens
+                        </TraceDescription>
+                      )}
+                    </TraceLine>
+                  </TraceCollapsibleTrigger>
+                  {thoughtText && (
+                    <TraceCollapsibleContent>
+                      <p className="max-h-56 overflow-y-auto whitespace-pre-wrap text-xs select-text">
+                        {thoughtText}
+                      </p>
+                    </TraceCollapsibleContent>
+                  )}
+                </TraceCollapsible>
+              </Trace>
             </div>
           )}
 

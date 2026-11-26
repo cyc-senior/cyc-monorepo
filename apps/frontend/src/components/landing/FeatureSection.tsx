@@ -1,17 +1,18 @@
 import * as React from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconSvgElement } from "@hugeicons/react";
+import { HugeIcon } from "@/components/ui/huge-icon";
 import { cn } from "@/lib/utils";
 import type { FeatureItem } from "@/config/landing-page-data";
 
 export interface FeatureCardProps {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   title: string;
   description: string;
   className?: string;
 }
 
 export function FeatureCard({
-  icon: Icon,
+  icon,
   title,
   description,
   className,
@@ -19,7 +20,7 @@ export function FeatureCard({
   return (
     <div className={cn("flex items-start gap-3", className)}>
       <div className="mt-0.5 shrink-0 text-brand-text">
-        <Icon className="size-4" aria-hidden="true" />
+        <HugeIcon icon={icon} size={16} />
       </div>
       <div>
         <h3 className="mb-1 font-sans text-sm font-semibold text-brand-text">

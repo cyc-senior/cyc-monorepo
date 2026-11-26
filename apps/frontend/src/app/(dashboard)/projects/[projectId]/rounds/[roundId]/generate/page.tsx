@@ -13,22 +13,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { HugeIcon } from "@/components/ui/huge-icon";
+import type { IconSvgElement } from "@hugeicons/react";
 import {
+  AiBrain01Icon,
   Alert02Icon,
+  CheckmarkCircle02Icon,
   CircleIcon,
+  File01Icon,
   Loading03Icon,
+  SecurityCheckIcon,
+  SourceCodeIcon,
   Tick02Icon,
+  Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import {
   Trace,
   TraceLine,
   TraceIcon,
+  TraceTitle,
+  TraceDescription,
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
 } from "@/components/ui/trace";
-import { Brain, CheckCircle2, FileCode, ShieldCheck, Wrench } from "lucide-react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import {
   useJobStream,
@@ -199,78 +207,110 @@ function SharedIntentBanner({
         </div>
       </div>
 
-      {isDone && (
-        <div className="ml-9">
-          <TraceCollapsible defaultOpen={false} className="w-full">
-            <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-muted-foreground hover:text-foreground font-medium cursor-pointer">
-              <span>Design intent & context summary</span>
-            </TraceCollapsibleTrigger>
-            <TraceCollapsibleContent>
-              <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
+      {(isDone || job.inputSnapshot?.synthesizePersona) && (
+        <Trace className="ml-9 mt-1">
+          {isDone && (
+            <TraceCollapsible>
+              <TraceCollapsibleTrigger>
+                <TraceLine>
+                  <TraceIcon>
+                    <HugeIcon icon={File01Icon} size={16} />
+                  </TraceIcon>
+                  <TraceTitle>Design intent &amp; context summary</TraceTitle>
+                </TraceLine>
+              </TraceCollapsibleTrigger>
+              <TraceCollapsibleContent className="space-y-1 text-xs">
                 <p>
-                  • Story: &ldquo;
+                  Story: &ldquo;
                   {job.inputSnapshot?.stories?.[0]?.title ??
                     "Primary user workflow"}
                   &rdquo;
                 </p>
-                <p>• UI Library: {designSystem}</p>
-                <p>• Standard: {standard}</p>
-                <p>• Accessibility & color tokens injected into context.</p>
-              </div>
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-        </div>
-      )}
+                <p>UI library: {designSystem}</p>
+                <p>Standard: {standard}</p>
+                <p>Accessibility &amp; color tokens injected into context.</p>
+              </TraceCollapsibleContent>
+            </TraceCollapsible>
+          )}
 
-      {job.inputSnapshot?.synthesizePersona && (
-        <div className="mt-2 pt-2 border-t border-border/60 ml-9">
-          <TraceCollapsible
-            open={openThoughtKey === "persona"}
-            onOpenChange={(open) => onToggleThought("persona", open)}
-            className="w-full"
-          >
-            <div className="flex items-center gap-2">
-              <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                <Brain
-                  className={cn(
-                    "size-3.5 shrink-0",
-                    personaRunning
-                      ? "text-violet-500 animate-pulse"
-                      : "text-muted-foreground"
-                  )}
-                />
-                <span>
-                  {personaRunning
-                    ? "Thinking (Drafting persona)..."
-                    : "Drafted a persona from your prompt"}
-                </span>
+          {job.inputSnapshot?.synthesizePersona && (
+            <TraceCollapsible
+              open={openThoughtKey === "persona"}
+              onOpenChange={(open) => onToggleThought("persona", open)}
+            >
+              <TraceCollapsibleTrigger>
+                <TraceLine status={personaRunning ? "running" : undefined}>
+                  <TraceIcon>
+                    <TraceStateIcon
+                      state={personaRunning ? "running" : pastPersona ? "done" : "pending"}
+                      icon={AiBrain01Icon}
+                    />
+                  </TraceIcon>
+                  <TraceTitle>
+                    {personaRunning
+                      ? "Drafting a persona from your prompt…"
+                      : "Drafted a persona from your prompt"}
+                  </TraceTitle>
+                </TraceLine>
               </TraceCollapsibleTrigger>
-              {personaRunning && (
-                <HugeIcon
-                  icon={Loading03Icon}
-                  size={12}
-                  className="animate-spin text-muted-foreground ml-auto shrink-0"
-                />
-              )}
-              {!personaRunning && pastPersona && (
-                <HugeIcon
-                  icon={Tick02Icon}
-                  size={12}
-                  className="text-muted-foreground/70 ml-auto shrink-0"
-                />
-              )}
-            </div>
-            <TraceCollapsibleContent>
-              <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                {personaThought ||
-                  "Synthesized target user persona from your prompt and project design intent."}
-              </div>
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-        </div>
+              <TraceCollapsibleContent>
+                <ThoughtText>
+                  {personaThought ||
+                    "Synthesized target user persona from your prompt and project design intent."}
+                </ThoughtText>
+              </TraceCollapsibleContent>
+            </TraceCollapsible>
+          )}
+        </Trace>
       )}
     </div>
   );
+}
+
+type TraceState = "running" | "done" | "error" | "pending";
+
+/** Phase icon of a trace step; every running step shows the same spinner. */
+function TraceStateIcon({
+  state,
+  icon,
+}: {
+  state: TraceState;
+  icon: IconSvgElement;
+}) {
+  if (state === "running") {
+    return <HugeIcon icon={Loading03Icon} size={16} className="animate-spin" />;
+  }
+  if (state === "error") {
+    return <HugeIcon icon={Alert02Icon} size={16} />;
+  }
+  return <HugeIcon icon={icon} size={16} />;
+}
+
+/** Streamed model reasoning inside an open trace step. */
+function ThoughtText({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="max-h-48 overflow-y-auto whitespace-pre-wrap text-xs select-text">
+      {children}
+    </p>
+  );
+}
+
+const PHASE_ICONS: Record<VariantTraceItem["phase"], IconSvgElement> = {
+  thinking: AiBrain01Icon,
+  generating: SourceCodeIcon,
+  checking: SecurityCheckIcon,
+  repairing: Wrench01Icon,
+  ready: CheckmarkCircle02Icon,
+};
+
+function traceState(status: VariantTraceItem["status"]): TraceState {
+  if (status === "running") return "running";
+  if (status === "error") return "error";
+  return "done";
+}
+
+function lineStatus(state: TraceState): "running" | "error" | undefined {
+  return state === "running" || state === "error" ? state : undefined;
 }
 
 function getVariantTraces(
@@ -448,201 +488,86 @@ function VariantCard({
       ) : (
         <Trace className="flex-1">
           {variantTraces.map((item) => {
+            const state = traceState(item.status);
+            const icon = (
+              <TraceIcon>
+                <TraceStateIcon state={state} icon={PHASE_ICONS[item.phase]} />
+              </TraceIcon>
+            );
+
             if (item.phase === "thinking") {
-              const isRunning = item.status === "running";
-              const liveTokens = item.thoughtTokens;
-              const runningBase =
-                (item.attempt ?? 1) > 1
-                  ? `Thinking about fixes (Attempt ${item.attempt})...`
-                  : "Thinking...";
-              const displayTitle = isRunning
-                ? `${runningBase}${liveTokens ? ` (${liveTokens.toLocaleString()} tokens)` : ""}`
+              const running = state === "running";
+              const title = running
+                ? (item.attempt ?? 1) > 1
+                  ? `Thinking about fixes (attempt ${item.attempt})…`
+                  : "Thinking…"
                 : item.title;
               const thoughtKey = `v${index}-${item.id}`;
-              const isOpen = openThoughtKey === thoughtKey;
-
-              return (
-                <TraceLine
-                  key={item.id}
-                  status={isRunning ? "running" : "finished"}
-                >
-                  <TraceIcon>
-                    <Brain
-                      className={cn(
-                        "size-4 shrink-0",
-                        isRunning
-                          ? "text-violet-500 animate-pulse"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible
-                      open={isOpen}
-                      onOpenChange={(open) =>
-                        onToggleThought(thoughtKey, open)
-                      }
-                      className="w-full"
-                    >
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{displayTitle}</span>
-                        </TraceCollapsibleTrigger>
-                        {isRunning && (
-                          <HugeIcon
-                            icon={Loading03Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {!isRunning && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      {item.thought && (
-                        <TraceCollapsibleContent>
-                          <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                            {item.thought}
-                          </div>
-                        </TraceCollapsibleContent>
-                      )}
-                    </TraceCollapsible>
-                  </div>
+              const tokens = running ? item.thoughtTokens : undefined;
+              const line = (
+                <TraceLine status={lineStatus(state)}>
+                  {icon}
+                  <TraceTitle>{title}</TraceTitle>
+                  {tokens ? (
+                    <TraceDescription>
+                      {tokens.toLocaleString()} tokens
+                    </TraceDescription>
+                  ) : null}
                 </TraceLine>
+              );
+              if (!item.thought) return <div key={item.id}>{line}</div>;
+              return (
+                <TraceCollapsible
+                  key={item.id}
+                  open={openThoughtKey === thoughtKey}
+                  onOpenChange={(open) => onToggleThought(thoughtKey, open)}
+                >
+                  <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+                  <TraceCollapsibleContent>
+                    <ThoughtText>{item.thought}</ThoughtText>
+                  </TraceCollapsibleContent>
+                </TraceCollapsible>
               );
             }
 
             if (item.phase === "checking") {
               return (
-                <TraceLine
-                  key={item.id}
-                  status={
-                    item.status === "running"
-                      ? "running"
-                      : item.status === "error"
-                        ? "error"
-                        : "finished"
-                  }
-                >
-                  <TraceIcon>
-                    <ShieldCheck
-                      className={cn(
-                        "size-4 shrink-0",
-                        item.status === "running"
-                          ? "text-amber-500 animate-pulse"
-                          : item.status === "error"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      )}
-                    />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible defaultOpen={false} className="w-full">
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{item.title}</span>
-                        </TraceCollapsibleTrigger>
-                        {item.status === "running" && (
-                          <HugeIcon
-                            icon={Loading03Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {item.status === "done" && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      <TraceCollapsibleContent>
-                        <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
-                          <p>
-                            ✓ {standard}: Contrast thresholds verified (4.5:1
-                            text, 3:1 graphical elements).
-                          </p>
-                          <p>
-                            ✓ UI Kit: Component markup confirmed against{" "}
-                            {designSystem} specifications.
-                          </p>
-                          <p>
-                            ✓ DOM structure: Verified slot attributes and tag
-                            nesting.
-                          </p>
-                        </div>
-                      </TraceCollapsibleContent>
-                    </TraceCollapsible>
-                  </div>
-                </TraceLine>
+                <TraceCollapsible key={item.id}>
+                  <TraceCollapsibleTrigger>
+                    <TraceLine status={lineStatus(state)}>
+                      {icon}
+                      <TraceTitle>{item.title}</TraceTitle>
+                    </TraceLine>
+                  </TraceCollapsibleTrigger>
+                  <TraceCollapsibleContent className="space-y-1 text-xs">
+                    <p>
+                      {standard}: contrast thresholds (4.5:1 text, 3:1
+                      graphical elements).
+                    </p>
+                    <p>UI kit: component markup against {designSystem}.</p>
+                    <p>DOM structure: slot attributes and tag nesting.</p>
+                  </TraceCollapsibleContent>
+                </TraceCollapsible>
               );
             }
 
+            const tokens =
+              (item.phase === "generating" || item.phase === "repairing") &&
+              state === "running"
+                ? item.outputTokens
+                : undefined;
             return (
-              <TraceLine
-                key={item.id}
-                status={item.status === "running" ? "running" : "finished"}
-              >
-                <TraceIcon>
-                  {item.phase === "generating" ? (
-                    <FileCode
-                      className={cn(
-                        "size-4 shrink-0",
-                        item.status === "running"
-                          ? "text-blue-500 animate-pulse"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                  ) : item.phase === "repairing" ? (
-                    <Wrench
-                      className={cn(
-                        "size-4 shrink-0",
-                        item.status === "running"
-                          ? "text-amber-500 animate-pulse"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                  ) : (
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-                  )}
-                </TraceIcon>
-                <div className="flex flex-1 items-center justify-between min-w-0 py-0.5 text-xs">
-                  <span
-                    className={cn(
-                      "font-medium",
-                      item.status === "running"
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {item.title}
-                    {(item.phase === "generating" || item.phase === "repairing") &&
-                    item.outputTokens &&
-                    item.status === "running"
-                      ? ` (${item.outputTokens.toLocaleString()} tokens)`
-                      : null}
-                  </span>
-                  {item.status === "running" && (
-                    <HugeIcon
-                      icon={Loading03Icon}
-                      size={12}
-                      className="animate-spin text-muted-foreground shrink-0"
-                    />
-                  )}
-                  {item.status === "done" && item.phase !== "ready" && (
-                    <HugeIcon
-                      icon={Tick02Icon}
-                      size={12}
-                      className="text-muted-foreground/70 shrink-0"
-                    />
-                  )}
-                </div>
-              </TraceLine>
+              <div key={item.id}>
+                <TraceLine status={lineStatus(state)}>
+                  {icon}
+                  <TraceTitle>{item.title}</TraceTitle>
+                  {tokens ? (
+                    <TraceDescription>
+                      {tokens.toLocaleString()} tokens
+                    </TraceDescription>
+                  ) : null}
+                </TraceLine>
+              </div>
             );
           })}
         </Trace>

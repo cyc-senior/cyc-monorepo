@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -174,7 +175,7 @@ export function HeroSection({
                         role="alert"
                         className="mt-2 flex items-center gap-1.5 text-xs text-danger"
                       >
-                        <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                        <HugeIcon icon={AlertCircleIcon} size={14} />
                         <span>{error}</span>
                       </p>
                     )}

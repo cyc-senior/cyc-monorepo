@@ -1,28 +1,28 @@
+import type { IconSvgElement } from "@hugeicons/react";
 import {
-  Braces,
-  ChartLine,
-  CircleCheck,
-  Palette,
-  User,
-  Users,
-  WandSparkles,
-  type LucideIcon,
-} from "lucide-react";
+  BracketsIcon,
+  ChartLineData01Icon,
+  CheckmarkCircle02Icon,
+  PaintBoardIcon,
+  UserIcon,
+  UserGroupIcon,
+  MagicWand01Icon,
+} from "@hugeicons/core-free-icons";
 
 export interface StepItem {
   title: string;
   description: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
 }
 
 export interface FeatureItem {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   title: string;
   description: string;
 }
 
 export interface RoleItem {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   title: string;
   description: string;
   footerText: string;
@@ -80,22 +80,22 @@ export const stepsData: StepItem[] = [
   {
     title: "Set design intent",
     description: "Persona, design system, brand colour and tone of voice.",
-    icon: Palette,
+    icon: PaintBoardIcon,
   },
   {
     title: "AI builds A and B",
     description: "Two alternatives built from your own components.",
-    icon: WandSparkles,
+    icon: MagicWand01Icon,
   },
   {
     title: "Testers compare",
     description: "Real people do one task on both and give feedback.",
-    icon: Users,
+    icon: UserGroupIcon,
   },
   {
     title: "You decide",
     description: "Feedback grouped into usability problems and preferences.",
-    icon: CircleCheck,
+    icon: CheckmarkCircle02Icon,
   },
 ];
 
@@ -107,13 +107,13 @@ export const testerRoundsContent = {
 
 export const testerRoundFeatures: FeatureItem[] = [
   {
-    icon: WandSparkles,
+    icon: MagicWand01Icon,
     title: "AI runs the rounds",
     description:
       "It analyses each tester's feedback and regenerates their next A/B.",
   },
   {
-    icon: User,
+    icon: UserIcon,
     title: "You step in when feedback swings",
     description:
       "If a tester's feedback goes up and down instead of falling, you decide what changes next.",
@@ -169,21 +169,21 @@ export const roleCardsContent = {
 
 export const rolesData: RoleItem[] = [
   {
-    icon: User,
+    icon: UserIcon,
     title: "Client",
     description:
       "Who your users are and what the change means for the business.",
     footerText: "From 6 tester comments",
   },
   {
-    icon: Braces,
+    icon: BracketsIcon,
     title: "Developer",
     description:
       "Handoff spec, components, constraints and flagged technical risks.",
     footerText: "From 3 pinned comments",
   },
   {
-    icon: ChartLine,
+    icon: ChartLineData01Icon,
     title: "Project manager",
     description:
       "Round progress, timeline, gap, budget and resources across the project.",
