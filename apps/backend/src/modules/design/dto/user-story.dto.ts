@@ -13,6 +13,7 @@ import {
   DesignRoundStatus,
   GenerationJobStatus,
   Prisma,
+  PromptDraftStatus,
   StoryOrigin,
   UserStoryStatus,
 } from '../../../generated/prisma/client'
@@ -113,6 +114,11 @@ export class UserStoryDto {
 
   @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
   draftPrompt: Prisma.JsonValue | null
+
+  @ApiProperty({ enum: PromptDraftStatus, enumName: 'PromptDraftStatus' })
+  draftStatus: PromptDraftStatus
+
+  draftError: string | null
 
   @ApiProperty({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
   status: UserStoryStatus

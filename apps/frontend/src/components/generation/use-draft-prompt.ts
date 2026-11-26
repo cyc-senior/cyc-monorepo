@@ -161,6 +161,7 @@ export function useDraftPrompt(
             error: null,
           };
           await readSseStream(res.body, (event) => {
+            if (event.type === "heartbeat") return;
             if (event.type === "error") {
               outcome.error = sseErrorMessage(event.data, "Drafting the prompt failed.");
               return false;

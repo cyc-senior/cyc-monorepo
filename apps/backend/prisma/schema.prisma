@@ -352,17 +352,27 @@ enum StoryOrigin {
   AI
 }
 
+enum PromptDraftStatus {
+  IDLE
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model UserStory {
-  id                 String          @id @default(uuid()) @db.Uuid
-  projectId          String          @db.Uuid
-  origin             StoryOrigin     @default(MANUAL)
-  generationId       String?         @db.Uuid
+  id                 String            @id @default(uuid()) @db.Uuid
+  projectId          String            @db.Uuid
+  origin             StoryOrigin       @default(MANUAL)
+  generationId       String?           @db.Uuid
   title              String
   description        String?
   acceptanceCriteria String?
   problemStatement   String?
   draftPrompt        Json?
-  status             UserStoryStatus @default(DRAFT)
+  draftStatus        PromptDraftStatus @default(IDLE)
+  draftError         String?
+  status             UserStoryStatus   @default(DRAFT)
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 

@@ -119,6 +119,8 @@ export interface UserStoryItem {
   acceptanceCriteria?: string | null;
   problemStatement?: string | null;
   draftPrompt?: Record<string, unknown> | null;
+  draftStatus?: "IDLE" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  draftError?: string | null;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
