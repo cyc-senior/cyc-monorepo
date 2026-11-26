@@ -375,7 +375,7 @@ function NewUserStoryContent() {
                   <p className="text-xs text-muted-foreground">
                     No personas defined in design intent.{" "}
                     <Link
-                      href={`/projects/${projectId}/setup/intent`}
+                      href={`/projects/${projectId}/intent`}
                       className="underline hover:text-foreground"
                     >
                       Add persona
@@ -646,7 +646,7 @@ function NewUserStoryContent() {
                 asChild
                 className="w-full rounded-[10px] h-8 text-xs font-medium border-border cursor-pointer hover:bg-muted"
               >
-                <Link href={`/projects/${projectId}/setup/intent`}>
+                <Link href={`/projects/${projectId}/intent`}>
                   <span>Edit design intent</span>
                 </Link>
               </Button>

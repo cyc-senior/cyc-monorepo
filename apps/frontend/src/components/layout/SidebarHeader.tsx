@@ -73,6 +73,8 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
       const pages: Array<[string, string]> = [
         ["/setup/intent", "Design intent"],
         ["/setup/team", "Team & roles"],
+        ["/intent", "Design intent"],
+        ["/team", "Team & roles"],
         ["/overview", "Overview"],
         ["/sessions", "Test sessions"],
         ["/reports", "Reports"],

@@ -158,7 +158,7 @@ export function ProjectMainLandingView({
             asChild
             className="rounded-[10px] h-8 px-3 font-medium text-sm border-border cursor-pointer hover:bg-muted"
           >
-            <Link href={`/projects/${projectId}/setup/intent`}>
+            <Link href={`/projects/${projectId}/intent`}>
               <span>Edit design intent</span>
             </Link>
           </Button>
@@ -212,7 +212,7 @@ export function ProjectMainLandingView({
                 spacing (pb-2.5, no top or side padding, 2px underline slot)
                 so it lines up with the tabs beside it. */}
             <Link
-              href={`/projects/${projectId}/setup/intent`}
+              href={`/projects/${projectId}/intent`}
               className="-mb-px inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-0 pb-2.5 pt-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
             >
               Design intent

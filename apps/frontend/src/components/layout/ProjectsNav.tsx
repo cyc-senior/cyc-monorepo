@@ -251,10 +251,10 @@ export function ProjectsNav() {
                       ))}
                     </div>
                   )}
-                  <Link href={`${base}/setup/intent`} className={itemClass(here && pathname === `${base}/setup/intent`)}>
+                  <Link href={`${base}/intent`} className={itemClass(here && pathname === `${base}/intent`)}>
                     <span className="truncate">Design intent</span>
                   </Link>
-                  <Link href={`${base}/setup/team`} className={itemClass(here && pathname === `${base}/setup/team`)}>
+                  <Link href={`${base}/team`} className={itemClass(here && pathname === `${base}/team`)}>
                     <span className="truncate">Team &amp; roles</span>
                   </Link>
                 </div>
