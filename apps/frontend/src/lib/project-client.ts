@@ -238,9 +238,13 @@ export async function putDesignIntent(
 }
 
 /** Persona API calls */
-export async function listPersonas(projectId: string): Promise<PersonaItem[]> {
+export async function listPersonas(
+  projectId: string,
+  origin?: "MANUAL" | "AI"
+): Promise<PersonaItem[]> {
+  const query = origin ? `?origin=${origin}` : "";
   const res = await apiFetch<PersonaItem[] | { data: PersonaItem[] }>(
-    `/projects/${projectId}/personas`
+    `/projects/${projectId}/personas${query}`
   );
   return Array.isArray(res) ? res : res.data || [];
 }

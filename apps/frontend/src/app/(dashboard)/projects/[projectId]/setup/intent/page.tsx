@@ -86,7 +86,7 @@ function DesignIntentStep2Content() {
       try {
         const [intent, personaList] = await Promise.all([
           getDesignIntent(projectId).catch(() => null),
-          listPersonas(projectId).catch(() => []),
+          listPersonas(projectId, "MANUAL").catch(() => []),
         ]);
         if (intent) {
           setIsEditMode(true);
@@ -149,6 +149,7 @@ function DesignIntentStep2Content() {
 
   const handleCreatePersona = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingPersona) return;
     if (!personaName.trim()) {
       setPersonaModalError("Persona name is required.");
       return;
@@ -262,14 +263,25 @@ function DesignIntentStep2Content() {
 
   return (
     <div className="p-6 sm:p-10 space-y-8">
-      {/* Step Progress Bar matching Figma Node 815:10125 & 815:10126 */}
-      <StepProgress
-        currentStep={2}
-        stepLabel="STEP 2 OF 3"
-        stepName="DESIGN INTENT"
-        title="Design intent"
-        description="AI uses this for every A/B it builds in this project. You can change it later."
-      />
+      {/* Step Progress Bar matching Figma Node 815:10125 & 815:10126 (hidden when editing) */}
+      {isEditMode ? (
+        <div className="space-y-1">
+          <h1 className="text-3xl font-heading font-medium tracking-tight text-foreground">
+            Design intent
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            AI uses this for every A/B it builds in this project. You can change it anytime.
+          </p>
+        </div>
+      ) : (
+        <StepProgress
+          currentStep={2}
+          stepLabel="STEP 2 OF 3"
+          stepName="DESIGN INTENT"
+          title="Design intent"
+          description="AI uses this for every A/B it builds in this project. You can change it later."
+        />
+      )}
 
       {serverError && (
         <Alert variant="destructive">

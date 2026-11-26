@@ -25,6 +25,7 @@ import { kitComponentCode } from "./kit-code";
 import {
   DesignVersion,
   PickedElement,
+  PinnedComment,
   timeAgo,
   versionName,
 } from "./versions";
@@ -197,9 +198,12 @@ export function ChatPanel({
   messages,
   label,
   picked,
+  pins = [],
   pickMode,
   onTogglePick,
   onClearPicked,
+  onPinPicked,
+  onRemovePin,
   onSend,
   sending,
   disabled,
@@ -209,9 +213,12 @@ export function ChatPanel({
   /** The design being refined: "A" or "B". */
   label: string;
   picked: PickedElement | null;
+  pins?: PinnedComment[];
   pickMode: boolean;
   onTogglePick: () => void;
   onClearPicked: () => void;
+  onPinPicked?: (comment: string) => void;
+  onRemovePin?: (pinId: string) => void;
   onSend: (text: string) => Promise<boolean>;
   sending: boolean;
   disabled: boolean;
@@ -229,8 +236,15 @@ export function ChatPanel({
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || sending || disabled) return;
+    if ((!text && pins.length === 0) || sending || disabled) return;
     if (await onSend(text)) setDraft("");
+  };
+
+  const pinCurrent = () => {
+    const text = draft.trim();
+    if (!picked || !text || !onPinPicked) return;
+    onPinPicked(text);
+    setDraft("");
   };
 
   return (
@@ -278,7 +292,7 @@ export function ChatPanel({
                 </span>
               )}
               <div className="w-[280px] max-w-full rounded-[10px] bg-primary-subtle px-3 py-2.5">
-                <p className="text-sm leading-5 text-foreground">{m.text}</p>
+                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{m.text}</p>
               </div>
             </div>
           )
@@ -302,18 +316,62 @@ export function ChatPanel({
             </p>
           </div>
           <div className="flex flex-col gap-1.5 rounded-[10px] border border-border bg-background px-2.5 py-2">
+            {pins.length > 0 && (
+              <div className="flex flex-col gap-1 pb-1.5 mb-1 border-b border-border/60 max-h-36 overflow-y-auto">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  Pinned comments ({pins.length})
+                </span>
+                {pins.map((pin, idx) => (
+                  <div
+                    key={pin.id}
+                    className="flex items-start justify-between gap-2 rounded-[6px] bg-muted/50 px-2 py-1 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-brand-500 mr-1.5">
+                        #{idx + 1} [{pin.element.kind}]
+                      </span>
+                      <span className="text-foreground break-words">{pin.comment}</span>
+                    </div>
+                    {onRemovePin && (
+                      <button
+                        type="button"
+                        onClick={() => onRemovePin(pin.id)}
+                        aria-label={`Remove pinned comment ${idx + 1}`}
+                        className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer mt-0.5"
+                      >
+                        <HugeIcon icon={Cancel01Icon} size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {picked && (
-              <span className="flex w-fit items-center gap-1 rounded-[6px] border border-brand-500 px-1.5 text-xs leading-5 text-brand-500">
-                {picked.kind}
-                <button
-                  type="button"
-                  onClick={onClearPicked}
-                  aria-label="Remove picked element"
-                  className="cursor-pointer"
-                >
-                  <HugeIcon icon={Cancel01Icon} size={10} />
-                </button>
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex w-fit items-center gap-1 rounded-[6px] border border-brand-500 px-1.5 text-xs leading-5 text-brand-500">
+                  {picked.kind}: {picked.name}
+                  <button
+                    type="button"
+                    onClick={onClearPicked}
+                    aria-label="Remove picked element"
+                    className="cursor-pointer"
+                  >
+                    <HugeIcon icon={Cancel01Icon} size={10} />
+                  </button>
+                </span>
+                {onPinPicked && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={pinCurrent}
+                    disabled={!draft.trim() || disabled}
+                    className="h-6 rounded-[6px] px-2 text-xs cursor-pointer"
+                  >
+                    Pin comment
+                  </Button>
+                )}
+              </div>
             )}
             <textarea
               value={draft}
@@ -321,14 +379,24 @@ export function ChatPanel({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  void send();
+                  if (picked && onPinPicked && draft.trim()) {
+                    pinCurrent();
+                  } else {
+                    void send();
+                  }
                 }
               }}
               rows={2}
               maxLength={2000}
               disabled={disabled}
               aria-label={`Ask for a change to ${label}`}
-              placeholder={picked ? `Ask for a change to ${picked.name}…` : `Ask for a change to ${label}…`}
+              placeholder={
+                picked
+                  ? `Comment on ${picked.name} (Enter to pin)…`
+                  : pins.length > 0
+                    ? `Add an overall note or send ${pins.length} pinned edit${pins.length === 1 ? "" : "s"}…`
+                    : `Ask for a change to ${label}…`
+              }
               className="min-h-10 w-full resize-y bg-transparent text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
             />
           </div>
@@ -348,12 +416,16 @@ export function ChatPanel({
           </Button>
           <Button
             type="button"
-            size="icon"
+            size={pins.length > 0 ? "sm" : "icon"}
             onClick={() => void send()}
-            disabled={!draft.trim() || sending || disabled}
-            aria-label="Send"
-            className="size-8 rounded-[10px] bg-primary-subtle text-primary-text hover:bg-primary-subtle/80"
+            disabled={(!draft.trim() && pins.length === 0) || sending || disabled}
+            aria-label={pins.length > 0 ? `Send all (${pins.length})` : "Send"}
+            className={cn(
+              "h-8 rounded-[10px] bg-primary-subtle text-primary-text hover:bg-primary-subtle/80",
+              pins.length > 0 ? "px-3 text-xs font-medium gap-1.5" : "w-8"
+            )}
           >
+            {pins.length > 0 && <span>Send all ({pins.length})</span>}
             <HugeIcon icon={sending ? Loading02Icon : ArrowUp02Icon} size={16} className={cn(sending && "animate-spin")} />
           </Button>
         </div>

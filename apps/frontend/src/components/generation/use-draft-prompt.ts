@@ -127,6 +127,25 @@ export function useDraftPrompt(
           return;
         }
 
+        if (storyData.draftStatus === "QUEUED" || storyData.draftStatus === "RUNNING") {
+          setBackendStatus("Resuming AI prompt draft...");
+          try {
+            const cachedRaw = sessionStorage.getItem(`draft_trace:${storyId}`);
+            if (cachedRaw) {
+              const cached = JSON.parse(cachedRaw) as {
+                thoughtText?: string;
+                thoughtTokens?: number;
+                outputTokens?: number;
+                backendStatus?: string;
+              };
+              if (cached.thoughtText) setThoughtText(cached.thoughtText);
+              if (cached.thoughtTokens) setThoughtTokens(cached.thoughtTokens);
+              if (cached.outputTokens) setOutputTokens(cached.outputTokens);
+              if (cached.backendStatus) setBackendStatus(cached.backendStatus);
+            }
+          } catch {}
+        }
+
         const initialPersona = personaList[0];
         const personaIdToUse = initialPersona?.id || "";
         setDraftedPersonaId(personaIdToUse);
@@ -179,8 +198,24 @@ export function useDraftPrompt(
             if (typeof parsed.thoughtDurationSeconds === "number") {
               setThoughtDurationSeconds(parsed.thoughtDurationSeconds);
             }
+            if (!parsed.prompt) {
+              try {
+                sessionStorage.setItem(
+                  `draft_trace:${storyId}`,
+                  JSON.stringify({
+                    thoughtText: parsed.thought,
+                    thoughtTokens: tTokens || undefined,
+                    outputTokens: oTokens || undefined,
+                    backendStatus: parsed.status,
+                  })
+                );
+              } catch {}
+            }
 
             if (parsed.prompt) {
+              try {
+                sessionStorage.removeItem(`draft_trace:${storyId}`);
+              } catch {}
               const pTokens = estimateTokens(
                 parsed.prompt.thoughtChars ?? parsed.prompt.thought?.length
               );

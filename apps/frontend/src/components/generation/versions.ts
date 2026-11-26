@@ -69,6 +69,7 @@ export function findVersion(
 }
 
 const ELEMENT_MARK = "\n\n---\nSelected element (";
+const BATCH_MARK = "\n\n---\nPinned element edits (";
 
 /** The element a refinement is about, as sent to the model. */
 export interface PickedElement {
@@ -79,14 +80,51 @@ export interface PickedElement {
   html: string;
 }
 
+/** One pinned element comment queued to be sent in a batch refinement. */
+export interface PinnedComment {
+  id: string;
+  element: PickedElement;
+  comment: string;
+}
+
 /** Adds the picked element to the prompt so the model changes that part. */
 export function encodeRefinePrompt(text: string, element: PickedElement | null): string {
   if (!element) return text;
   return `${text}${ELEMENT_MARK}${element.kind}): change only this element unless asked otherwise.\n${element.html}`;
 }
 
+/** Encodes a batch of pinned element comments (plus optional overall note) for the LLM. */
+export function encodeBatchRefinePrompt(
+  text: string,
+  element: PickedElement | null,
+  pins: PinnedComment[]
+): string {
+  if (pins.length === 0) {
+    return encodeRefinePrompt(text, element);
+  }
+  const header = text.trim() || `Apply ${pins.length} pinned element edit${pins.length === 1 ? "" : "s"}.`;
+  const blocks = pins.map(
+    (p, idx) =>
+      `${idx + 1}. [${p.element.kind} "${p.element.name}"] ${p.comment}\nElement HTML:\n${p.element.html}`
+  );
+  return `${header}${BATCH_MARK}${pins.length}): apply every listed change and keep all other parts unchanged.\n${blocks.join("\n\n")}`;
+}
+
 /** Splits a stored refinement prompt back into what the designer typed. */
 export function decodeRefinePrompt(prompt: string): { text: string; elementKind?: string } {
+  const batchAt = prompt.indexOf(BATCH_MARK);
+  if (batchAt !== -1) {
+    const header = prompt.slice(0, batchAt).trim();
+    const rest = prompt.slice(batchAt);
+    const items = [...rest.matchAll(/^\d+\.\s+\[([^\]]+)\]\s+(.+)$/gm)].map(
+      (m) => `• [${m[1]}] ${m[2]}`
+    );
+    const count = items.length;
+    return {
+      text: items.length > 0 ? `${header}\n${items.join("\n")}` : header,
+      elementKind: count > 0 ? `${count} pinned edit${count === 1 ? "" : "s"}` : undefined,
+    };
+  }
   const at = prompt.indexOf(ELEMENT_MARK);
   if (at === -1) return { text: prompt };
   const rest = prompt.slice(at + ELEMENT_MARK.length);

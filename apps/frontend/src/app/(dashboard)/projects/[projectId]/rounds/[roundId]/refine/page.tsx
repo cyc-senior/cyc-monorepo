@@ -54,9 +54,10 @@ import {
   buildVersions,
   decodeRefinePrompt,
   DesignVersion,
-  encodeRefinePrompt,
+  encodeBatchRefinePrompt,
   findVersion,
   PickedElement,
+  PinnedComment,
   versionName,
   versionSummary,
 } from "@/components/generation/versions";
@@ -226,6 +227,20 @@ function RefineContent() {
   const [viewport, setViewport] = React.useState<ViewportState>(DEFAULT_VIEWPORT);
   const [pickMode, setPickMode] = React.useState(false);
   const [picked, setPicked] = React.useState<{ element: PickedElement; selection: Selection } | null>(null);
+  const [pinsByVariant, setPinsByVariant] = React.useState<Record<string, PinnedComment[]>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = localStorage.getItem(`refine_pins:${roundId}`);
+      return raw ? (JSON.parse(raw) as Record<string, PinnedComment[]>) : {};
+    } catch {
+      return {};
+    }
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(`refine_pins:${roundId}`, JSON.stringify(pinsByVariant));
+    } catch {}
+  }, [roundId, pinsByVariant]);
   const [componentId, setComponentId] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
   const [restoringId, setRestoringId] = React.useState<string | null>(null);
@@ -368,18 +383,59 @@ function RefineContent() {
     }
   };
 
+  const shownVariantId = shown?.variant.id ?? "";
+  const currentPins = React.useMemo(
+    () => (shownVariantId ? (pinsByVariant[shownVariantId] ?? []) : []),
+    [pinsByVariant, shownVariantId]
+  );
+
+  const handlePinPicked = React.useCallback(
+    (comment: string) => {
+      if (!picked || !shownVariantId) return;
+      const pin: PinnedComment = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        element: picked.element,
+        comment,
+      };
+      setPinsByVariant((prev) => ({
+        ...prev,
+        [shownVariantId]: [...(prev[shownVariantId] ?? []), pin],
+      }));
+      setPicked(null);
+      setPickMode(true);
+    },
+    [picked, shownVariantId]
+  );
+
+  const handleRemovePin = React.useCallback(
+    (pinId: string) => {
+      if (!shownVariantId) return;
+      setPinsByVariant((prev) => ({
+        ...prev,
+        [shownVariantId]: (prev[shownVariantId] ?? []).filter((p) => p.id !== pinId),
+      }));
+    },
+    [shownVariantId]
+  );
+
   const handleSend = async (text: string): Promise<boolean> => {
     if (!shown) return false;
     setSending(true);
     setError(null);
     try {
       const job = await startRefinement(projectId, roundId, {
-        prompt: encodeRefinePrompt(text, picked?.element ?? null),
+        prompt: encodeBatchRefinePrompt(text, picked?.element ?? null, currentPins),
         baseVariantId: shown.variant.id,
         storyIds: shown.variant.storyIds,
       });
       setJobs((prev) => [...prev, job]);
       setPicked(null);
+      setPickMode(false);
+      setPinsByVariant((prev) => {
+        const next = { ...prev };
+        delete next[shown.variant.id];
+        return next;
+      });
       return true;
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -501,12 +557,15 @@ function RefineContent() {
                   messages={messages}
                   label={label}
                   picked={picked?.element ?? null}
+                  pins={currentPins}
                   pickMode={pickMode}
                   onTogglePick={() => {
                     setPickMode((on) => !on);
                     setRightTab("preview");
                   }}
                   onClearPicked={() => setPicked(null)}
+                  onPinPicked={handlePinPicked}
+                  onRemovePin={handleRemovePin}
                   onSend={handleSend}
                   onAction={handleAction}
                   sending={sending}

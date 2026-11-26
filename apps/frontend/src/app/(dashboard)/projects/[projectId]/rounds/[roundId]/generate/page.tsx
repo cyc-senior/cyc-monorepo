@@ -16,7 +16,7 @@ import { HugeIcon } from "@/components/ui/huge-icon";
 import {
   Alert02Icon,
   CircleIcon,
-  Loading02Icon,
+  Loading03Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
@@ -182,7 +182,7 @@ function SharedIntentBanner({
           {isDone ? (
             <HugeIcon icon={Tick02Icon} size={16} className="text-primary-text" />
           ) : isActive ? (
-            <HugeIcon icon={Loading02Icon} size={14} className="animate-spin text-foreground" />
+            <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-foreground" />
           ) : (
             <HugeIcon icon={CircleIcon} size={14} className="text-muted-foreground" />
           )}
@@ -247,7 +247,7 @@ function SharedIntentBanner({
               </TraceCollapsibleTrigger>
               {personaRunning && (
                 <HugeIcon
-                  icon={Loading02Icon}
+                  icon={Loading03Icon}
                   size={12}
                   className="animate-spin text-muted-foreground ml-auto shrink-0"
                 />
@@ -416,7 +416,7 @@ function VariantCard({
         <div className="flex items-center gap-1.5" aria-live="polite">
           {line.busy && (
             <HugeIcon
-              icon={Loading02Icon}
+              icon={Loading03Icon}
               size={14}
               className="animate-spin text-foreground"
             />
@@ -490,7 +490,7 @@ function VariantCard({
                         </TraceCollapsibleTrigger>
                         {isRunning && (
                           <HugeIcon
-                            icon={Loading02Icon}
+                            icon={Loading03Icon}
                             size={12}
                             className="animate-spin text-muted-foreground ml-auto shrink-0"
                           />
@@ -548,7 +548,7 @@ function VariantCard({
                         </TraceCollapsibleTrigger>
                         {item.status === "running" && (
                           <HugeIcon
-                            icon={Loading02Icon}
+                            icon={Loading03Icon}
                             size={12}
                             className="animate-spin text-muted-foreground ml-auto shrink-0"
                           />
@@ -629,7 +629,7 @@ function VariantCard({
                   </span>
                   {item.status === "running" && (
                     <HugeIcon
-                      icon={Loading02Icon}
+                      icon={Loading03Icon}
                       size={12}
                       className="animate-spin text-muted-foreground shrink-0"
                     />
@@ -814,7 +814,7 @@ function GeneratingContent() {
   if (!job) {
     return (
       <div className="flex w-full justify-center py-24">
-        <HugeIcon icon={Loading02Icon} size={24} className="animate-spin text-muted-foreground" />
+        <HugeIcon icon={Loading03Icon} size={24} className="animate-spin text-muted-foreground" />
       </div>
     );
   }
