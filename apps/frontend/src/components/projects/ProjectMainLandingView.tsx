@@ -34,7 +34,7 @@ import {
 } from "@/lib/project-activity";
 import { EditProjectDialog } from "./EditProjectDialog";
 import { useProjectOverview } from "./use-project-overview";
-import { storyContinueHref } from "@/lib/design-cycle";
+import { storyCode, storyContinueHref } from "@/lib/design-cycle";
 
 export function ProjectMainLandingView({
   initialTab,
@@ -82,6 +82,14 @@ export function ProjectMainLandingView({
       setActivityError("That item is no longer available.");
     }
   };
+
+  const orderedStories = React.useMemo(
+    () =>
+      [...stories].sort((a, b) =>
+        (a.createdAt ?? "").localeCompare(b.createdAt ?? "")
+      ),
+    [stories]
+  );
 
   const latestAuditLogs = React.useMemo(() => {
     return [...auditLogs]
@@ -285,8 +293,8 @@ export function ProjectMainLandingView({
 
                 {/* Gallery grid matching Figma Node 924:20995 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stories.map((story, idx) => {
-                    const storyKey = story.storyKey || `US${idx + 1}`;
+                  {orderedStories.map((story) => {
+                    const storyKey = story.storyKey || storyCode(stories, story);
 
                     return (
                       <Card
@@ -558,7 +566,7 @@ export function ProjectMainLandingView({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {stories.map((story, idx) => (
+                {orderedStories.map((story) => (
                   <Card
                     key={story.id}
                     className="p-5 rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs flex flex-col justify-between gap-3 cursor-pointer"
@@ -567,7 +575,7 @@ export function ProjectMainLandingView({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono text-muted-foreground">
-                          {story.storyKey || `US${idx + 1}`}
+                          {story.storyKey || storyCode(stories, story)}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
                           {story.status || "DRAFT"}

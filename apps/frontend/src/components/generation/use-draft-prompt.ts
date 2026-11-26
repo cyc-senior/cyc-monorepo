@@ -5,10 +5,12 @@ import {
   getUserStoryById,
   getDesignIntent,
   listPersonas,
+  listUserStories,
   UserStoryItem,
   DesignIntentDetail,
   PersonaItem,
 } from "@/lib/project-client";
+import { storyCode } from "@/lib/design-cycle";
 import { API_URL } from "@/lib/api-client";
 import { fetchSse, readSseStream, sseErrorMessage } from "@/lib/sse";
 import { estimateTokens } from "@/components/generation/use-job-stream";
@@ -88,15 +90,19 @@ export function useDraftPrompt(
       setThoughtDurationSeconds(null);
 
       try {
-        const [storyData, intentData, personaList] = await Promise.all([
+        const [storyData, intentData, personaList, allStories] = await Promise.all([
           getUserStoryById(projectId, storyId),
           getDesignIntent(projectId).catch(() => null),
           listPersonas(projectId).catch(() => []),
+          listUserStories(projectId).catch(() => []),
         ]);
 
         if (isCancelled || abortController.signal.aborted) return;
 
-        setStory(storyData);
+        const computedKey =
+          storyData.storyKey ||
+          (allStories.length > 0 ? storyCode(allStories, storyData) : undefined);
+        setStory(computedKey ? { ...storyData, storyKey: computedKey } : storyData);
         setIntent(intentData);
         setPersonas(personaList);
 

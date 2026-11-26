@@ -187,13 +187,14 @@ export function ProjectsNav() {
         const list = (stories[project.id] ?? [])
           .slice()
           .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-          .slice(0, MAX_STORIES);
+          .slice(0, MAX_STORIES)
+          .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
         // The story being worked on: from the route, else the newest one.
         const routeStoryId = searchParams.get("storyId");
         const currentStory =
           list.find((s) => s.id === routeStoryId) ??
           list.find((s) => s.designCycle && pathname.includes(`/rounds/${s.designCycle.roundId}/`)) ??
-          list[0];
+          list.at(-1);
         const isStepActive = (step: CycleStep) => {
           if (!here || !step.href) return false;
           const [path, query] = step.href.split("?");
