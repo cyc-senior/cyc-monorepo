@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException } from '@nestjs/common'
 
 import { PrismaService } from '../../prisma/prisma.service'
+import { PromptDraftEvents } from '../generation/prompt-draft-events.service'
+import { PromptDraftQueue } from '../generation/prompt-draft-queue.service'
 import { PromptDrafter } from '../generation/prompt-drafter'
 import { RoundsService } from './rounds.service'
 
@@ -29,9 +31,18 @@ describe('RoundsService', () => {
     configured: false,
     draft: jest.fn(),
   }
+  const draftQueue = {
+    enqueue: jest.fn(),
+    latestProgress: jest.fn(),
+  }
+  const draftEvents = {
+    forStory: jest.fn(),
+  }
   const service = new RoundsService(
     prisma as unknown as PrismaService,
     drafter as unknown as PromptDrafter,
+    draftQueue as unknown as PromptDraftQueue,
+    draftEvents as unknown as PromptDraftEvents,
   )
   const round = (overrides = {}) => ({
     id: 'r-2',

@@ -109,7 +109,7 @@ export class GenerationJobsService {
    * @throws ConflictException for an approved or archived round, or a
    *   project whose design intent is not defined yet.
    * @throws BadRequestException for personas, stories or a base variant
-   *   outside the project.
+   *   outside the project, or a new build for a story other than the round's.
    * @throws ServiceUnavailableException when generation is not configured or
    *   the queue cannot be reached (the job is then marked FAILED).
    */
@@ -140,6 +140,18 @@ export class GenerationJobsService {
       )
     }
     const stories = await this.stories(projectId, dto.storyIds)
+    // A round designs one user story: a new build for another story must
+    // not land in it (a stale client once sent US3's build to US4's round).
+    if (
+      !dto.baseVariantId &&
+      round.storyId &&
+      stories.length > 0 &&
+      !stories.some((story) => story.id === round.storyId)
+    ) {
+      throw new BadRequestException(
+        'This round belongs to another user story. Start a new round for this story.',
+      )
+    }
     if (!round.storyId && stories.length > 0) {
       // A round made without a story belongs to the first story it designs.
       await this.prisma.designRound.updateMany({
@@ -147,7 +159,24 @@ export class GenerationJobsService {
         data: { storyId: stories[0].id },
       })
     }
-    const personas = await this.personas(projectId, dto.personaIds)
+    // One AI persona per project: when a round asks for one but an earlier
+    // round (e.g. started at the same time) already drafted it, reuse it
+    // instead of adding a duplicate to the project.
+    let personaIds = dto.personaIds
+    let synthesizePersona =
+      dto.synthesizePersona ?? (personaIds?.length ? false : true)
+    if (synthesizePersona) {
+      const drafted = await this.prisma.userPersona.findFirst({
+        where: { projectId, origin: 'AI' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      })
+      if (drafted) {
+        personaIds = [drafted.id]
+        synthesizePersona = false
+      }
+    }
+    const personas = await this.personas(projectId, personaIds)
     const baseDesign = await this.baseDesign(projectId, dto.baseVariantId)
     const feedbackThemes = await this.feedbackThemes(roundId)
     const input: GenerationInput = {
@@ -175,8 +204,7 @@ export class GenerationJobsService {
       personas,
       stories,
       prompt: dto.prompt,
-      synthesizePersona:
-        dto.synthesizePersona ?? (dto.personaIds?.length ? false : true),
+      synthesizePersona,
       baseDesign,
       feedbackThemes,
     }
@@ -459,7 +487,7 @@ export class GenerationJobsService {
     }
     const unique = [...new Set(storyIds)]
     const stories = await this.prisma.userStory.findMany({
-      where: { id: { in: unique }, projectId },
+      where: { id: { in: unique }, projectId, deletedAt: null },
       select: {
         id: true,
         title: true,

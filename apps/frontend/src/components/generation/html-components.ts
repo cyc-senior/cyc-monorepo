@@ -91,6 +91,23 @@ export function toPickedElement(el: Element): PickedElement {
   };
 }
 
+/**
+ * A CSS path from body to `el` (`body > div:nth-of-type(2) > button:nth-of-type(1)`),
+ * used to find a pinned element again after a reload, scroll or zoom.
+ */
+export function elementPath(el: Element): string {
+  const parts: string[] = [];
+  for (let node: Element | null = el; node && node.tagName !== "BODY"; node = node.parentElement) {
+    const tag = node.tagName.toLowerCase();
+    let index = 1;
+    for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
+      if (sib.tagName === node.tagName) index += 1;
+    }
+    parts.unshift(`${tag}:nth-of-type(${index})`);
+  }
+  return ["body", ...parts].join(" > ");
+}
+
 function attributesOf(el: Element): string {
   return Array.from(el.attributes)
     .map((attr) => `${attr.name}="${attr.value.replace(/"/g, "&quot;")}"`)

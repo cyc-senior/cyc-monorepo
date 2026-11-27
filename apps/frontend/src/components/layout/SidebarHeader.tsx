@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { ProjectRole } from "@/types/project";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import { SidebarLeft01Icon } from "@hugeicons/core-free-icons";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
@@ -15,6 +17,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
+const ROLE_LABELS: Record<ProjectRole, string> = {
+  DESIGNER: "Designer",
+  PROJECT_MANAGER: "Project manager",
+  PRODUCT_OWNER: "Product owner",
+  DEVELOPER: "Developer",
+  CLIENT: "Client",
+};
 
 interface SidebarHeaderProps {
   onToggleSidebar?: () => void;
@@ -58,32 +68,37 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
         // Screen 14 & 14A: overview
         return [{ label: projectName }];
       }
-      if (subpath.startsWith("/setup")) {
-        // Screen 12 & 13: Setup
-        return [
-          { label: projectName, href: `/projects/${projectId}` },
-          { label: "Setup" },
-        ];
-      }
+      const projectCrumb = { label: projectName, href: `/projects/${projectId}` };
+      // Pages named as in the sidebar's project tree.
+      const pages: Array<[string, string]> = [
+        ["/setup/intent", "Design intent"],
+        ["/setup/team", "Team & roles"],
+        ["/intent", "Design intent"],
+        ["/team", "Team & roles"],
+        ["/overview", "Overview"],
+        ["/sessions", "Test sessions"],
+        ["/reports", "Reports"],
+      ];
+      const page = pages.find(([path]) => subpath.startsWith(path));
+      if (page) return [projectCrumb, { label: page[1] }];
       if (subpath.startsWith("/stories/new")) {
         // Screen 15: New user story
         return [
-          { label: projectName, href: `/projects/${projectId}` },
+          projectCrumb,
+          { label: "User stories", href: `/projects/${projectId}/stories` },
           { label: "New user story" },
         ];
       }
-      if (subpath.startsWith("/rounds/new")) {
-        // Screen 16: Review structured prompt
-        return [
-          { label: projectName, href: `/projects/${projectId}` },
-          { label: "Review structured prompt" },
-        ];
+      if (subpath === "/stories") {
+        return [projectCrumb, { label: "User stories" }];
+      }
+      if (subpath.startsWith("/stories/")) {
+        // A story's pages set "US3 › …" once the story loads.
+        return [projectCrumb, { label: "User stories", href: `/projects/${projectId}/stories` }];
       }
 
-      return [
-        { label: projectName, href: `/projects/${projectId}` },
-        { label: "Overview" },
-      ];
+      // Design-cycle pages set their own trail; never guess a page name.
+      return [{ label: projectName, href: `/projects/${projectId}` }];
     }
 
     return [{ label: "Projects", href: "/projects" }];
@@ -116,12 +131,14 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
                 {idx > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem className="truncate">
                   {isLast || !seg.href ? (
-                    <BreadcrumbPage className="truncate max-w-[240px]">
+                    <BreadcrumbPage className="truncate max-w-[240px]" title={seg.title}>
                       {seg.label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild className="truncate max-w-[200px]">
-                      <Link href={seg.href}>{seg.label}</Link>
+                      <Link href={seg.href} title={seg.title}>
+                        {seg.label}
+                      </Link>
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
@@ -130,6 +147,13 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+
+      {/* The viewer's role on the open project (Figma header badge) */}
+      {project?.role && pathname.startsWith(`/projects/${project.id}`) && (
+        <Badge variant="outline" className="ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+          {ROLE_LABELS[project.role] ?? project.role}
+        </Badge>
+      )}
     </header>
   );
 }

@@ -4,6 +4,16 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {
+  useDefaultLayout,
+  type GroupImperativeHandle,
+  type LayoutStorage,
+} from "react-resizable-panels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +36,8 @@ import {
   ViewIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
+import { useStoryBreadcrumbs } from "@/components/layout/use-story-breadcrumbs";
+import { useSidebarMode } from "@/contexts/sidebar-context";
 import { useJobStream } from "@/components/generation/use-job-stream";
 import {
   DEFAULT_VIEWPORT,
@@ -34,7 +45,7 @@ import {
   MOBILE_PRESET,
   PreviewCanvas,
   RESPONSIVE,
-  Selection,
+  CanvasPin,
   ViewportState,
 } from "@/components/generation/PreviewCanvas";
 import {
@@ -53,9 +64,12 @@ import {
   buildVersions,
   decodeRefinePrompt,
   DesignVersion,
-  encodeRefinePrompt,
+  encodeBatchRefinePrompt,
   findVersion,
   PickedElement,
+  PinAnchor,
+  PinnedComment,
+  SentPins,
   versionName,
   versionSummary,
 } from "@/components/generation/versions";
@@ -205,10 +219,75 @@ function buildMessages(
   return messages;
 }
 
+/** Chat panel never narrower than this; the live view never below 50%. */
+const CHAT_MIN_PX = 320;
+
+/**
+ * First-visit chat width, like commercial AI builders: about a third of the
+ * screen, kept between 360px and 640px. The user's drag is remembered after.
+ */
+function defaultChatWidth(): number {
+  if (typeof window === "undefined") return 400;
+  return Math.round(Math.min(640, Math.max(360, window.innerWidth * 0.32)));
+}
+
+/** localStorage for the split layout; never throws (private mode, blocked storage). */
+const safeLocalStorage: LayoutStorage = {
+  getItem: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+};
+
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+/** Split view from 1024px up; assumed on the server so desktop never flashes tabs. */
+function useIsDesktop(): boolean {
+  return React.useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(DESKTOP_QUERY);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => true
+  );
+}
+
+/**
+ * `useState` mirrored to sessionStorage: survives a reload of this tab, and is
+ * gone when the tab closes. Reads and writes never throw.
+ */
+function useSessionState<T>(key: string, initial: T) {
+  const [value, setValue] = React.useState<T>(() => {
+    if (typeof window === "undefined") return initial;
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : initial;
+    } catch {
+      return initial;
+    }
+  });
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  }, [key, value]);
+  return [value, setValue] as const;
+}
+
 function RefineContent() {
   const params = useParams();
   const router = useRouter();
-  const { project, setBreadcrumbs } = useBreadcrumbs();
+  useSidebarMode("rail");
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
 
@@ -223,7 +302,39 @@ function RefineContent() {
   const [rightTab, setRightTab] = React.useState("preview");
   const [viewport, setViewport] = React.useState<ViewportState>(DEFAULT_VIEWPORT);
   const [pickMode, setPickMode] = React.useState(false);
-  const [picked, setPicked] = React.useState<{ element: PickedElement; selection: Selection } | null>(null);
+  const isDesktop = useIsDesktop();
+  /** Below 1024px chat and live view are tabs instead of a split. */
+  const [narrowTab, setNarrowTab] = React.useState<"chat" | "preview">("chat");
+  const splitRef = React.useRef<HTMLDivElement | null>(null);
+  const splitApi = React.useRef<GroupImperativeHandle | null>(null);
+  const splitLayout = useDefaultLayout({ id: "refine-split", storage: safeLocalStorage });
+  /** Double-click on the handle: back to the default chat width. */
+  const resetSplit = React.useCallback(() => {
+    const width = splitRef.current?.getBoundingClientRect().width;
+    if (!width || !splitApi.current) return;
+    const chat = Math.min(50, (defaultChatWidth() / width) * 100);
+    splitApi.current.setLayout({ chat, canvas: 100 - chat });
+  }, []);
+  /** A pin dropped on the design whose comment is being written. */
+  const [draftPin, setDraftPin] = React.useState<{ element: PickedElement; anchor: PinAnchor } | null>(null);
+  const [activePinId, setActivePinId] = React.useState<string | null>(null);
+  // Unsent comments live in this tab only (sessionStorage): what was sent is
+  // kept by the refinement job itself, so nothing piles up on the device.
+  const [pinsByVariant, setPinsByVariant] = useSessionState<Record<string, PinnedComment[]>>(
+    `refine_pins:${roundId}`,
+    {}
+  );
+  /** Pins already sent, per base version: shown there as resolved. */
+  const [sentByVariant, setSentByVariant] = useSessionState<Record<string, SentPins[]>>(
+    `refine_sent:${roundId}`,
+    {}
+  );
+  React.useEffect(() => {
+    // Pins were kept in localStorage before; drop that copy.
+    try {
+      localStorage.removeItem(`refine_pins:${roundId}`);
+    } catch {}
+  }, [roundId]);
   const [componentId, setComponentId] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
   const [restoringId, setRestoringId] = React.useState<string | null>(null);
@@ -279,9 +390,33 @@ function RefineContent() {
     if (!activeJob || !liveStatus || ACTIVE.has(liveStatus)) return;
     if (settledJob.current === activeJob.id) return;
     settledJob.current = activeJob.id;
+    const jobId = activeJob.id;
+    const applied = liveStatus === "SUCCEEDED";
+    // Sent comments become "Applied in vN" on their version; if the
+    // refinement failed they go back to the unsent list to send again.
+    const restore: Record<string, PinnedComment[]> = {};
+    const nextSent: Record<string, SentPins[]> = {};
+    for (const [variantId, entries] of Object.entries(sentByVariant)) {
+      nextSent[variantId] = entries.flatMap((entry) => {
+        if (entry.jobId !== jobId || entry.status !== "sent") return [entry];
+        if (applied) return [{ ...entry, status: "applied" as const }];
+        restore[variantId] = entry.pins;
+        return [];
+      });
+    }
+    setSentByVariant(nextSent);
+    if (Object.keys(restore).length > 0) {
+      setPinsByVariant((pins) => {
+        const next = { ...pins };
+        for (const [variantId, back] of Object.entries(restore)) {
+          next[variantId] = [...back, ...(next[variantId] ?? [])];
+        }
+        return next;
+      });
+    }
     // The refinement finished: show the newest version (or keep the old one if it failed).
     void load().then(() => setPreviewed({}));
-  }, [activeJob, liveStatus, load]);
+  }, [activeJob, liveStatus, load, sentByVariant, setPinsByVariant, setSentByVariant]);
 
   const lines = React.useMemo(() => buildVersions(variants), [variants]);
   const labels = React.useMemo(() => Object.keys(lines).sort(), [lines]);
@@ -292,13 +427,7 @@ function RefineContent() {
   const shown = findVersion(lines, previewed[label]) ?? current;
   const shownIndex = shown ? line.indexOf(shown) : -1;
 
-  React.useEffect(() => {
-    const storyTitle = jobs[0]?.inputSnapshot?.stories?.[0]?.title;
-    setBreadcrumbs([
-      { label: project?.name ?? "Project", href: `/projects/${projectId}` },
-      { label: storyTitle ?? "Refine A/B" },
-    ]);
-  }, [setBreadcrumbs, project?.name, projectId, jobs]);
+  useStoryBreadcrumbs(projectId, jobs[0]?.inputSnapshot?.stories?.[0]?.id, "design");
 
   const shownHtml = shown?.variant.html ?? null;
   const components = React.useMemo<DesignComponent[]>(
@@ -325,20 +454,23 @@ function RefineContent() {
   const showVersion = (version: DesignVersion) => {
     setLabel(version.label);
     setPreviewed((prev) => ({ ...prev, [version.label]: version.variant.id }));
-    setPicked(null);
+    setDraftPin(null);
+    setActivePinId(null);
     setComponentId(null);
   };
 
   const switchLabel = (next: string) => {
     setLabel(next);
-    setPicked(null);
+    setDraftPin(null);
+    setActivePinId(null);
     setPickMode(false);
     setComponentId(null);
   };
 
-  const handlePick = React.useCallback((element: PickedElement, selection: Selection) => {
-    setPicked({ element, selection });
-    setPickMode(false);
+  /** Comment mode: a click on the design drops a pin and opens its comment box. */
+  const handlePick = React.useCallback((element: PickedElement, anchor: PinAnchor) => {
+    setDraftPin({ element, anchor });
+    setActivePinId(null);
     setLeftTab("chat");
   }, []);
 
@@ -366,18 +498,123 @@ function RefineContent() {
     }
   };
 
+  const shownVariantId = shown?.variant.id ?? "";
+  const currentPins = React.useMemo(
+    () => (shownVariantId ? (pinsByVariant[shownVariantId] ?? []) : []),
+    [pinsByVariant, shownVariantId]
+  );
+
+  const handleSaveDraft = React.useCallback(
+    (comment: string) => {
+      if (!draftPin || !shownVariantId) return;
+      const pin: PinnedComment = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        element: draftPin.element,
+        anchor: draftPin.anchor,
+        comment,
+      };
+      setPinsByVariant((prev) => ({
+        ...prev,
+        [shownVariantId]: [...(prev[shownVariantId] ?? []), pin],
+      }));
+      setDraftPin(null);
+    },
+    [draftPin, shownVariantId, setPinsByVariant]
+  );
+
+  const handleRemovePin = React.useCallback(
+    (pinId: string) => {
+      if (!shownVariantId) return;
+      setPinsByVariant((prev) => ({
+        ...prev,
+        [shownVariantId]: (prev[shownVariantId] ?? []).filter((p) => p.id !== pinId),
+      }));
+      setActivePinId((id) => (id === pinId ? null : id));
+    },
+    [shownVariantId, setPinsByVariant]
+  );
+
+  // Esc: close the comment box first, then leave comment mode.
+  React.useEffect(() => {
+    if (!pickMode && !draftPin && !activePinId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (draftPin) setDraftPin(null);
+      else if (activePinId) setActivePinId(null);
+      else setPickMode(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pickMode, draftPin, activePinId]);
+
+  // Unsent comments are lost with the tab: ask before it closes or reloads.
+  const hasUnsent = Boolean(draftPin) || Object.values(pinsByVariant).some((pins) => pins.length > 0);
+  React.useEffect(() => {
+    if (!hasUnsent) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsent]);
+
+  /** Pins drawn on the shown version: unsent ones, then sent ones as resolved. */
+  const canvasPins = React.useMemo<CanvasPin[]>(() => {
+    const unsent = currentPins.map((pin, idx) => ({
+      id: pin.id,
+      number: idx + 1,
+      kind: pin.element.kind,
+      comment: pin.comment,
+      anchor: pin.anchor,
+    }));
+    const sent = (sentByVariant[shownVariantId] ?? []).flatMap((entry) => {
+      const made = variants.find((v) => v.generationJobId === entry.jobId);
+      const madeVersion = made ? findVersion(lines, made.id) : undefined;
+      const resolvedLabel =
+        entry.status === "applied"
+          ? madeVersion
+            ? `Applied in ${versionName(madeVersion)}`
+            : "Applied"
+          : "Sent to Designer";
+      return entry.pins.map((pin, idx) => ({
+        id: `${entry.jobId}-${pin.id}`,
+        number: idx + 1,
+        kind: pin.element.kind,
+        comment: pin.comment,
+        anchor: pin.anchor,
+        resolvedLabel,
+      }));
+    });
+    return [...unsent, ...sent];
+  }, [currentPins, sentByVariant, shownVariantId, variants, lines]);
+
   const handleSend = async (text: string): Promise<boolean> => {
     if (!shown) return false;
     setSending(true);
     setError(null);
     try {
       const job = await startRefinement(projectId, roundId, {
-        prompt: encodeRefinePrompt(text, picked?.element ?? null),
+        prompt: encodeBatchRefinePrompt(text, null, currentPins),
         baseVariantId: shown.variant.id,
         storyIds: shown.variant.storyIds,
       });
       setJobs((prev) => [...prev, job]);
-      setPicked(null);
+      setDraftPin(null);
+      setActivePinId(null);
+      setPickMode(false);
+      if (currentPins.length > 0) {
+        const baseId = shown.variant.id;
+        setSentByVariant((prev) => ({
+          ...prev,
+          [baseId]: [...(prev[baseId] ?? []), { jobId: job.id, pins: currentPins, status: "sent" }],
+        }));
+      }
+      setPinsByVariant((prev) => {
+        const next = { ...prev };
+        delete next[shown.variant.id];
+        return next;
+      });
       return true;
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -444,19 +681,10 @@ function RefineContent() {
 
   const mobile = isMobileViewport(viewport);
 
-  return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full flex-col gap-4 px-10 py-10">
-      {error && (
-        <Alert variant="destructive">
-          <HugeIcon icon={Alert02Icon} size={16} />
-          <AlertTitle>Something went wrong</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex min-h-0 w-full flex-1 items-stretch gap-8">
-        {/* Refine panel */}
-        <section className="flex w-[400px] shrink-0 flex-col gap-4 rounded-[14px] border border-border bg-card p-6">
+  // Chat (refine) panel and live view, shared by the resizable split
+  // (desktop) and the Chat / Preview tabs (narrow screens).
+  const chatSection = (
+    <section className="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden bg-background p-6">
           {rightTab === "components" ? (
             <Tabs value="code" className="flex min-h-0 flex-1 flex-col gap-4">
               <TabsList variant="line" className="w-auto gap-0 border-b-0">
@@ -498,13 +726,21 @@ function RefineContent() {
                 <ChatPanel
                   messages={messages}
                   label={label}
-                  picked={picked?.element ?? null}
+                  pins={currentPins}
+                  activePinId={activePinId}
                   pickMode={pickMode}
                   onTogglePick={() => {
                     setPickMode((on) => !on);
                     setRightTab("preview");
+                    setNarrowTab("preview");
                   }}
-                  onClearPicked={() => setPicked(null)}
+                  onFocusPin={(id) => {
+                    setRightTab("preview");
+                    setNarrowTab("preview");
+                    setDraftPin(null);
+                    setActivePinId(id);
+                  }}
+                  onRemovePin={handleRemovePin}
                   onSend={handleSend}
                   onAction={handleAction}
                   sending={sending}
@@ -523,12 +759,12 @@ function RefineContent() {
               </TabsContent>
             </Tabs>
           )}
-        </section>
-
-        {/* Canvas column */}
-        <section className="flex min-w-0 flex-1 flex-col gap-4 rounded-[12px] border border-border bg-card px-4 pb-4">
+    </section>
+  );
+  const canvasSection = (
+    <section className="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden bg-background p-4">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex min-h-0 flex-1 flex-col gap-4">
-            <TabsList variant="line" className="gap-0 pt-2">
+            <TabsList variant="line" className="gap-0">
               <TabsTrigger value="preview" className={cn(TAB_TRIGGER, "flex-1")}>
                 <HugeIcon icon={ViewIcon} size={16} />
                 Preview
@@ -540,7 +776,7 @@ function RefineContent() {
             </TabsList>
 
             {/* Toolbar */}
-            <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <Select
                 value={shown.variant.id}
                 onValueChange={(id) => {
@@ -621,7 +857,16 @@ function RefineContent() {
                 onViewportChange={setViewport}
                 pickMode={pickMode}
                 onPick={handlePick}
-                selection={picked?.selection ?? null}
+                pins={canvasPins}
+                draft={draftPin ? { kind: draftPin.element.kind, anchor: draftPin.anchor } : null}
+                activePinId={activePinId}
+                onSaveDraft={handleSaveDraft}
+                onCancelDraft={() => setDraftPin(null)}
+                onActivatePin={(id) => {
+                  setDraftPin(null);
+                  setActivePinId(id);
+                }}
+                onRemovePin={handleRemovePin}
                 canGoBack={shownIndex > 0}
                 canGoForward={shownIndex >= 0 && shownIndex < line.length - 1}
                 onBack={() => shownIndex > 0 && showVersion(line[shownIndex - 1])}
@@ -649,8 +894,66 @@ function RefineContent() {
               <HugeIcon icon={ArrowRight02Icon} size={16} />
             </Button>
           </div>
-        </section>
-      </div>
+    </section>
+  );
+
+  return (
+    // Full-height panels under the header, never wider than the viewport;
+    // only the chat list and the canvas scroll.
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden">
+      {error && (
+        <Alert variant="destructive" className="m-4 mb-0 w-auto">
+          <HugeIcon icon={Alert02Icon} size={16} />
+          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isDesktop ? (
+        // Draggable split: chat 320px..50%, live view always at least 50%.
+        <ResizablePanelGroup
+          orientation="horizontal"
+          id="refine-split"
+          elementRef={splitRef}
+          groupRef={splitApi}
+          defaultLayout={splitLayout.defaultLayout}
+          onLayoutChanged={splitLayout.onLayoutChanged}
+          className="min-h-0 min-w-0 flex-1"
+        >
+          <ResizablePanel id="chat" defaultSize={defaultChatWidth()} minSize={CHAT_MIN_PX} maxSize="50" className="min-w-0">
+            {chatSection}
+          </ResizablePanel>
+          <ResizableHandle
+            withHandle
+            onDoubleClick={resetSplit}
+            title="Drag to resize. Double-click to reset."
+          />
+          <ResizablePanel id="canvas" minSize="50" className="min-w-0">
+            {canvasSection}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div role="tablist" aria-label="Refine view" className="flex shrink-0 gap-1 border-b border-border px-4 py-2">
+            {(["chat", "preview"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={narrowTab === tab}
+                onClick={() => setNarrowTab(tab)}
+                className={cn(
+                  "h-8 flex-1 cursor-pointer rounded-[10px] text-sm font-medium",
+                  narrowTab === tab ? "bg-primary-subtle text-primary-text" : "text-muted-foreground"
+                )}
+              >
+                {tab === "chat" ? "Chat" : "Preview"}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 min-w-0 flex-1">{narrowTab === "chat" ? chatSection : canvasSection}</div>
+        </div>
+      )}
 
     </div>
   );

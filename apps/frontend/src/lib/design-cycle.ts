@@ -1,7 +1,7 @@
 import type { UserStoryItem } from "@/lib/project-client";
 
 /** One user story is one design cycle: these are its steps. */
-export type CycleStepKey = "story" | "prompt" | "refine" | "test";
+export type CycleStepKey = "prompt" | "refine" | "test";
 export type CycleStepState = "done" | "current" | "todo";
 
 export interface CycleStep {
@@ -29,6 +29,14 @@ function designHref(projectId: string, story: UserStoryItem): string | undefined
   return cycle.activeJob ? `${round}/generate?job=${cycle.activeJob.id}` : `${round}/generate`;
 }
 
+/**
+ * The design step's name: "Generate design" until the story's first A/B
+ * designs exist, then "Refine UI" (sidebar and breadcrumb).
+ */
+export function designStepLabel(story: Pick<UserStoryItem, "designCycle">): "Generate design" | "Refine UI" {
+  return (story.designCycle?.variantCount ?? 0) > 0 ? "Refine UI" : "Generate design";
+}
+
 export function storySteps(projectId: string, story: UserStoryItem): CycleStep[] {
   const cycle = story.designCycle;
   const designs = designHref(projectId, story);
@@ -39,24 +47,18 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
 
   return [
     {
-      key: "story",
-      label: "User story",
-      state: "done",
-      href: `/projects/${projectId}/stories`,
-    },
-    {
       key: "prompt",
       label: "Review prompt",
       state: !cycle || isCancelled ? "current" : "done",
       // Approving the prompt again would start another round: open it before designs exist or if cancelled.
       href:
         !cycle || isCancelled || cycle.variantCount === 0
-          ? `/projects/${projectId}/rounds/new?storyId=${story.id}`
+          ? `/projects/${projectId}/stories/${story.id}/prompt`
           : undefined,
     },
     {
       key: "refine",
-      label: "Refine UI",
+      label: designStepLabel(story),
       state: !cycle || isCancelled ? "todo" : approved ? "done" : "current",
       href: designs,
     },
@@ -71,7 +73,7 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
 
 /** Where to continue a story: its designs once they exist, else the prompt. */
 export function storyContinueHref(projectId: string, story: UserStoryItem): string {
-  return designHref(projectId, story) ?? `/projects/${projectId}/rounds/new?storyId=${story.id}`;
+  return designHref(projectId, story) ?? `/projects/${projectId}/stories/${story.id}/prompt`;
 }
 
 /** "US1", "US2", … in creation order. */

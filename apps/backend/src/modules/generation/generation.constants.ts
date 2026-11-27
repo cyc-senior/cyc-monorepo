@@ -1,6 +1,35 @@
 import { JobsOptions } from 'bullmq'
 
 export const DESIGN_GENERATION_QUEUE = 'design-generation'
+export const PROMPT_DRAFT_QUEUE = 'prompt-draft'
+
+/** What a queued prompt-drafting job carries. */
+export interface PromptDraftJobData {
+  projectId: string
+  storyId: string
+  personaId?: string
+}
+
+/** Progress a worker reports while drafting a structured prompt (relayed over SSE). */
+export interface PromptDraftProgress {
+  status: string
+  stage: 'loading_inputs' | 'drafting' | 'llm_streaming'
+  thought?: string
+  thoughtChars?: number
+  charsReceived?: number
+  thoughtDurationSeconds?: number
+}
+
+export const PROMPT_DRAFT_JOB_OPTIONS: JobsOptions = {
+  attempts: 2,
+  backoff: { type: 'exponential', delay: 5_000 },
+  removeOnComplete: { age: 3600, count: 500 },
+  removeOnFail: { age: 3600, count: 500 },
+}
+
+export function promptDraftJobId(storyId: string): string {
+  return `draft-${storyId}`
+}
 
 /** What a queued job carries; everything else is read from the database. */
 export interface DesignGenerationJobData {
@@ -24,6 +53,8 @@ export interface GenerationProgress {
   attempt?: number
   /** Characters of model output received so far in this attempt. */
   receivedChars?: number
+  /** Total characters of reasoning received so far in this attempt. */
+  thoughtChars?: number
   /** The latest part of the model's live reasoning (see {@link thoughtTail}). */
   thought?: string
   /** Errors found by the last check. */

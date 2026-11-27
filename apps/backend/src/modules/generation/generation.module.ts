@@ -5,11 +5,17 @@ import { ConfigService } from '@nestjs/config'
 import { EnvironmentVariables } from '../../config/env.validation'
 import { DesignGenerationProcessor } from './design-generation.processor'
 import { DesignGenerator } from './design-generator.service'
-import { DESIGN_GENERATION_QUEUE } from './generation.constants'
+import {
+  DESIGN_GENERATION_QUEUE,
+  PROMPT_DRAFT_QUEUE,
+} from './generation.constants'
 import { GenerationEvents } from './generation-events.service'
 import { GenerationQueue } from './generation-queue.service'
 import { LlmClient } from './llm.client'
 import { PersonaSynthesizer } from './persona-synthesizer'
+import { PromptDraftEvents } from './prompt-draft-events.service'
+import { PromptDraftProcessor } from './prompt-draft.processor'
+import { PromptDraftQueue } from './prompt-draft-queue.service'
 import { PromptDrafter } from './prompt-drafter'
 
 /**
@@ -30,7 +36,10 @@ import { PromptDrafter } from './prompt-drafter'
         },
       }),
     }),
-    BullModule.registerQueue({ name: DESIGN_GENERATION_QUEUE }),
+    BullModule.registerQueue(
+      { name: DESIGN_GENERATION_QUEUE },
+      { name: PROMPT_DRAFT_QUEUE },
+    ),
   ],
   providers: [
     LlmClient,
@@ -40,7 +49,17 @@ import { PromptDrafter } from './prompt-drafter'
     DesignGenerationProcessor,
     GenerationQueue,
     GenerationEvents,
+    PromptDraftProcessor,
+    PromptDraftQueue,
+    PromptDraftEvents,
   ],
-  exports: [GenerationQueue, GenerationEvents, LlmClient, PromptDrafter],
+  exports: [
+    GenerationQueue,
+    GenerationEvents,
+    PromptDraftQueue,
+    PromptDraftEvents,
+    LlmClient,
+    PromptDrafter,
+  ],
 })
 export class GenerationModule {}

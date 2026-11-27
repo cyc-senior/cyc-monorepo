@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { listWorkspaceProjects } from "@/services/project.service";
 import { listUserStories, UserStoryItem } from "@/lib/project-client";
+import { STORIES_CHANGED_EVENT } from "@/components/projects/StoryCard";
 import {
   CycleStep,
   storyCode,
@@ -124,6 +125,13 @@ export function ProjectsNav() {
   const [projects, setProjects] = React.useState<NavProject[]>([]);
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const [stories, setStories] = React.useState<Record<string, UserStoryItem[]>>({});
+  /** Bumped when a story is added or deleted elsewhere, to reload the lists. */
+  const [storiesVersion, setStoriesVersion] = React.useState(0);
+  React.useEffect(() => {
+    const onChanged = () => setStoriesVersion((v) => v + 1);
+    window.addEventListener(STORIES_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(STORIES_CHANGED_EVENT, onChanged);
+  }, []);
 
   const currentProjectId = pathname.match(/^\/projects\/([0-9a-f-]{36})/)?.[1] ?? null;
   const tab = searchParams.get("tab");
@@ -160,7 +168,7 @@ export function ProjectsNav() {
       active = false;
       if (timer) clearInterval(timer);
     };
-  }, [openKey, pathname, generating]);
+  }, [openKey, pathname, generating, storiesVersion]);
 
   const recent = React.useMemo(() => {
     const sorted = [...projects].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
@@ -187,13 +195,15 @@ export function ProjectsNav() {
         const list = (stories[project.id] ?? [])
           .slice()
           .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-          .slice(0, MAX_STORIES);
+          .slice(0, MAX_STORIES)
+          .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
         // The story being worked on: from the route, else the newest one.
-        const routeStoryId = searchParams.get("storyId");
+        // /projects/{p}/stories/{storyId}(/prompt): the story in the path.
+        const routeStoryId = pathname.match(/\/stories\/([0-9a-f-]{36})(?:\/|$)/)?.[1] ?? null;
         const currentStory =
           list.find((s) => s.id === routeStoryId) ??
           list.find((s) => s.designCycle && pathname.includes(`/rounds/${s.designCycle.roundId}/`)) ??
-          list[0];
+          list.at(-1);
         const isStepActive = (step: CycleStep) => {
           if (!here || !step.href) return false;
           const [path, query] = step.href.split("?");
@@ -237,7 +247,7 @@ export function ProjectsNav() {
                     <span className="truncate">User stories</span>
                   </Link>
                   {list.length > 0 && (
-                    <div className="flex w-full flex-col gap-0.5 border-l border-border pb-1 pl-2.5 pt-0.5">
+                    <div className="ml-2.5 flex w-[calc(100%-0.625rem)] flex-col gap-0.5 border-l border-border pb-1 pl-2.5 pt-0.5">
                       {list.map((story) => (
                         <StoryCycle
                           key={story.id}
@@ -250,10 +260,10 @@ export function ProjectsNav() {
                       ))}
                     </div>
                   )}
-                  <Link href={`${base}/setup/intent`} className={itemClass(here && pathname === `${base}/setup/intent`)}>
+                  <Link href={`${base}/intent`} className={itemClass(here && pathname === `${base}/intent`)}>
                     <span className="truncate">Design intent</span>
                   </Link>
-                  <Link href={`${base}/setup/team`} className={itemClass(here && pathname === `${base}/setup/team`)}>
+                  <Link href={`${base}/team`} className={itemClass(here && pathname === `${base}/team`)}>
                     <span className="truncate">Team &amp; roles</span>
                   </Link>
                 </div>

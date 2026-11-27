@@ -26,6 +26,7 @@ export interface GenerationProgress {
   of: number;
   attempt?: number;
   receivedChars?: number;
+  thoughtChars?: number;
   /** Live reasoning or thinking text emitted by the model. */
   thought?: string;
   /** Errors found by the last check. */
@@ -51,6 +52,16 @@ export interface GenerationOutputVariant {
   rationale?: string;
   thought?: string;
   issues?: Array<{ message: string; criterion?: string }>;
+  /** Accessibility/markup warnings left in a passed design. */
+  warnings?: number;
+  /** What the sanitizer removed (scripts, handlers, external resources…). */
+  removed?: string[];
+  /** Measured time in the model's reasoning phase (jobs since the trace update). */
+  thinkingMs?: number;
+  /** Measured time to build and check this design. */
+  durationMs?: number;
+  /** Real completion tokens billed for this design. */
+  completionTokens?: number;
 }
 
 export interface GenerationJob {

@@ -1,4 +1,6 @@
-import { MessageSquare, type LucideIcon } from "lucide-react";
+import type { IconSvgElement } from "@hugeicons/react";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import { Message01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -16,7 +18,7 @@ import {
 } from "@/config/landing-page-data";
 
 export interface RoleCardProps {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   title: string;
   description: string;
   footerText: string;
@@ -24,7 +26,7 @@ export interface RoleCardProps {
 }
 
 export function RoleCard({
-  icon: Icon,
+  icon,
   title,
   description,
   footerText,
@@ -34,7 +36,7 @@ export function RoleCard({
     <Card className={cn("flex h-full flex-col gap-0", className)}>
       <CardHeader className="pb-1.5">
         <div className="mb-2.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-text">
-          <Icon className="size-4" aria-hidden="true" />
+          <HugeIcon icon={icon} size={16} />
         </div>
         <CardTitle className="text-sm">{title}</CardTitle>
       </CardHeader>
@@ -47,7 +49,7 @@ export function RoleCard({
         <Separator />
       </div>
       <CardFooter className="gap-2 pt-4 text-muted-foreground">
-        <MessageSquare className="size-3.5 shrink-0" aria-hidden="true" />
+        <HugeIcon icon={Message01Icon} size={14} />
         <span className="text-xs">{footerText}</span>
       </CardFooter>
     </Card>

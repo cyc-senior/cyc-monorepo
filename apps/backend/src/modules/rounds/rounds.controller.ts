@@ -51,10 +51,29 @@ export class RoundsController {
   }
 
   /**
+   * Starts (or returns existing/in-flight) background AI prompt drafting for a
+   * user story.
+   */
+  @Post('draft-prompt')
+  @Authorize(Permission.DesignWrite)
+  @RateLimit({ limit: 10, windowMs: MINUTE })
+  startDraftPrompt(
+    @UuidParam('projectId') projectId: string,
+    @Query() query: DraftPromptQueryDto,
+  ) {
+    return this.rounds.startDraftPrompt(
+      projectId,
+      query.storyId,
+      query.personaId,
+      query.refresh,
+    )
+  }
+
+  /**
    * SSE endpoint to stream AI structured prompt drafting for a user story.
    *
-   * @remarks Calls the LLM, so it needs the same permission as starting a
-   *   generation and is rate limited.
+   * @remarks Re-attaches to an existing background BullMQ job if one is
+   *   already running, so refreshing does not abort or duplicate drafting.
    */
   @Sse('draft-prompt/events')
   @Authorize(Permission.DesignWrite)
@@ -69,6 +88,7 @@ export class RoundsController {
       projectId,
       query.storyId,
       query.personaId,
+      query.refresh,
     )
   }
 

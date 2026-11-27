@@ -4,26 +4,41 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { HugeIcon } from "@/components/ui/huge-icon";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { HugeIcon } from "@/components/ui/huge-icon";
+import type { IconSvgElement } from "@hugeicons/react";
+import {
+  AiBrain01Icon,
   Alert02Icon,
+  CheckmarkCircle02Icon,
   CircleIcon,
-  Loading02Icon,
+  File01Icon,
+  Loading03Icon,
+  SecurityCheckIcon,
+  SourceCodeIcon,
   Tick02Icon,
+  Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import {
   Trace,
   TraceLine,
   TraceIcon,
+  TraceTitle,
+  TraceDescription,
   TraceCollapsible,
   TraceCollapsibleTrigger,
   TraceCollapsibleContent,
 } from "@/components/ui/trace";
-import { Brain, CheckCircle2, FileCode, ShieldCheck, Wrench } from "lucide-react";
-import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
+import { useStoryBreadcrumbs } from "@/components/layout/use-story-breadcrumbs";
 import {
-  PHASE_ORDER,
   useJobStream,
   VariantTraceItem,
 } from "@/components/generation/use-job-stream";
@@ -76,7 +91,7 @@ function variantStatus(
     }
     if (progress?.stage === "repairing") {
       return {
-        text: `Fixing ${progress.errors ?? "a few"} issue${progress.errors === 1 ? "" : "s"}…`,
+        text: "Polishing…",
         busy: true,
         done: false,
       };
@@ -175,7 +190,7 @@ function SharedIntentBanner({
           {isDone ? (
             <HugeIcon icon={Tick02Icon} size={16} className="text-primary-text" />
           ) : isActive ? (
-            <HugeIcon icon={Loading02Icon} size={14} className="animate-spin text-foreground" />
+            <HugeIcon icon={Loading03Icon} size={14} className="animate-spin text-foreground" />
           ) : (
             <HugeIcon icon={CircleIcon} size={14} className="text-muted-foreground" />
           )}
@@ -192,78 +207,178 @@ function SharedIntentBanner({
         </div>
       </div>
 
-      {isDone && (
-        <div className="ml-9">
-          <TraceCollapsible defaultOpen={false} className="w-full">
-            <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-muted-foreground hover:text-foreground font-medium cursor-pointer">
-              <span>Design intent & context summary</span>
-            </TraceCollapsibleTrigger>
-            <TraceCollapsibleContent>
-              <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
+      {(isDone || job.inputSnapshot?.synthesizePersona) && (
+        <Trace className="mt-1 pl-9">
+          {isDone && (
+            <TraceCollapsible>
+              <TraceCollapsibleTrigger>
+                <TraceLine>
+                  <TraceIcon>
+                    <HugeIcon icon={File01Icon} size={16} />
+                  </TraceIcon>
+                  <TraceTitle>Design intent &amp; context summary</TraceTitle>
+                </TraceLine>
+              </TraceCollapsibleTrigger>
+              <TraceCollapsibleContent className="space-y-1 text-xs">
                 <p>
-                  • Story: &ldquo;
+                  Story: &ldquo;
                   {job.inputSnapshot?.stories?.[0]?.title ??
                     "Primary user workflow"}
                   &rdquo;
                 </p>
-                <p>• UI Library: {designSystem}</p>
-                <p>• Standard: {standard}</p>
-                <p>• Accessibility & color tokens injected into context.</p>
-              </div>
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-        </div>
-      )}
+                <p>UI library: {designSystem}</p>
+                <p>Standard: {standard}</p>
+                <p>Accessibility &amp; color tokens injected into context.</p>
+              </TraceCollapsibleContent>
+            </TraceCollapsible>
+          )}
 
-      {job.inputSnapshot?.synthesizePersona && (
-        <div className="mt-2 pt-2 border-t border-border/60 ml-9">
-          <TraceCollapsible
-            open={openThoughtKey === "persona"}
-            onOpenChange={(open) => onToggleThought("persona", open)}
-            className="w-full"
-          >
-            <div className="flex items-center gap-2">
-              <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                <Brain
-                  className={cn(
-                    "size-3.5 shrink-0",
-                    personaRunning
-                      ? "text-violet-500 animate-pulse"
-                      : "text-muted-foreground"
-                  )}
-                />
-                <span>
-                  {personaRunning
-                    ? "Thinking (Drafting persona)..."
-                    : "Drafted a persona from your prompt"}
-                </span>
+          {job.inputSnapshot?.synthesizePersona && (
+            <TraceCollapsible
+              open={openThoughtKey === "persona"}
+              onOpenChange={(open) => onToggleThought("persona", open)}
+            >
+              <TraceCollapsibleTrigger>
+                <TraceLine status={personaRunning ? "running" : undefined}>
+                  <TraceIcon>
+                    <TraceStateIcon
+                      state={personaRunning ? "running" : pastPersona ? "done" : "pending"}
+                      icon={AiBrain01Icon}
+                    />
+                  </TraceIcon>
+                  <TraceTitle>
+                    {personaRunning
+                      ? "Drafting a persona from your prompt…"
+                      : "Drafted a persona from your prompt"}
+                  </TraceTitle>
+                </TraceLine>
               </TraceCollapsibleTrigger>
-              {personaRunning && (
-                <HugeIcon
-                  icon={Loading02Icon}
-                  size={12}
-                  className="animate-spin text-muted-foreground ml-auto shrink-0"
-                />
-              )}
-              {!personaRunning && pastPersona && (
-                <HugeIcon
-                  icon={Tick02Icon}
-                  size={12}
-                  className="text-muted-foreground/70 ml-auto shrink-0"
-                />
-              )}
-            </div>
-            <TraceCollapsibleContent>
-              <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                {personaThought ||
-                  "Synthesized target user persona from your prompt and project design intent."}
-              </div>
-            </TraceCollapsibleContent>
-          </TraceCollapsible>
-        </div>
+              <TraceCollapsibleContent>
+                <ThoughtText>
+                  {personaThought ||
+                    "Synthesized target user persona from your prompt and project design intent."}
+                </ThoughtText>
+              </TraceCollapsibleContent>
+            </TraceCollapsible>
+          )}
+        </Trace>
       )}
     </div>
   );
+}
+
+/**
+ * What the markup check found. The check reads static markup only (no
+ * contrast, focus order or zoom), so it never claims more than that.
+ */
+function CheckResults({
+  running,
+  standard,
+  designSystem,
+  outputVariant,
+}: {
+  running: boolean;
+  standard: string;
+  designSystem: string;
+  outputVariant?: GenerationOutputVariant;
+}) {
+  if (running || !outputVariant) {
+    return (
+      <p>
+        Checking the markup against {standard} rules and {designSystem}{" "}
+        components…
+      </p>
+    );
+  }
+  if (!outputVariant.passed) {
+    const issues = outputVariant.issues ?? [];
+    return (
+      <>
+        <p className="text-destructive">
+          Still failing after {outputVariant.attempts} attempt
+          {outputVariant.attempts === 1 ? "" : "s"}:
+        </p>
+        <ul className="list-disc space-y-0.5 pl-4">
+          {issues.slice(0, 6).map((issue, i) => (
+            <li key={i}>
+              {issue.criterion ? `WCAG ${issue.criterion}: ` : ""}
+              {issue.message}
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+  const warnings = outputVariant.warnings ?? 0;
+  const removed = outputVariant.removed ?? [];
+  return (
+    <>
+      <p>
+        Passed {standard} markup rules and {designSystem} component checks
+        {outputVariant.attempts > 1
+          ? ` after ${outputVariant.attempts} attempts`
+          : ""}
+        .
+      </p>
+      <p>
+        {warnings === 0
+          ? "No warnings."
+          : `${warnings} warning${warnings === 1 ? "" : "s"} left to review.`}
+      </p>
+      {removed.length > 0 && (
+        <p>Removed for safety: {removed.slice(0, 4).join(", ")}.</p>
+      )}
+      <p className="text-muted-foreground/70">
+        Static markup only: contrast, focus order and zoom are not checked here.
+      </p>
+    </>
+  );
+}
+
+type TraceState = "running" | "done" | "error" | "pending";
+
+/** Phase icon of a trace step; every running step shows the same spinner. */
+function TraceStateIcon({
+  state,
+  icon,
+}: {
+  state: TraceState;
+  icon: IconSvgElement;
+}) {
+  if (state === "running") {
+    return <HugeIcon icon={Loading03Icon} size={16} className="animate-spin" />;
+  }
+  if (state === "error") {
+    return <HugeIcon icon={Alert02Icon} size={16} />;
+  }
+  return <HugeIcon icon={icon} size={16} />;
+}
+
+/** Streamed model reasoning inside an open trace step. */
+function ThoughtText({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="max-h-48 overflow-y-auto whitespace-pre-wrap text-xs select-text">
+      {children}
+    </p>
+  );
+}
+
+const PHASE_ICONS: Record<VariantTraceItem["phase"], IconSvgElement> = {
+  thinking: AiBrain01Icon,
+  generating: SourceCodeIcon,
+  checking: SecurityCheckIcon,
+  repairing: Wrench01Icon,
+  ready: CheckmarkCircle02Icon,
+};
+
+function traceState(status: VariantTraceItem["status"]): TraceState {
+  if (status === "running") return "running";
+  if (status === "error") return "error";
+  return "done";
+}
+
+function lineStatus(state: TraceState): "running" | "error" | undefined {
+  return state === "running" || state === "error" ? state : undefined;
 }
 
 function getVariantTraces(
@@ -277,73 +392,91 @@ function getVariantTraces(
   const effectiveThought = thought ?? outputVariant?.thought;
 
   if (liveTraces.length > 0) {
-    const list = liveTraces.map((item) => {
-      if (item.phase === "thinking" && !item.thought && effectiveThought) {
+    const items = liveTraces.map((item) => {
+      if (item.phase === "thinking" && (item.attempt ?? 1) === 1 && !item.thought && effectiveThought) {
         return { ...item, thought: effectiveThought };
       }
       return item;
     });
-    return list.sort(
-      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-    );
+    if (outputVariant && !outputVariant.passed) {
+      const failed: VariantTraceItem = {
+        id: "checking-final",
+        phase: "checking",
+        status: "error",
+        title: "Couldn't pass the markup & UI kit check",
+      };
+      return [...items.filter((i) => i.phase !== "checking" && i.phase !== "ready"), failed];
+    }
+    return items;
   }
 
   if (stepState === "done" || Boolean(outputVariant)) {
+    // Only measured values from the job: older jobs did not record timings,
+    // so they show no duration rather than a guess.
     const list: VariantTraceItem[] = [];
-    const estimatedSeconds = effectiveThought
-      ? Math.max(3, Math.min(15, Math.round(effectiveThought.length / 300)))
-      : 5;
+    const label = String.fromCharCode(64 + variantIdx);
+    const thinkingSeconds =
+      outputVariant?.thinkingMs !== undefined
+        ? Math.max(1, Math.round(outputVariant.thinkingMs / 1000))
+        : undefined;
 
     if (effectiveThought) {
       list.push({
-        id: "thinking",
+        id: "thinking-1",
         phase: "thinking",
         status: "done",
-        title: `Thought for ${estimatedSeconds} seconds`,
+        attempt: 1,
+        title:
+          thinkingSeconds !== undefined
+            ? `Thought for ${thinkingSeconds} second${thinkingSeconds === 1 ? "" : "s"}`
+            : "Thought",
         thought: effectiveThought,
-        thoughtDurationSeconds: estimatedSeconds,
+        thoughtDurationSeconds: thinkingSeconds,
       });
     }
     list.push({
-      id: "generating",
+      id: "generating-1",
       phase: "generating",
       status: "done",
-      title: "Drafted HTML component hierarchy",
+      attempt: 1,
+      title: `Generated Variant ${label} HTML`,
+      outputTokens: outputVariant?.completionTokens,
     });
     list.push({
-      id: "checking",
+      id: "checking-1",
       phase: "checking",
-      status: "done",
-      title: `Validated ${standard} contrast & design system rules`,
+      status: outputVariant && !outputVariant.passed ? "error" : "done",
+      attempt: 1,
+      title:
+        outputVariant && !outputVariant.passed
+          ? "Couldn't pass the markup & UI kit check"
+          : `Checked markup against ${standard} & the UI kit`,
     });
     if (outputVariant?.attempts && outputVariant.attempts > 1) {
       list.push({
         id: `repairing-${outputVariant.attempts}`,
         phase: "repairing",
         status: "done",
-        title: `Thought for 3 seconds (Attempt ${outputVariant.attempts})`,
-        thoughtDurationSeconds: 3,
+        title: `Polished Variant ${label}`,
         attempt: outputVariant.attempts,
-        thought: `Auto-adjusted contrast ratios and component slot attributes to pass ${standard} checks.`,
       });
     }
     list.push({
       id: "ready",
       phase: "ready",
       status: "done",
-      title: "Variant markup verified & saved",
+      title: "Variant saved",
     });
-    return list.sort(
-      (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-    );
+    return list;
   }
 
   if (stepState === "active") {
     return [
       {
-        id: "thinking",
+        id: "thinking-1",
         phase: "thinking",
         status: "running",
+        attempt: 1,
         title: "Thinking...",
         thought: effectiveThought,
       },
@@ -407,7 +540,7 @@ function VariantCard({
         <div className="flex items-center gap-1.5" aria-live="polite">
           {line.busy && (
             <HugeIcon
-              icon={Loading02Icon}
+              icon={Loading03Icon}
               size={14}
               className="animate-spin text-foreground"
             />
@@ -439,243 +572,92 @@ function VariantCard({
       ) : (
         <Trace className="flex-1">
           {variantTraces.map((item) => {
-            if (item.phase === "thinking") {
-              const isRunning = item.status === "running";
-              const displayTitle = isRunning
-                ? "Thinking..."
-                : `Thought for ${item.thoughtDurationSeconds ?? 5} seconds`;
-              const thoughtKey = `v${index}-thinking`;
-              const isOpen = openThoughtKey === thoughtKey;
+            const state = traceState(item.status);
+            const icon = (
+              <TraceIcon>
+                <TraceStateIcon state={state} icon={PHASE_ICONS[item.phase]} />
+              </TraceIcon>
+            );
 
-              return (
-                <TraceLine
-                  key={item.id}
-                  status={isRunning ? "running" : "finished"}
-                >
-                  <TraceIcon>
-                    <Brain
-                      className={cn(
-                        "size-4 shrink-0",
-                        isRunning
-                          ? "text-violet-500 animate-pulse"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible
-                      open={isOpen}
-                      onOpenChange={(open) =>
-                        onToggleThought(thoughtKey, open)
-                      }
-                      className="w-full"
-                    >
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{displayTitle}</span>
-                        </TraceCollapsibleTrigger>
-                        {isRunning && (
-                          <HugeIcon
-                            icon={Loading02Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {!isRunning && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      {item.thought && (
-                        <TraceCollapsibleContent>
-                          <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                            {item.thought}
-                          </div>
-                        </TraceCollapsibleContent>
-                      )}
-                    </TraceCollapsible>
-                  </div>
+            if (item.phase === "thinking") {
+              const running = state === "running";
+              const title = running
+                ? "Thinking…"
+                : item.title;
+              const thoughtKey = `v${index}-${item.id}`;
+              const tokens = running ? item.thoughtTokens : undefined;
+              const line = (
+                <TraceLine status={lineStatus(state)}>
+                  {icon}
+                  <TraceTitle>{title}</TraceTitle>
+                  {tokens ? (
+                    <TraceDescription>
+                      ~{tokens.toLocaleString()} tokens
+                    </TraceDescription>
+                  ) : null}
                 </TraceLine>
               );
-            }
-
-            if (item.phase === "repairing") {
-              const isRunning = item.status === "running";
-              const displayTitle = isRunning
-                ? `Thinking about repairs (Attempt ${item.attempt || 2})...`
-                : `Thought for ${item.thoughtDurationSeconds ?? 3} seconds (Attempt ${item.attempt || 2})`;
-
-              const thoughtKey = `v${index}-${item.id}`;
-              const isOpen = openThoughtKey === thoughtKey;
-
+              if (!item.thought) return <div key={item.id}>{line}</div>;
               return (
-                <TraceLine
+                <TraceCollapsible
                   key={item.id}
-                  status={isRunning ? "running" : "finished"}
+                  open={openThoughtKey === thoughtKey}
+                  onOpenChange={(open) => onToggleThought(thoughtKey, open)}
                 >
-                  <TraceIcon>
-                    <Wrench className="size-4 shrink-0 text-amber-500 animate-pulse" />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible
-                      open={isOpen}
-                      onOpenChange={(open) =>
-                        onToggleThought(thoughtKey, open)
-                      }
-                      className="w-full"
-                    >
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{displayTitle}</span>
-                        </TraceCollapsibleTrigger>
-                        {isRunning && (
-                          <HugeIcon
-                            icon={Loading02Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {!isRunning && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      <TraceCollapsibleContent>
-                        <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto select-text shadow-inner">
-                          {item.thought ||
-                            `Auto-adjusting contrast & element slots to pass ${standard} checks.`}
-                        </div>
-                      </TraceCollapsibleContent>
-                    </TraceCollapsible>
-                  </div>
-                </TraceLine>
+                  <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+                  <TraceCollapsibleContent>
+                    <ThoughtText>{item.thought}</ThoughtText>
+                  </TraceCollapsibleContent>
+                </TraceCollapsible>
               );
             }
 
             if (item.phase === "checking") {
               return (
-                <TraceLine
-                  key={item.id}
-                  status={
-                    item.status === "running"
-                      ? "running"
-                      : item.status === "error"
-                        ? "error"
-                        : "finished"
-                  }
-                >
-                  <TraceIcon>
-                    <ShieldCheck
-                      className={cn(
-                        "size-4 shrink-0",
-                        item.status === "running"
-                          ? "text-amber-500 animate-pulse"
-                          : item.status === "error"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      )}
+                <TraceCollapsible key={item.id}>
+                  <TraceCollapsibleTrigger>
+                    <TraceLine status={lineStatus(state)}>
+                      {icon}
+                      <TraceTitle>{item.title}</TraceTitle>
+                    </TraceLine>
+                  </TraceCollapsibleTrigger>
+                  <TraceCollapsibleContent className="space-y-1 text-xs">
+                    <CheckResults
+                      running={state === "running"}
+                      standard={standard}
+                      designSystem={designSystem}
+                      outputVariant={outputVariant}
                     />
-                  </TraceIcon>
-                  <div className="flex flex-1 flex-col min-w-0">
-                    <TraceCollapsible defaultOpen={false} className="w-full">
-                      <div className="flex items-center gap-2">
-                        <TraceCollapsibleTrigger className="flex items-center gap-1.5 text-xs py-0.5 text-foreground hover:text-foreground/80 font-medium cursor-pointer">
-                          <span>{item.title}</span>
-                        </TraceCollapsibleTrigger>
-                        {item.status === "running" && (
-                          <HugeIcon
-                            icon={Loading02Icon}
-                            size={12}
-                            className="animate-spin text-muted-foreground ml-auto shrink-0"
-                          />
-                        )}
-                        {item.status === "done" && (
-                          <HugeIcon
-                            icon={Tick02Icon}
-                            size={12}
-                            className="text-muted-foreground/70 ml-auto shrink-0"
-                          />
-                        )}
-                      </div>
-                      <TraceCollapsibleContent>
-                        <div className="mt-1.5 rounded-md border border-border/70 bg-muted/40 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground space-y-1 shadow-inner">
-                          <p>
-                            ✓ {standard}: Contrast thresholds verified (4.5:1
-                            text, 3:1 graphical elements).
-                          </p>
-                          <p>
-                            ✓ UI Kit: Component markup confirmed against{" "}
-                            {designSystem} specifications.
-                          </p>
-                          <p>
-                            ✓ DOM structure: Verified slot attributes and tag
-                            nesting.
-                          </p>
-                        </div>
-                      </TraceCollapsibleContent>
-                    </TraceCollapsible>
-                  </div>
-                </TraceLine>
+                  </TraceCollapsibleContent>
+                </TraceCollapsible>
               );
             }
 
+            const tokens =
+              item.phase === "generating" || item.phase === "repairing"
+                ? item.outputTokens
+                : undefined;
+            const durationSeconds =
+              item.phase === "ready" && outputVariant?.durationMs !== undefined
+                ? Math.max(1, Math.round(outputVariant.durationMs / 1000))
+                : undefined;
             return (
-              <TraceLine
-                key={item.id}
-                status={item.status === "running" ? "running" : "finished"}
-              >
-                <TraceIcon>
-                  {item.phase === "generating" ? (
-                    <FileCode
-                      className={cn(
-                        "size-4 shrink-0",
-                        item.status === "running"
-                          ? "text-blue-500 animate-pulse"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                  ) : (
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+              <div key={item.id}>
+                <TraceLine status={lineStatus(state)}>
+                  {icon}
+                  <TraceTitle>{item.title}</TraceTitle>
+                  {tokens ? (
+                    <TraceDescription>
+                      {/* Live counts are estimated from streamed text. */}
+                      {state === "running" ? "~" : ""}
+                      {tokens.toLocaleString()} tokens
+                    </TraceDescription>
+                  ) : null}
+                  {durationSeconds !== undefined && (
+                    <TraceDescription>{durationSeconds}s total</TraceDescription>
                   )}
-                </TraceIcon>
-                <div className="flex flex-1 items-center justify-between min-w-0 py-0.5 text-xs">
-                  <span
-                    className={cn(
-                      "font-medium",
-                      item.status === "running"
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {item.title}
-                    {item.phase === "generating" &&
-                    item.receivedChars &&
-                    item.status === "running"
-                      ? ` (${(item.receivedChars / 1024).toFixed(1)} KB)`
-                      : null}
-                  </span>
-                  {item.status === "running" && (
-                    <HugeIcon
-                      icon={Loading02Icon}
-                      size={12}
-                      className="animate-spin text-muted-foreground shrink-0"
-                    />
-                  )}
-                  {item.status === "done" && item.phase !== "ready" && (
-                    <HugeIcon
-                      icon={Tick02Icon}
-                      size={12}
-                      className="text-muted-foreground/70 shrink-0"
-                    />
-                  )}
-                </div>
-              </TraceLine>
+                </TraceLine>
+              </div>
             );
           })}
         </Trace>
@@ -688,7 +670,6 @@ function GeneratingContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { project, setBreadcrumbs } = useBreadcrumbs();
   const projectId = params.projectId as string;
   const roundId = params.roundId as string;
   const jobParam = searchParams.get("job");
@@ -697,6 +678,7 @@ function GeneratingContent() {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [busyAction, setBusyAction] = React.useState<"cancel" | "retry" | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
 
   // The job to follow: ?job=…, else the latest job of the round.
   React.useEffect(() => {
@@ -743,22 +725,10 @@ function GeneratingContent() {
     if (progress?.stage === "persona") {
       return "persona";
     }
-    const v = progress?.variant;
-    if (v && progress) {
-      if (progress.stage === "thinking") {
-        return `v${v}-thinking`;
-      }
-      if (progress.stage === "repairing") {
-        const attempt = progress.attempt ?? 2;
-        return `v${v}-repairing-${attempt}`;
-      }
-    }
     for (let idx = 1; idx <= (job?.variantCount ?? 2); idx++) {
       const traces = live.tracesByVariant[idx] ?? [];
       const running = traces.find(
-        (t) =>
-          (t.phase === "thinking" || t.phase === "repairing") &&
-          t.status === "running"
+        (t) => t.phase === "thinking" && t.status === "running"
       );
       if (running) {
         return `v${idx}-${running.id}`;
@@ -795,18 +765,12 @@ function GeneratingContent() {
     } else if (status === "CANCELLED") {
       const storyId = job?.inputSnapshot?.stories?.[0]?.id;
       if (storyId) {
-        router.replace(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+        router.replace(`/projects/${projectId}/stories/${storyId}/prompt`);
       }
     }
   }, [status, router, projectId, roundId, job]);
 
-  React.useEffect(() => {
-    const storyTitle = job?.inputSnapshot?.stories?.[0]?.title;
-    setBreadcrumbs([
-      { label: project?.name ?? "Project", href: `/projects/${projectId}` },
-      { label: storyTitle ?? "Generating A/B" },
-    ]);
-  }, [setBreadcrumbs, project?.name, projectId, job]);
+  useStoryBreadcrumbs(projectId, job?.inputSnapshot?.stories?.[0]?.id, "design");
 
   const handleCancel = async () => {
     if (!job) return;
@@ -818,7 +782,7 @@ function GeneratingContent() {
       }
       const storyId = job.inputSnapshot?.stories?.[0]?.id;
       if (storyId) {
-        router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+        router.push(`/projects/${projectId}/stories/${storyId}/prompt`);
       } else {
         router.push(`/projects/${projectId}`);
       }
@@ -858,7 +822,7 @@ function GeneratingContent() {
   if (!job) {
     return (
       <div className="flex w-full justify-center py-24">
-        <HugeIcon icon={Loading02Icon} size={24} className="animate-spin text-muted-foreground" />
+        <HugeIcon icon={Loading03Icon} size={24} className="animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -880,7 +844,7 @@ function GeneratingContent() {
             Building {labels.join(" and ")} from {designSystem}
           </h1>
           <p className="text-base leading-6 text-muted-foreground">
-            This usually takes a few minutes. You can leave this page; the designs keep generating.
+            This takes a few minutes. Feel free to leave. We&apos;ll keep working on your designs in the background.
           </p>
         </div>
 
@@ -962,7 +926,7 @@ function GeneratingContent() {
               onClick={() => {
                 const storyId = job.inputSnapshot?.stories?.[0]?.id;
                 if (storyId) {
-                  router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+                  router.push(`/projects/${projectId}/stories/${storyId}/prompt`);
                 } else {
                   router.push(`/projects/${projectId}`);
                 }
@@ -977,13 +941,45 @@ function GeneratingContent() {
         ) : (
           <Button
             variant="ghost"
-            onClick={handleCancel}
+            onClick={() => setCancelDialogOpen(true)}
             disabled={busyAction !== null || status === "SUCCEEDED"}
           >
             {busyAction === "cancel" ? "Cancelling…" : "Cancel"}
           </Button>
         )}
       </div>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Cancel generation?</DialogTitle>
+            <DialogDescription>
+              This will stop generating Variant A and B and return you to your structured prompt.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={busyAction === "cancel"}
+            >
+              Keep generating
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setCancelDialogOpen(false);
+                void handleCancel();
+              }}
+              disabled={busyAction === "cancel"}
+            >
+              {busyAction === "cancel" ? "Cancelling…" : "Cancel generation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

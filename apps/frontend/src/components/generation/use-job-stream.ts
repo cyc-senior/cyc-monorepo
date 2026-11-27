@@ -29,11 +29,16 @@ export interface VariantTraceItem {
   title: string;
   thought?: string;
   thoughtDurationSeconds?: number;
+  thoughtTokens?: number;
+  outputTokens?: number;
   startedAt?: number;
   endedAt?: number;
   receivedChars?: number;
   errors?: number;
+  /** Attempt number across restarts (the backend restarts each run at 1). */
   attempt?: number;
+  /** The attempt number as the backend sent it, within its run. */
+  rawAttempt?: number;
 }
 
 export interface JobStreamState {
@@ -58,6 +63,110 @@ const EMPTY: JobStreamState = {
   streamError: null,
 };
 
+export function estimateTokens(chars?: number): number {
+  if (!chars || chars <= 0) return 0;
+  return Math.max(1, Math.round(chars / 4));
+}
+
+function finalizeThinkingItem(
+  item: VariantTraceItem,
+  thoughtChars?: number
+): VariantTraceItem {
+  const start = item.startedAt ?? Date.now() - 4000;
+  const dur = item.thoughtDurationSeconds ?? Math.max(1, Math.round((Date.now() - start) / 1000));
+  const tokens =
+    item.thoughtTokens ??
+    estimateTokens(thoughtChars ?? item.thought?.length);
+  const tokenSuffix = tokens > 0 ? ` (${tokens.toLocaleString()} tokens)` : "";
+  return {
+    ...item,
+    status: "done",
+    endedAt: item.endedAt ?? Date.now(),
+    thoughtDurationSeconds: dur,
+    thoughtTokens: tokens > 0 ? tokens : item.thoughtTokens,
+    title: `Thought for ${dur} second${dur === 1 ? "" : "s"}${tokenSuffix}`,
+  };
+}
+
+function finalizeOutputItem(item: VariantTraceItem, variantIndex: number): VariantTraceItem {
+  // The token count is shown next to the title, so it is not repeated in it.
+  const tokens = item.outputTokens ?? estimateTokens(item.receivedChars);
+  const label = String.fromCharCode(64 + variantIndex);
+  const done = {
+    ...item,
+    status: "done" as const,
+    endedAt: item.endedAt ?? Date.now(),
+    outputTokens: tokens > 0 ? tokens : item.outputTokens,
+  };
+  if (item.phase === "repairing") return { ...done, title: `Polished Variant ${label}` };
+  if ((item.attempt ?? 1) > 1) return { ...done, title: `Rebuilt Variant ${label}` };
+  return { ...done, title: `Generated Variant ${label} HTML` };
+}
+
+/**
+ * The attempt number across restarts. When a design still fails after its
+ * repairs, the backend starts it over and counts attempts from 1 again; those
+ * steps must not collide with (and be ignored as) the finished first run.
+ */
+function effectiveAttempt(
+  items: VariantTraceItem[],
+  stage: GenerationProgress["stage"],
+  raw: number
+): number {
+  const lastThinking = items.filter((i) => i.phase === "thinking").at(-1);
+  if (!lastThinking) return raw;
+  const lastRaw = lastThinking.rawAttempt ?? lastThinking.attempt ?? 1;
+  const offset = (lastThinking.attempt ?? 1) - lastRaw;
+  const maxAttempt = Math.max(...items.map((i) => i.attempt ?? 1));
+  const lastOutputDone = items.some(
+    (i) =>
+      (i.phase === "generating" || i.phase === "repairing") &&
+      (i.attempt ?? 1) === maxAttempt &&
+      i.status === "done"
+  );
+  // A new run: thinking restarts at an attempt the previous run already
+  // finished, after that run's last output was built and checked.
+  if (stage === "thinking" && raw <= lastRaw && lastThinking.status === "done" && lastOutputDone) {
+    return maxAttempt + raw;
+  }
+  return raw + offset;
+}
+
+function finalizeVariantItems(
+  items: VariantTraceItem[],
+  variantIndex: number,
+  markReady = true
+): VariantTraceItem[] {
+  const updated = items.map((item) => {
+    if (item.status !== "running") return item;
+    if (item.phase === "thinking") {
+      return finalizeThinkingItem(item);
+    }
+    if (item.phase === "generating" || item.phase === "repairing") {
+      return finalizeOutputItem(item, variantIndex);
+    }
+    if (item.phase === "checking") {
+      return {
+        ...item,
+        status: "done" as const,
+        endedAt: item.endedAt ?? Date.now(),
+        title: "Checked markup & UI kit rules",
+      };
+    }
+    return { ...item, status: "done" as const };
+  });
+
+  if (markReady && !updated.some((i) => i.phase === "ready")) {
+    updated.push({
+      id: "ready",
+      phase: "ready",
+      status: "done",
+      title: "Variant saved",
+    });
+  }
+  return updated;
+}
+
 function updateTraces(
   prevTraces: Record<number, VariantTraceItem[]>,
   progress: GenerationProgress
@@ -67,240 +176,171 @@ function updateTraces(
 
   const next: Record<number, VariantTraceItem[]> = { ...prevTraces };
 
-  // For any variant prior to currentVariant, mark all items done and ensure "ready" exists
+  // Mark any prior variants as finished & ready
   for (let v = 1; v < currentVariant; v++) {
     if (next[v]) {
-      const items = next[v].map((item) => {
-        if (item.status === "running") {
-          if (item.phase === "thinking" || item.phase === "repairing") {
-            const start = item.startedAt ?? Date.now() - 5000;
-            const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
-            return {
-              ...item,
-              status: "done" as const,
-              thoughtDurationSeconds: dur,
-              title: item.phase === "thinking"
-                ? `Thought for ${dur} seconds`
-                : item.title,
-            };
-          }
-          return { ...item, status: "done" as const };
-        }
-        return item;
-      });
-      if (!items.some((i) => i.phase === "ready")) {
-        items.push({
-          id: "ready",
-          phase: "ready",
-          status: "done",
-          title: "Variant markup verified & saved",
-        });
-      }
-      items.sort(
-        (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-      );
-      next[v] = items;
+      next[v] = finalizeVariantItems(next[v], v, true);
     }
   }
 
-  // Update current variant
   const currentItems = [...(next[currentVariant] ?? [])];
+  const rawAttempt = progress.attempt ?? 1;
+  const attempt = effectiveAttempt(currentItems, progress.stage, rawAttempt);
+  const label = String.fromCharCode(64 + currentVariant);
 
   if (progress.stage === "thinking") {
-    const existingIdx = currentItems.findIndex((i) => i.id === "thinking");
+    const thinkId = `thinking-${attempt}`;
+    const existingIdx = currentItems.findIndex((i) => i.id === thinkId);
+    const hasMovedPastThinking = currentItems.some(
+      (i) =>
+        (i.id === `generating-${attempt}` ||
+          i.id === `repairing-${attempt}` ||
+          i.id === `checking-${attempt}`) &&
+        (i.attempt ?? 1) === attempt
+    );
+
     if (existingIdx >= 0) {
+      // Never revert a completed thinking step back to running
+      if (currentItems[existingIdx].status === "done" || hasMovedPastThinking) {
+        return next;
+      }
+      const tokens = estimateTokens(progress.thoughtChars ?? progress.thought?.length);
       currentItems[existingIdx] = {
         ...currentItems[existingIdx],
         thought: progress.thought ?? currentItems[existingIdx].thought,
+        thoughtTokens: tokens > 0 ? tokens : currentItems[existingIdx].thoughtTokens,
       };
-    } else {
+    } else if (!hasMovedPastThinking) {
+      // Finalize any earlier running items from previous attempts
+      for (let i = 0; i < currentItems.length; i++) {
+        if (currentItems[i].status === "running") {
+          if (currentItems[i].phase === "thinking") {
+            currentItems[i] = finalizeThinkingItem(currentItems[i]);
+          } else if (
+            currentItems[i].phase === "generating" ||
+            currentItems[i].phase === "repairing"
+          ) {
+            currentItems[i] = finalizeOutputItem(currentItems[i], currentVariant);
+          }
+        }
+      }
+      const tokens = estimateTokens(progress.thoughtChars ?? progress.thought?.length);
       currentItems.push({
-        id: "thinking",
+        id: thinkId,
         phase: "thinking",
         status: "running",
+        attempt,
         title: "Thinking...",
+        rawAttempt,
         thought: progress.thought,
+        thoughtTokens: tokens > 0 ? tokens : undefined,
         startedAt: Date.now(),
       });
     }
-  } else if (progress.stage === "generating") {
-    // If thinking was running, finish it and calculate duration
+  } else if (progress.stage === "generating" || progress.stage === "repairing") {
+    const thinkId = `thinking-${attempt}`;
     for (let i = 0; i < currentItems.length; i++) {
-      if (
-        currentItems[i].phase === "thinking" &&
-        currentItems[i].status === "running"
-      ) {
-        const start = currentItems[i].startedAt ?? Date.now() - 4000;
-        const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
-        currentItems[i] = {
-          ...currentItems[i],
-          status: "done",
-          thoughtDurationSeconds: dur,
-          title: `Thought for ${dur} seconds`,
-        };
+      if (currentItems[i].id === thinkId && currentItems[i].status === "running") {
+        currentItems[i] = finalizeThinkingItem(
+          currentItems[i],
+          progress.thoughtChars
+        );
       }
     }
 
-    // If thinking wasn't captured yet but we have thoughts, backfill thinking item
-    if (
-      !currentItems.some((i) => i.phase === "thinking") &&
-      progress.thought
-    ) {
-      currentItems.unshift({
-        id: "thinking",
-        phase: "thinking",
-        status: "done",
-        title: "Thought for 5 seconds",
-        thoughtDurationSeconds: 5,
-        thought: progress.thought,
-      });
+    // Do not go backwards if checking for this attempt has already started
+    if (currentItems.some((i) => i.id === `checking-${attempt}`)) {
+      next[currentVariant] = currentItems;
+      return next;
     }
 
-    const existingIdx = currentItems.findIndex((i) => i.id === "generating");
+    const genId = `${progress.stage}-${attempt}`;
+    const existingIdx = currentItems.findIndex((i) => i.id === genId);
+    const outputTokens = estimateTokens(progress.receivedChars);
+
     if (existingIdx >= 0) {
+      if (currentItems[existingIdx].status === "done") {
+        next[currentVariant] = currentItems;
+        return next;
+      }
       currentItems[existingIdx] = {
         ...currentItems[existingIdx],
         receivedChars:
           progress.receivedChars ?? currentItems[existingIdx].receivedChars,
+        outputTokens:
+          outputTokens > 0
+            ? outputTokens
+            : currentItems[existingIdx].outputTokens,
       };
     } else {
       currentItems.push({
-        id: "generating",
-        phase: "generating",
+        id: genId,
+        phase: progress.stage,
         status: "running",
-        title: "Drafting HTML component hierarchy",
+        attempt,
+        title:
+          progress.stage === "repairing"
+            ? `Polishing Variant ${label}`
+            : attempt > 1
+              ? `Rebuilding Variant ${label}`
+              : `Generating Variant ${label} HTML`,
         receivedChars: progress.receivedChars,
-      });
-    }
-  } else if (progress.stage === "checking") {
-    // Generating is done
-    for (let i = 0; i < currentItems.length; i++) {
-      if (
-        currentItems[i].phase === "generating" &&
-        currentItems[i].status === "running"
-      ) {
-        const chars = currentItems[i].receivedChars;
-        currentItems[i] = {
-          ...currentItems[i],
-          status: "done",
-          title: chars
-            ? `Drafted HTML component hierarchy (${(chars / 1024).toFixed(1)} KB)`
-            : "Drafted HTML component hierarchy",
-        };
-      }
-      if (
-        currentItems[i].phase === "repairing" &&
-        currentItems[i].status === "running"
-      ) {
-        const start = currentItems[i].startedAt ?? Date.now() - 3000;
-        const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
-        currentItems[i] = {
-          ...currentItems[i],
-          status: "done",
-          thoughtDurationSeconds: dur,
-        };
-      }
-    }
-    const existingIdx = currentItems.findIndex((i) => i.id === "checking");
-    const hasErrors = progress.errors !== undefined && progress.errors > 0;
-    if (existingIdx >= 0) {
-      currentItems[existingIdx] = {
-        ...currentItems[existingIdx],
-        status: hasErrors ? "error" : "running",
-        errors: progress.errors,
-      };
-    } else {
-      currentItems.push({
-        id: "checking",
-        phase: "checking",
-        status: hasErrors ? "error" : "running",
-        title: "Validating WCAG 2.2 AA contrast & design system rules",
-        errors: progress.errors,
-      });
-    }
-  } else if (progress.stage === "repairing") {
-    // Checking has error
-    for (let i = 0; i < currentItems.length; i++) {
-      if (currentItems[i].phase === "checking") {
-        currentItems[i] = { ...currentItems[i], status: "error" };
-      }
-    }
-    const repairId = `repairing-${progress.attempt ?? 2}`;
-    const existingIdx = currentItems.findIndex((i) => i.id === repairId);
-    if (existingIdx >= 0) {
-      currentItems[existingIdx] = {
-        ...currentItems[existingIdx],
-        thought: progress.thought ?? currentItems[existingIdx].thought,
-        errors: progress.errors ?? currentItems[existingIdx].errors,
-      };
-    } else {
-      currentItems.push({
-        id: repairId,
-        phase: "repairing",
-        status: "running",
-        title: `Auto-adjusting contrast & element slots (Attempt ${progress.attempt ?? 2})`,
-        thought: progress.thought,
-        errors: progress.errors,
-        attempt: progress.attempt,
+        outputTokens: outputTokens > 0 ? outputTokens : undefined,
         startedAt: Date.now(),
       });
     }
-  } else if (progress.stage === "saving") {
-    // All done for all variants
-    for (const v in next) {
-      next[v] = next[v].map((item) => {
-        if (item.status === "running") {
-          if (item.phase === "thinking" || item.phase === "repairing") {
-            const start = item.startedAt ?? Date.now() - 5000;
-            const dur = Math.max(1, Math.round((Date.now() - start) / 1000));
-            return {
-              ...item,
-              status: "done" as const,
-              thoughtDurationSeconds: dur,
-              title: item.phase === "thinking"
-                ? `Thought for ${dur} seconds`
-                : item.title,
-            };
-          }
-          if (item.phase === "generating") {
-            const chars = item.receivedChars;
-            return {
-              ...item,
-              status: "done" as const,
-              title: chars
-                ? `Drafted HTML component hierarchy (${(chars / 1024).toFixed(1)} KB)`
-                : "Drafted HTML component hierarchy",
-            };
-          }
-          if (item.phase === "checking") {
-            return {
-              ...item,
-              status: "done" as const,
-              title: "Validated WCAG 2.2 AA contrast & design system rules",
-            };
-          }
-          return { ...item, status: "done" as const };
+  } else if (progress.stage === "checking") {
+    for (let i = 0; i < currentItems.length; i++) {
+      if (currentItems[i].status === "running") {
+        if (currentItems[i].phase === "thinking") {
+          currentItems[i] = finalizeThinkingItem(
+            currentItems[i],
+            progress.thoughtChars
+          );
+        } else if (
+          currentItems[i].phase === "generating" ||
+          currentItems[i].phase === "repairing"
+        ) {
+          currentItems[i] = finalizeOutputItem(currentItems[i], currentVariant);
         }
-        return item;
-      });
-      if (!next[v].some((i) => i.phase === "ready")) {
-        next[v].push({
-          id: "ready",
-          phase: "ready",
-          status: "done",
-          title: "Variant markup verified & saved",
-        });
       }
-      next[v].sort(
-        (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-      );
+    }
+
+    const checkId = `checking-${attempt}`;
+    const existingIdx = currentItems.findIndex((i) => i.id === checkId);
+    const hasErrors = progress.errors !== undefined && progress.errors > 0;
+    const passed = progress.errors === 0;
+
+    if (hasErrors) {
+      // A failed check starts another repair round: an internal step, not
+      // something to alarm the designer with. A design that still fails at
+      // the end shows its issues from the job result instead.
+      if (existingIdx >= 0) currentItems.splice(existingIdx, 1);
+      next[currentVariant] = currentItems;
+      return next;
+    }
+
+    const checkItem: VariantTraceItem = {
+      id: checkId,
+      phase: "checking",
+      status: passed ? "done" : "running",
+      attempt,
+      title: passed ? "Checked markup & UI kit rules" : "Checking markup & UI kit rules",
+      errors: progress.errors,
+    };
+    if (existingIdx >= 0) {
+      currentItems[existingIdx] = { ...currentItems[existingIdx], ...checkItem };
+    } else {
+      currentItems.push(checkItem);
+    }
+  } else if (progress.stage === "saving") {
+    for (const v of Object.keys(next)) {
+      const idx = Number(v);
+      next[idx] = finalizeVariantItems(next[idx], idx, true);
     }
     return next;
   }
 
-  currentItems.sort(
-    (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
-  );
   next[currentVariant] = currentItems;
   return next;
 }
@@ -309,7 +349,18 @@ function loadCachedState(jobId: string | null): Partial<JobStreamState> {
   if (!jobId || typeof window === "undefined") return {};
   try {
     const raw = sessionStorage.getItem(`gen_trace:${jobId}`);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const cached = JSON.parse(raw) as Partial<JobStreamState>;
+      if (cached.tracesByVariant) {
+        cached.tracesByVariant = Object.fromEntries(
+          Object.entries(cached.tracesByVariant).map(([v, items]) => [
+            v,
+            items.filter((i) => !(i.phase === "checking" && i.status === "error")),
+          ])
+        );
+      }
+      return cached;
+    }
   } catch {}
   return {};
 }
@@ -353,7 +404,10 @@ export function useJobStream(
       jobId,
       (event) =>
         setState((prev) => {
-          const cached = prev.jobId === jobId ? prev : { jobId, ...EMPTY, ...loadCachedState(jobId) };
+          const cached =
+            prev.jobId === jobId
+              ? prev
+              : { jobId, ...EMPTY, ...loadCachedState(jobId) };
           if (event.type === "progress") {
             const nextThoughts =
               event.data.variant && event.data.thought
@@ -386,34 +440,12 @@ export function useJobStream(
             const finishedTraces: Record<number, VariantTraceItem[]> = {
               ...cached.tracesByVariant,
             };
-            for (const v in finishedTraces) {
-              finishedTraces[v] = finishedTraces[v].map((item) => {
-                if (item.status === "running") {
-                  if (item.phase === "thinking" || item.phase === "repairing") {
-                    const dur = item.thoughtDurationSeconds ?? 5;
-                    return {
-                      ...item,
-                      status: "done" as const,
-                      thoughtDurationSeconds: dur,
-                      title: item.phase === "thinking"
-                        ? `Thought for ${dur} seconds`
-                        : item.title,
-                    };
-                  }
-                  return { ...item, status: "done" as const };
-                }
-                return item;
-              });
-              if (!finishedTraces[v].some((i) => i.phase === "ready")) {
-                finishedTraces[v].push({
-                  id: "ready",
-                  phase: "ready",
-                  status: "done",
-                  title: "Variant markup verified & saved",
-                });
-              }
-              finishedTraces[v].sort(
-                (a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99)
+            for (const v of Object.keys(finishedTraces)) {
+              const idx = Number(v);
+              finishedTraces[idx] = finalizeVariantItems(
+                finishedTraces[idx],
+                idx,
+                true
               );
             }
             const nextState = {

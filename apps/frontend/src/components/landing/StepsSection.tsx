@@ -1,4 +1,5 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconSvgElement } from "@hugeicons/react";
+import { HugeIcon } from "@/components/ui/huge-icon";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -11,7 +12,7 @@ import { stepsData, type StepItem } from "@/config/landing-page-data";
 
 export interface StepCardProps {
   stepNumber: number;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   title: string;
   description: string;
   className?: string;
@@ -19,7 +20,7 @@ export interface StepCardProps {
 
 export function StepCard({
   stepNumber,
-  icon: Icon,
+  icon,
   title,
   description,
   className,
@@ -30,7 +31,7 @@ export function StepCard({
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-xs font-semibold text-primary-text">
           {stepNumber}
         </span>
-        <Icon className="size-4 shrink-0 text-primary-text" aria-hidden="true" />
+        <HugeIcon icon={icon} size={16} className="text-primary-text" />
       </CardHeader>
       <CardContent>
         <CardTitle className="mb-1.5 text-sm">{title}</CardTitle>

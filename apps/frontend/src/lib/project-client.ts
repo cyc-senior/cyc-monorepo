@@ -26,6 +26,8 @@ export interface ProjectDetails {
   description?: string | null;
   targetAudience?: string | null;
   status: string;
+  /** The viewer's role on this project. */
+  role?: ProjectRole;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,6 +120,9 @@ export interface UserStoryItem {
   description?: string | null;
   acceptanceCriteria?: string | null;
   problemStatement?: string | null;
+  draftPrompt?: Record<string, unknown> | null;
+  draftStatus?: "IDLE" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  draftError?: string | null;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -127,6 +132,7 @@ export interface UserStoryItem {
   want?: string;
   benefit?: string;
   successMetric?: string;
+  /** Personas the story targets (its Scope), stored as story-persona links. */
   personaIds?: string[];
   screenScope?: string[];
   devices?: string[];
@@ -152,6 +158,8 @@ export interface CreateUserStoryPayload {
   acceptanceCriteria?: string | null;
   problemStatement?: string | null;
   status?: "DRAFT" | "READY" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
+  /** Personas the story targets; replaces the current list on update. */
+  personaIds?: string[];
 }
 
 export interface DesignRoundItem {
@@ -235,9 +243,13 @@ export async function putDesignIntent(
 }
 
 /** Persona API calls */
-export async function listPersonas(projectId: string): Promise<PersonaItem[]> {
+export async function listPersonas(
+  projectId: string,
+  origin?: "MANUAL" | "AI"
+): Promise<PersonaItem[]> {
+  const query = origin ? `?origin=${origin}` : "";
   const res = await apiFetch<PersonaItem[] | { data: PersonaItem[] }>(
-    `/projects/${projectId}/personas`
+    `/projects/${projectId}/personas${query}`
   );
   return Array.isArray(res) ? res : res.data || [];
 }
@@ -332,10 +344,22 @@ export async function createUserStory(
   });
 }
 
+/**
+ * Deletes a user story (soft delete on the server: hidden from the project,
+ * its running generations stop; kept for a future recycle bin).
+ */
+export async function deleteUserStory(projectId: string, storyId: string): Promise<void> {
+  return apiFetch<void>(`/projects/${projectId}/user-stories/${storyId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateUserStory(
   projectId: string,
   storyId: string,
-  payload: Partial<CreateUserStoryPayload>
+  payload: Partial<CreateUserStoryPayload> & {
+    draftPrompt?: Record<string, unknown> | null;
+  }
 ): Promise<UserStoryItem> {
   return apiFetch<UserStoryItem>(`/projects/${projectId}/user-stories/${storyId}`, {
     method: "PATCH",

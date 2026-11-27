@@ -1,9 +1,13 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator'
 
@@ -11,6 +15,8 @@ import { PaginationQueryDto } from '../../../common/dto/pagination.dto'
 import {
   DesignRoundStatus,
   GenerationJobStatus,
+  Prisma,
+  PromptDraftStatus,
   StoryOrigin,
   UserStoryStatus,
 } from '../../../generated/prisma/client'
@@ -41,9 +47,30 @@ export class CreateUserStoryDto {
   @IsOptional()
   @IsEnum(UserStoryStatus)
   status?: UserStoryStatus
+
+  /**
+   * The personas this story targets (its Scope); all must belong to the
+   * project. On update, the list replaces the current one.
+   */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('all', { each: true })
+  personaIds?: string[]
 }
 
-export class UpdateUserStoryDto extends PartialType(CreateUserStoryDto) {}
+export class UpdateUserStoryDto extends PartialType(CreateUserStoryDto) {
+  /** Saved structured A/B prompt draft for this story. */
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsObject()
+  draftPrompt?: Record<string, unknown> | null
+}
 
 export class UserStoryQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
@@ -99,8 +126,20 @@ export class UserStoryDto {
 
   problemStatement: string | null
 
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  draftPrompt: Prisma.JsonValue | null
+
+  @ApiProperty({ enum: PromptDraftStatus, enumName: 'PromptDraftStatus' })
+  draftStatus: PromptDraftStatus
+
+  draftError: string | null
+
   @ApiProperty({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
   status: UserStoryStatus
+
+  /** The personas this story targets (its Scope). */
+  @ApiProperty({ type: [String], format: 'uuid' })
+  personaIds: string[]
 
   /** MANUAL, or AI for a draft written by the model (always starts as DRAFT). */
   @ApiProperty({ enum: StoryOrigin, enumName: 'StoryOrigin' })

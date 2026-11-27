@@ -193,7 +193,7 @@ export function userPrompt(
       ),
     ),
     ...section(
-      'Existing design to refine (keep everything the request does not change; return the full revised document)',
+      'Existing design to refine (keep everything the request does not change; if multiple numbered edits are listed, apply all of them; return the full revised document)',
       [
         input.baseDesign &&
           [

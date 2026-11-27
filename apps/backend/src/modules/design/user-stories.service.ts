@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
@@ -13,6 +13,7 @@ import {
 
 /** The latest design round of a story, with what its design cycle needs. */
 const WITH_CYCLE = {
+  personas: { select: { personaId: true }, orderBy: { createdAt: 'asc' } },
   rounds: {
     orderBy: { roundNumber: 'desc' },
     take: 1,
@@ -36,7 +37,7 @@ const WITH_CYCLE = {
 
 type StoryWithCycle = Prisma.UserStoryGetPayload<{ include: typeof WITH_CYCLE }>
 
-function toDto({ rounds, ...story }: StoryWithCycle): UserStoryDto {
+function toDto({ rounds, personas, ...story }: StoryWithCycle): UserStoryDto {
   const round = rounds[0]
   const designCycle: StoryDesignCycleDto | null = round
     ? {
@@ -56,7 +57,11 @@ function toDto({ rounds, ...story }: StoryWithCycle): UserStoryDto {
       }
     : null
 
-  return { ...story, designCycle }
+  return {
+    ...story,
+    personaIds: personas.map((p) => p.personaId),
+    designCycle,
+  }
 }
 
 @Injectable()
@@ -70,6 +75,7 @@ export class UserStoriesService {
     const where: Prisma.UserStoryWhereInput = {
       projectId,
       status: query.status,
+      deletedAt: null,
     }
 
     return paginate(
@@ -91,18 +97,48 @@ export class UserStoriesService {
     projectId: string,
     dto: CreateUserStoryDto,
   ): Promise<UserStoryDto> {
+    const { personaIds, ...data } = dto
+    const personas = await this.personaLinks(projectId, personaIds)
     return toDto(
       await this.prisma.userStory.create({
-        data: { ...dto, projectId },
+        data: {
+          ...data,
+          projectId,
+          ...(personas ? { personas: { create: personas } } : {}),
+        },
         include: WITH_CYCLE,
       }),
     )
   }
 
+  /**
+   * The story-persona links for `personaIds` (deduplicated), or undefined to
+   * leave them unchanged.
+   * @throws BadRequestException if a persona is not of this project.
+   */
+  private async personaLinks(
+    projectId: string,
+    personaIds: string[] | undefined,
+  ): Promise<Array<{ personaId: string }> | undefined> {
+    if (personaIds === undefined) return undefined
+    const unique = [...new Set(personaIds)]
+    if (unique.length > 0) {
+      const found = await this.prisma.userPersona.count({
+        where: { projectId, id: { in: unique } },
+      })
+      if (found !== unique.length) {
+        throw new BadRequestException(
+          'personaIds must all be user personas of this project.',
+        )
+      }
+    }
+    return unique.map((personaId) => ({ personaId }))
+  }
+
   async get(projectId: string, id: string): Promise<UserStoryDto> {
     return toDto(
       await this.prisma.userStory.findFirstOrThrow({
-        where: { id, projectId },
+        where: { id, projectId, deletedAt: null },
         include: WITH_CYCLE,
       }),
     )
@@ -115,17 +151,48 @@ export class UserStoriesService {
   ): Promise<UserStoryDto> {
     await this.get(projectId, id)
 
+    const { draftPrompt, personaIds, ...rest } = dto
+    const personas = await this.personaLinks(projectId, personaIds)
     return toDto(
       await this.prisma.userStory.update({
         where: { id },
-        data: dto,
+        data: {
+          ...rest,
+          ...(personas ? { personas: { deleteMany: {}, create: personas } } : {}),
+          ...(draftPrompt === undefined
+            ? {}
+            : {
+                draftPrompt:
+                  draftPrompt === null
+                    ? Prisma.JsonNull
+                    : (draftPrompt as Prisma.InputJsonValue),
+              }),
+        },
         include: WITH_CYCLE,
       }),
     )
   }
 
-  async remove(projectId: string, id: string): Promise<void> {
+  /**
+   * Soft delete: the story (and its rounds, from the design pages) is hidden
+   * but kept for a future recycle bin. Its queued or running generations are
+   * cancelled so no more LLM work is done for it; the worker aborts on its
+   * next cancellation check.
+   */
+  async remove(projectId: string, id: string, userId: string): Promise<void> {
     await this.get(projectId, id)
-    await this.prisma.userStory.delete({ where: { id } })
+    await this.prisma.$transaction([
+      this.prisma.userStory.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedById: userId },
+      }),
+      this.prisma.generationJob.updateMany({
+        where: {
+          round: { storyId: id, projectId },
+          status: { in: ['QUEUED', 'RUNNING'] },
+        },
+        data: { status: 'CANCELLED', finishedAt: new Date() },
+      }),
+    ])
   }
 }

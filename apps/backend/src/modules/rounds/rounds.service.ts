@@ -5,15 +5,27 @@ import {
   Logger,
   MessageEvent,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
-import { Observable } from 'rxjs'
+import {
+  concatMap,
+  defer,
+  from,
+  interval,
+  map,
+  merge,
+  Observable,
+  of,
+  takeWhile,
+} from 'rxjs'
 
 import { recordDecision } from '../../common/decisions'
 import { lockKey } from '../../common/db-lock'
 import { Page, paginate } from '../../common/dto/pagination.dto'
 import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
-import { thoughtTail } from '../generation/generation.constants'
+import { PromptDraftEvents } from '../generation/prompt-draft-events.service'
+import { PromptDraftQueue } from '../generation/prompt-draft-queue.service'
 import { PromptDrafter } from '../generation/prompt-drafter'
 import {
   CreateDesignRoundDto,
@@ -30,6 +42,8 @@ export class RoundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly drafter: PromptDrafter,
+    private readonly draftQueue: PromptDraftQueue,
+    private readonly draftEvents: PromptDraftEvents,
   ) {}
 
   list(
@@ -39,6 +53,8 @@ export class RoundsService {
     const where: Prisma.DesignRoundWhereInput = {
       projectId,
       status: query.status,
+      // Rounds of a deleted story leave the design pages with it.
+      OR: [{ storyId: null }, { story: { deletedAt: null } }],
     }
 
     return paginate(
@@ -64,7 +80,7 @@ export class RoundsService {
     if (
       dto.storyId &&
       !(await this.prisma.userStory.findFirst({
-        where: { id: dto.storyId, projectId },
+        where: { id: dto.storyId, projectId, deletedAt: null },
         select: { id: true },
       }))
     ) {
@@ -214,126 +230,196 @@ export class RoundsService {
   }
 
   /**
-   * Streams the drafting of a story's structured A/B prompt: loads the
-   * story, design intent and persona, and relays {@link PromptDrafter}'s
-   * progress as server-sent events.
+   * Starts or returns the status of background prompt drafting for a story.
+   * Refreshing the browser does not cancel or duplicate the job.
+   */
+  async startDraftPrompt(
+    projectId: string,
+    storyId: string,
+    personaId?: string,
+    refresh = false,
+  ): Promise<{
+    status: string
+    prompt?: Record<string, unknown>
+    error?: string | null
+  }> {
+    const [story, persona] = await Promise.all([
+      this.prisma.userStory.findFirst({
+        where: { id: storyId, projectId, deletedAt: null },
+      }),
+      personaId
+        ? this.prisma.userPersona.findFirst({
+            where: { id: personaId, projectId },
+          })
+        : Promise.resolve(null),
+    ])
+
+    if (!story) {
+      throw new NotFoundException('User story not found.')
+    }
+    if (personaId && !persona) {
+      throw new BadRequestException(
+        'personaId must be a persona of this project.',
+      )
+    }
+
+    if (
+      !refresh &&
+      story.draftPrompt &&
+      typeof story.draftPrompt === 'object' &&
+      !Array.isArray(story.draftPrompt)
+    ) {
+      return {
+        status: 'SUCCEEDED',
+        prompt: story.draftPrompt as Record<string, unknown>,
+      }
+    }
+
+    if (
+      !refresh &&
+      (story.draftStatus === 'QUEUED' || story.draftStatus === 'RUNNING')
+    ) {
+      return { status: story.draftStatus }
+    }
+
+    if (!this.drafter.configured) {
+      throw new BadRequestException(
+        'LLM provider is not configured on the backend. Please verify LLM_BASE_URL and LLM_API_KEY.',
+      )
+    }
+
+    await this.prisma.userStory.update({
+      where: { id: story.id },
+      data: { draftStatus: 'QUEUED', draftError: null },
+    })
+
+    try {
+      await this.draftQueue.enqueue(
+        { projectId, storyId, ...(personaId ? { personaId } : {}) },
+        refresh,
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await this.prisma.userStory.update({
+        where: { id: story.id },
+        data: { draftStatus: 'FAILED', draftError: message },
+      })
+      throw new ServiceUnavailableException(
+        'Could not queue prompt drafting; try again shortly.',
+      )
+    }
+
+    return { status: 'QUEUED' }
+  }
+
+  /**
+   * Streams the drafting of a story's structured A/B prompt by attaching to
+   * the background BullMQ job (or starting it if idle). Client disconnect does
+   * not abort the worker.
    */
   streamDraftPrompt(
     projectId: string,
     storyId: string,
     personaId?: string,
+    refresh = false,
   ): Observable<MessageEvent> {
-    return new Observable<MessageEvent>((subscriber) => {
-      const abortController = new AbortController()
+    const HEARTBEAT_MS = 15_000
 
-      ;(async () => {
-        try {
-          // Inputs are checked before any progress is reported: a story or
-          // persona outside the project ends the stream with an `error`
-          // event and nothing else. (The query DTO already rejects missing
-          // or malformed ids with a 400 before the stream opens.)
-          const [story, intent, persona] = await Promise.all([
-            this.prisma.userStory.findFirst({
-              where: { id: storyId, projectId },
-            }),
-            this.prisma.designIntent.findFirst({
-              where: { projectId },
-              orderBy: { version: 'desc' },
-            }),
-            personaId
-              ? this.prisma.userPersona.findFirst({
-                  where: { id: personaId, projectId },
-                })
-              : // Default: the project's first persona, the one the page preselects.
-                this.prisma.userPersona.findFirst({
-                  where: { projectId },
-                  orderBy: { createdAt: 'asc' },
-                }),
-          ])
-
-          if (!story) {
-            subscriber.error(new NotFoundException('User story not found.'))
-            return
-          }
-          if (personaId && !persona) {
-            subscriber.error(
-              new BadRequestException(
-                'personaId must be a persona of this project.',
-              ),
-            )
-            return
-          }
-
-          subscriber.next({
-            data: {
-              status: 'Drafting your prompt with AI...',
-              stage: 'loading_inputs',
-            },
-          })
-
-          subscriber.next({
-            data: {
-              status: 'Drafting your prompt with AI...',
-              stage: 'drafting',
-            },
-          })
-
-          if (!this.drafter.configured) {
-            subscriber.error(
-              new BadRequestException(
-                'LLM provider is not configured on the backend. Please verify LLM_BASE_URL and LLM_API_KEY.',
-              ),
-            )
-            return
-          }
-
-          // Progress is relayed at most every THROTTLE_MS.
-          let lastSent = 0
-          const THROTTLE_MS = 400
-          const throttled = (data: Record<string, unknown>) => {
-            const now = Date.now()
-            if (now - lastSent < THROTTLE_MS) {
-              return
-            }
-            lastSent = now
-            subscriber.next({ data })
-          }
-
-          const parsed = await this.drafter.draft(
-            { story, intent, persona },
-            {
-              signal: abortController.signal,
-              onThought: (thought) =>
-                throttled({
-                  status: 'Reasoning about prompt strategy...',
-                  stage: 'llm_streaming',
-                  thought: thoughtTail(thought),
-                }),
-              onDelta: (charsReceived) =>
-                throttled({
-                  status: 'Drafting your prompt with AI...',
-                  stage: 'llm_streaming',
-                  charsReceived,
-                }),
-            },
-          )
-          subscriber.next({
-            data: {
-              status: 'Drafting complete',
-              stage: 'completed',
-              prompt: parsed,
-            },
-          })
-          subscriber.complete()
-        } catch (err: unknown) {
-          this.logger.error('Error drafting prompt via LLM', err)
-          subscriber.error(err)
+    const live = this.draftEvents.forStory(storyId).pipe(
+      concatMap((signal) => {
+        if (signal.kind === 'progress') {
+          return of<MessageEvent>({ data: signal.progress })
         }
-      })()
+        return defer(() => this.draftSnapshot(projectId, storyId))
+      }),
+    )
 
-      return () => {
-        abortController.abort()
+    const initial = defer(async () => {
+      const started = await this.startDraftPrompt(
+        projectId,
+        storyId,
+        personaId,
+        refresh,
+      )
+      if (started.status === 'SUCCEEDED' && started.prompt) {
+        return [this.completedEvent(started.prompt)]
       }
+
+      const events: MessageEvent[] = [
+        {
+          data: {
+            status: 'Drafting your prompt with AI...',
+            stage: 'loading_inputs',
+          },
+        },
+      ]
+      const progress = await this.draftQueue.latestProgress(storyId)
+      if (progress) {
+        events.push({ data: progress })
+      }
+      return events
+    }).pipe(concatMap((events) => from(events)))
+
+    const heartbeat = interval(HEARTBEAT_MS).pipe(
+      map((): MessageEvent => ({ type: 'heartbeat', data: { storyId } })),
+    )
+
+    return merge(live, initial, heartbeat).pipe(
+      takeWhile((event) => {
+        if (event.type === 'error') {
+          return false
+        }
+        const data = event.data as Record<string, unknown> | undefined
+        return data?.stage !== 'completed'
+      }, true),
+    )
+  }
+
+  private async draftSnapshot(
+    projectId: string,
+    storyId: string,
+  ): Promise<MessageEvent> {
+    const story = await this.prisma.userStory.findFirst({
+      where: { id: storyId, projectId, deletedAt: null },
     })
+    if (!story) {
+      return { type: 'error', data: 'User story not found.' }
+    }
+    if (
+      story.draftStatus === 'SUCCEEDED' &&
+      story.draftPrompt &&
+      typeof story.draftPrompt === 'object' &&
+      !Array.isArray(story.draftPrompt)
+    ) {
+      return this.completedEvent(story.draftPrompt as Record<string, unknown>)
+    }
+    if (story.draftStatus === 'FAILED') {
+      return {
+        type: 'error',
+        data: story.draftError ?? 'Drafting the prompt failed.',
+      }
+    }
+    return {
+      data: {
+        status: 'Drafting your prompt with AI...',
+        stage: 'drafting',
+      },
+    }
+  }
+
+  private completedEvent(prompt: Record<string, unknown>): MessageEvent {
+    return {
+      data: {
+        status: 'Drafting complete',
+        stage: 'completed',
+        prompt,
+        ...(typeof prompt.thoughtChars === 'number'
+          ? { thoughtChars: prompt.thoughtChars }
+          : {}),
+        ...(typeof prompt.thoughtDurationSeconds === 'number'
+          ? { thoughtDurationSeconds: prompt.thoughtDurationSeconds }
+          : {}),
+      },
+    }
   }
 }

@@ -4,14 +4,16 @@ import * as React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { HugeIcon } from "@/components/ui/huge-icon";
+import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import {
   ArrowUp02Icon,
   BracketsIcon,
   Cancel01Icon,
   CodeIcon,
   Copy01Icon,
-  CursorEdit02Icon,
+  CommentAdd01Icon,
   Loading02Icon,
+  Loading03Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
@@ -24,7 +26,7 @@ import {
 import { kitComponentCode } from "./kit-code";
 import {
   DesignVersion,
-  PickedElement,
+  PinnedComment,
   timeAgo,
   versionName,
 } from "./versions";
@@ -35,9 +37,9 @@ import {
 
 export function CodeEmptyState() {
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 rounded-[10px] bg-[var(--cyc-bg-brand)] px-8 text-center">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4 rounded-[10px] bg-cyc-bg-brand px-8 text-center">
       <HugeIcon icon={BracketsIcon} size={24} className="text-primary" />
-      <p className="font-heading text-xl font-medium leading-7 text-white">
+      <p className="font-heading text-xl font-medium leading-7 text-brand-foreground">
         Pick any component to see source code.
       </p>
     </div>
@@ -196,10 +198,12 @@ function AiMark() {
 export function ChatPanel({
   messages,
   label,
-  picked,
+  pins = [],
+  activePinId = null,
   pickMode,
   onTogglePick,
-  onClearPicked,
+  onFocusPin,
+  onRemovePin,
   onSend,
   sending,
   disabled,
@@ -208,10 +212,13 @@ export function ChatPanel({
   messages: ChatMessage[];
   /** The design being refined: "A" or "B". */
   label: string;
-  picked: PickedElement | null;
+  /** Comments pinned on the design, not sent yet. */
+  pins?: PinnedComment[];
+  activePinId?: string | null;
   pickMode: boolean;
   onTogglePick: () => void;
-  onClearPicked: () => void;
+  onFocusPin?: (pinId: string) => void;
+  onRemovePin?: (pinId: string) => void;
   onSend: (text: string) => Promise<boolean>;
   sending: boolean;
   disabled: boolean;
@@ -229,33 +236,35 @@ export function ChatPanel({
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || sending || disabled) return;
+    if ((!text && pins.length === 0) || sending || disabled) return;
     if (await onSend(text)) setDraft("");
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col justify-end gap-4">
-      <div ref={listRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-live="polite">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-4">
+      {/* Only the message list scrolls; messages sit at its bottom. */}
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" aria-live="polite">
+        <div className="mt-auto" aria-hidden="true" />
         {messages.map((m) =>
           m.role === "ai" ? (
             <div key={m.id} className="flex items-start gap-2">
               <AiMark />
               <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-                <p
-                  className={cn(
-                    "text-sm leading-5 text-foreground",
-                    m.pending && "text-muted-foreground"
-                  )}
-                >
-                  {m.pending && (
-                    <HugeIcon
-                      icon={Loading02Icon}
-                      size={14}
-                      className="mr-1.5 inline animate-spin align-[-2px]"
-                    />
-                  )}
-                  {m.text}
-                </p>
+                {m.pending ? (
+                  // Live refinement stage, shown like the generation trace.
+                  <Trace>
+                    <div>
+                      <TraceLine status="running">
+                        <TraceIcon>
+                          <HugeIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                        </TraceIcon>
+                        <TraceTitle>{m.text}</TraceTitle>
+                      </TraceLine>
+                    </div>
+                  </Trace>
+                ) : (
+                  <p className="text-sm leading-5 text-foreground">{m.text}</p>
+                )}
                 {m.action && onAction && (
                   <Button
                     type="button"
@@ -273,12 +282,12 @@ export function ChatPanel({
           ) : (
             <div key={m.id} className="flex flex-col items-end gap-1">
               {m.elementKind && (
-                <span className="rounded-[6px] border border-brand-500 bg-background px-1.5 text-xs leading-5 text-brand-500">
+                <span className="rounded-[6px] border border-brand-500 bg-brand-50 px-[7px] py-[3px] text-sm leading-5 text-brand-700">
                   {m.elementKind}
                 </span>
               )}
               <div className="w-[280px] max-w-full rounded-[10px] bg-primary-subtle px-3 py-2.5">
-                <p className="text-sm leading-5 text-foreground">{m.text}</p>
+                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{m.text}</p>
               </div>
             </div>
           )
@@ -302,18 +311,45 @@ export function ChatPanel({
             </p>
           </div>
           <div className="flex flex-col gap-1.5 rounded-[10px] border border-border bg-background px-2.5 py-2">
-            {picked && (
-              <span className="flex w-fit items-center gap-1 rounded-[6px] border border-brand-500 px-1.5 text-xs leading-5 text-brand-500">
-                {picked.kind}
-                <button
-                  type="button"
-                  onClick={onClearPicked}
-                  aria-label="Remove picked element"
-                  className="cursor-pointer"
-                >
-                  <HugeIcon icon={Cancel01Icon} size={10} />
-                </button>
-              </span>
+            {pins.length > 0 && (
+              <div className="mb-1 flex max-h-40 flex-col gap-1 overflow-y-auto border-b border-border/60 pb-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  Comments on the design ({pins.length})
+                </span>
+                {pins.map((pin, idx) => (
+                  <div
+                    key={pin.id}
+                    className={cn(
+                      "flex items-start justify-between gap-2 rounded-[6px] px-2 py-1 text-xs",
+                      pin.id === activePinId ? "bg-brand-500/10" : "bg-muted/50"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onFocusPin?.(pin.id)}
+                      className="flex min-w-0 flex-1 cursor-pointer items-start gap-1.5 text-left"
+                    >
+                      <span className="flex size-4 shrink-0 items-center justify-center rounded-full rounded-bl-none bg-brand-500 text-[10px] font-semibold text-white">
+                        {idx + 1}
+                      </span>
+                      <span className="min-w-0 break-words text-foreground">
+                        <span className="mr-1 text-brand-500">{pin.element.kind}</span>
+                        {pin.comment}
+                      </span>
+                    </button>
+                    {onRemovePin && (
+                      <button
+                        type="button"
+                        onClick={() => onRemovePin(pin.id)}
+                        aria-label={`Delete comment ${idx + 1}`}
+                        className="mt-0.5 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+                      >
+                        <HugeIcon icon={Cancel01Icon} size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
             <textarea
               value={draft}
@@ -328,7 +364,11 @@ export function ChatPanel({
               maxLength={2000}
               disabled={disabled}
               aria-label={`Ask for a change to ${label}`}
-              placeholder={picked ? `Ask for a change to ${picked.name}…` : `Ask for a change to ${label}…`}
+              placeholder={
+                pins.length > 0
+                  ? `Add an overall note, or send ${pins.length} comment${pins.length === 1 ? "" : "s"}…`
+                  : `Ask for a change to ${label}…`
+              }
               className="min-h-10 w-full resize-y bg-transparent text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
             />
           </div>
@@ -340,20 +380,24 @@ export function ChatPanel({
             size="icon"
             onClick={onTogglePick}
             aria-pressed={pickMode}
-            aria-label={pickMode ? "Stop picking" : "Pick an element in the preview"}
-            title={pickMode ? "Stop picking" : "Pick an element in the preview"}
-            className={cn("size-8 rounded-[10px]", pickMode && "ring-2 ring-brand-500")}
+            aria-label={pickMode ? "Stop commenting" : "Add a comment on the design"}
+            title={pickMode ? "Stop commenting (Esc)" : "Add a comment on the design"}
+            className={cn("size-8 rounded-[10px]", pickMode && "bg-brand-500/10 text-brand-500 ring-2 ring-brand-500")}
           >
-            <HugeIcon icon={CursorEdit02Icon} size={16} />
+            <HugeIcon icon={CommentAdd01Icon} size={16} />
           </Button>
           <Button
             type="button"
-            size="icon"
+            size={pins.length > 0 ? "sm" : "icon"}
             onClick={() => void send()}
-            disabled={!draft.trim() || sending || disabled}
-            aria-label="Send"
-            className="size-8 rounded-[10px] bg-primary-subtle text-primary-text hover:bg-primary-subtle/80"
+            disabled={(!draft.trim() && pins.length === 0) || sending || disabled}
+            aria-label={pins.length > 0 ? `Send ${pins.length} comment${pins.length === 1 ? "" : "s"}` : "Send"}
+            className={cn(
+              "h-8 rounded-[10px] bg-primary-subtle text-primary-text hover:bg-primary-subtle/80",
+              pins.length > 0 ? "px-3 text-xs font-medium gap-1.5" : "w-8"
+            )}
           >
+            {pins.length > 0 && <span>Send ({pins.length})</span>}
             <HugeIcon icon={sending ? Loading02Icon : ArrowUp02Icon} size={16} className={cn(sending && "animate-spin")} />
           </Button>
         </div>

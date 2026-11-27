@@ -12,6 +12,25 @@ import { AccessService } from '../access/access.service'
 import { AuditService } from '../audit/audit.service'
 import { can, Permission } from '../access/permissions'
 import { DesignGenerator, VariantResult } from './design-generator.service'
+
+/** Measured wall-clock time of one design, for the generation trace. */
+interface VariantTiming {
+  /** Time spent in the model's reasoning phase, over every run. */
+  thinkingMs: number
+  /** From the start of the design until it was checked and done. */
+  durationMs: number
+}
+
+type TimedVariantResult = VariantResult & { timing: VariantTiming }
+
+/** Trace fields stored per design in the job's output metadata. */
+function traceFields(r: TimedVariantResult) {
+  return {
+    thinkingMs: r.timing.thinkingMs,
+    durationMs: r.timing.durationMs,
+    completionTokens: r.usage.completionTokens,
+  }
+}
 import {
   GENERATION_INPUT_FORMAT,
   GenerationInput,
@@ -339,6 +358,22 @@ export class DesignGenerationProcessor
         usage: { promptTokens: 0, completionTokens: 0 },
       }
     }
+    // Another job of this project drafted one while this job was queued:
+    // reuse it so the project keeps a single AI persona.
+    const drafted = await this.prisma.userPersona.findFirst({
+      where: { projectId, origin: 'AI' },
+      orderBy: { createdAt: 'asc' },
+    })
+    if (drafted) {
+      this.logger.log(
+        logEvent('persona.reused', { job: id, persona: drafted.id }),
+      )
+      return {
+        id: drafted.id,
+        persona: drafted,
+        usage: { promptTokens: 0, completionTokens: 0 },
+      }
+    }
     await job.updateProgress({
       stage: 'persona',
       of: 1,
@@ -392,8 +427,8 @@ export class DesignGenerationProcessor
     personas: PersonaInput[],
     signal: AbortSignal,
     existing: Array<{ title: string; rationale: string }> = [],
-  ): Promise<VariantResult[]> {
-    const results: VariantResult[] = []
+  ): Promise<TimedVariantResult[]> {
+    const results: TimedVariantResult[] = []
     const previous: Array<{ title: string; rationale: string }> = [...existing]
 
     for (let index = 1; index <= total; index++) {
@@ -404,6 +439,10 @@ export class DesignGenerationProcessor
       } satisfies GenerationProgress)
       let lastSent = 0
       let lastStage: string | undefined = 'thinking'
+      // Real timings for the trace (no estimates from text length).
+      const variantStartedAt = Date.now()
+      let thinkingSince: number | null = variantStartedAt
+      let thinkingMs = 0
       // Assigned by the first run: the loop below always runs at least once.
       let result!: VariantResult
       // Every run is paid for, so tokens and attempts add up across restarts.
@@ -437,6 +476,13 @@ export class DesignGenerationProcessor
             progress: (progress) => {
               const now = Date.now()
               const isStageChange = progress.stage !== lastStage
+              if (isStageChange) {
+                if (lastStage === 'thinking' && thinkingSince !== null) {
+                  thinkingMs += now - thinkingSince
+                  thinkingSince = null
+                }
+                if (progress.stage === 'thinking') thinkingSince = now
+              }
               if (
                 !isStageChange &&
                 (progress.receivedChars !== undefined ||
@@ -466,7 +512,12 @@ export class DesignGenerationProcessor
         }
       }
       result = { ...result, usage: spent, attempts }
-      results.push(result)
+      const finishedAt = Date.now()
+      if (thinkingSince !== null) thinkingMs += finishedAt - thinkingSince
+      results.push({
+        ...result,
+        timing: { thinkingMs, durationMs: finishedAt - variantStartedAt },
+      })
       if (result.passed) {
         previous.push({ title: result.title, rationale: result.rationale })
       }
@@ -475,6 +526,7 @@ export class DesignGenerationProcessor
         passed: r.passed,
         attempts: r.attempts,
         thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
+        ...traceFields(r),
         ...(r.passed
           ? {
               title: r.title,
@@ -504,7 +556,7 @@ export class DesignGenerationProcessor
     projectId: string,
     roundId: string,
     input: GenerationInput,
-    results: VariantResult[],
+    results: TimedVariantResult[],
     artifact: PersonaArtifact | null,
   ): Promise<DesignGenerationResult> {
     const usage = results.reduce(
@@ -519,6 +571,7 @@ export class DesignGenerationProcessor
       passed: r.passed,
       attempts: r.attempts,
       thought: thoughtTail(r.thought, STORED_THOUGHT_CHARS),
+      ...traceFields(r),
       ...('issues' in r
         ? { issues: r.issues.slice(0, 20) }
         : {
@@ -536,7 +589,8 @@ export class DesignGenerationProcessor
       variants: summary,
     } as Prisma.InputJsonObject
     const passed = results.filter(
-      (r): r is Extract<VariantResult, { passed: true }> => r.passed,
+      (r): r is Extract<VariantResult, { passed: true }> & { timing: VariantTiming } =>
+        r.passed,
     )
     if (passed.length === 0) {
       // Keep the per-variant issues; fail() then marks the job FAILED.

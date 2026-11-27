@@ -4,7 +4,9 @@ import {
   OmitType,
   PartialType,
 } from '@nestjs/swagger'
+import { Transform } from 'class-transformer'
 import {
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -46,6 +48,13 @@ export class DraftPromptQueryDto {
   @IsOptional()
   @IsUUID()
   personaId?: string
+
+  /** Bypass any saved draft prompt and re-draft with AI. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  refresh?: boolean
 }
 
 export class UpdateDesignRoundDto extends PartialType(

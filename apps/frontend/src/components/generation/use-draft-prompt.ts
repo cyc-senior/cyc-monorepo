@@ -5,12 +5,15 @@ import {
   getUserStoryById,
   getDesignIntent,
   listPersonas,
+  listUserStories,
   UserStoryItem,
   DesignIntentDetail,
   PersonaItem,
 } from "@/lib/project-client";
+import { storyCode } from "@/lib/design-cycle";
 import { API_URL } from "@/lib/api-client";
 import { fetchSse, readSseStream, sseErrorMessage } from "@/lib/sse";
+import { estimateTokens } from "@/components/generation/use-job-stream";
 
 /** The structured prompt the drafter returns (every field may be missing). */
 export interface DraftedPrompt {
@@ -20,6 +23,10 @@ export interface DraftedPrompt {
   comparisonQuestion?: string;
   variantA?: { name?: string; description?: string };
   variantB?: { name?: string; description?: string };
+  personaId?: string;
+  thought?: string;
+  thoughtChars?: number;
+  thoughtDurationSeconds?: number;
 }
 
 /** One progress frame of `GET .../rounds/draft-prompt/events`. */
@@ -27,6 +34,9 @@ interface DraftPromptEvent {
   status?: string;
   stage?: string;
   thought?: string;
+  thoughtChars?: number;
+  charsReceived?: number;
+  thoughtDurationSeconds?: number;
   prompt?: DraftedPrompt;
 }
 
@@ -51,6 +61,9 @@ export function useDraftPrompt(
     "Drafting your prompt with AI..."
   );
   const [thoughtText, setThoughtText] = React.useState<string>("");
+  const [thoughtTokens, setThoughtTokens] = React.useState<number>(0);
+  const [outputTokens, setOutputTokens] = React.useState<number>(0);
+  const [thoughtDurationSeconds, setThoughtDurationSeconds] = React.useState<number | null>(null);
 
   const onPromptRef = React.useRef(onPrompt);
   React.useEffect(() => {
@@ -62,7 +75,7 @@ export function useDraftPrompt(
     let isCancelled = false;
     let abortController = new AbortController();
 
-    async function loadData() {
+    async function loadData(refresh = false) {
       if (!storyId || !projectId) return;
 
       abortController.abort();
@@ -71,28 +84,91 @@ export function useDraftPrompt(
       setIsLoading(true);
       setError(null);
       setBackendStatus("Drafting your prompt with AI...");
+      setThoughtText("");
+      setThoughtTokens(0);
+      setOutputTokens(0);
+      setThoughtDurationSeconds(null);
 
       try {
-        const [storyData, intentData, personaList] = await Promise.all([
+        const [storyData, intentData, personaList, allStories] = await Promise.all([
           getUserStoryById(projectId, storyId),
           getDesignIntent(projectId).catch(() => null),
           listPersonas(projectId).catch(() => []),
+          listUserStories(projectId).catch(() => []),
         ]);
 
         if (isCancelled || abortController.signal.aborted) return;
 
-        setStory(storyData);
+        const computedKey =
+          storyData.storyKey ||
+          (allStories.length > 0 ? storyCode(allStories, storyData) : undefined);
+        setStory(computedKey ? { ...storyData, storyKey: computedKey } : storyData);
         setIntent(intentData);
         setPersonas(personaList);
 
-        const initialPersona = personaList[0];
-        const personaIdToUse = initialPersona?.id || "";
+        // The persona the prompt is written for: the story's own Scope
+        // persona first, then a designer-written one, then any.
+        const storyPersonaId = storyData.personaIds?.find((id) =>
+          personaList.some((p) => p.id === id)
+        );
+        const defaultPersonaId =
+          storyPersonaId ??
+          personaList.find((p) => p.origin !== "AI")?.id ??
+          personaList[0]?.id ??
+          "";
+
+        const savedDraft =
+          !refresh &&
+          storyData.draftPrompt &&
+          typeof storyData.draftPrompt === "object"
+            ? (storyData.draftPrompt as DraftedPrompt)
+            : null;
+
+        if (savedDraft) {
+          const restoredPersonaId = savedDraft.personaId || defaultPersonaId;
+          setDraftedPersonaId(restoredPersonaId);
+          if (savedDraft.thought) {
+            setThoughtText(savedDraft.thought);
+          }
+          const tokens = estimateTokens(
+            savedDraft.thoughtChars ?? savedDraft.thought?.length
+          );
+          if (tokens > 0) setThoughtTokens(tokens);
+          if (typeof savedDraft.thoughtDurationSeconds === "number") {
+            setThoughtDurationSeconds(savedDraft.thoughtDurationSeconds);
+          }
+          onPromptRef.current(savedDraft);
+          setIsLoading(false);
+          setBackendStatus(null);
+          return;
+        }
+
+        if (storyData.draftStatus === "QUEUED" || storyData.draftStatus === "RUNNING") {
+          setBackendStatus("Resuming AI prompt draft...");
+          try {
+            const cachedRaw = sessionStorage.getItem(`draft_trace:${storyId}`);
+            if (cachedRaw) {
+              const cached = JSON.parse(cachedRaw) as {
+                thoughtText?: string;
+                thoughtTokens?: number;
+                outputTokens?: number;
+                backendStatus?: string;
+              };
+              if (cached.thoughtText) setThoughtText(cached.thoughtText);
+              if (cached.thoughtTokens) setThoughtTokens(cached.thoughtTokens);
+              if (cached.outputTokens) setOutputTokens(cached.outputTokens);
+              if (cached.backendStatus) setBackendStatus(cached.backendStatus);
+            }
+          } catch {}
+        }
+
+        const personaIdToUse = defaultPersonaId;
         setDraftedPersonaId(personaIdToUse);
 
         // Start SSE stream from backend to draft prompt
         const sseUrl = `${API_URL}/projects/${projectId}/rounds/draft-prompt/events?storyId=${storyId}${
           personaIdToUse ? `&personaId=${personaIdToUse}` : ""
-        }`;
+        }${refresh ? "&refresh=true" : ""}`;
 
         try {
           const res = await fetchSse(sseUrl, abortController.signal);
@@ -119,6 +195,7 @@ export function useDraftPrompt(
             error: null,
           };
           await readSseStream(res.body, (event) => {
+            if (event.type === "heartbeat") return;
             if (event.type === "error") {
               outcome.error = sseErrorMessage(event.data, "Drafting the prompt failed.");
               return false;
@@ -127,8 +204,40 @@ export function useDraftPrompt(
             if (!parsed || typeof parsed !== "object") return;
             if (parsed.status) setBackendStatus(parsed.status);
             if (parsed.thought) setThoughtText(parsed.thought);
+            const tTokens = estimateTokens(
+              parsed.thoughtChars ?? parsed.thought?.length
+            );
+            if (tTokens > 0) setThoughtTokens(tTokens);
+            const oTokens = estimateTokens(parsed.charsReceived);
+            if (oTokens > 0) setOutputTokens(oTokens);
+            if (typeof parsed.thoughtDurationSeconds === "number") {
+              setThoughtDurationSeconds(parsed.thoughtDurationSeconds);
+            }
+            if (!parsed.prompt) {
+              try {
+                sessionStorage.setItem(
+                  `draft_trace:${storyId}`,
+                  JSON.stringify({
+                    thoughtText: parsed.thought,
+                    thoughtTokens: tTokens || undefined,
+                    outputTokens: oTokens || undefined,
+                    backendStatus: parsed.status,
+                  })
+                );
+              } catch {}
+            }
 
             if (parsed.prompt) {
+              try {
+                sessionStorage.removeItem(`draft_trace:${storyId}`);
+              } catch {}
+              const pTokens = estimateTokens(
+                parsed.prompt.thoughtChars ?? parsed.prompt.thought?.length
+              );
+              if (pTokens > 0) setThoughtTokens(pTokens);
+              if (typeof parsed.prompt.thoughtDurationSeconds === "number") {
+                setThoughtDurationSeconds(parsed.prompt.thoughtDurationSeconds);
+              }
               onPromptRef.current(parsed.prompt);
               outcome.drafted = true;
               setIsLoading(false);
@@ -165,7 +274,7 @@ export function useDraftPrompt(
     }
 
     retryRef.current = () => {
-      void loadData();
+      void loadData(true);
     };
 
     if (projectId && storyId) {
@@ -190,6 +299,9 @@ export function useDraftPrompt(
     isLoading,
     backendStatus,
     thoughtText,
+    thoughtTokens,
+    outputTokens,
+    thoughtDurationSeconds,
     retry,
   };
 }

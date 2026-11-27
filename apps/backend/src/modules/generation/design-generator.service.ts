@@ -119,8 +119,10 @@ export class DesignGenerator {
     let currentThought = ''
 
     for (let attempt = 1; attempt <= this.repairs + 1; attempt++) {
+      currentThought = ''
+      let totalThoughtChars = 0
       hooks.progress?.({
-        stage: attempt === 1 ? 'generating' : 'repairing',
+        stage: 'thinking',
         attempt,
       })
       const completion = await this.llm.structured({
@@ -131,10 +133,12 @@ export class DesignGenerator {
         signal: hooks.signal,
         onThoughtDelta: (_chunk, totalThought) => {
           currentThought = totalThought
+          totalThoughtChars = totalThought.length
           hooks.progress?.({
-            stage: attempt === 1 ? 'thinking' : 'repairing',
+            stage: 'thinking',
             attempt,
             thought: currentThought,
+            thoughtChars: totalThoughtChars,
           })
         },
         onDelta: (receivedChars) =>
@@ -142,7 +146,9 @@ export class DesignGenerator {
             stage: attempt === 1 ? 'generating' : 'repairing',
             attempt,
             receivedChars,
-            thought: currentThought || undefined,
+            ...(totalThoughtChars > 0
+              ? { thoughtChars: totalThoughtChars }
+              : {}),
           }),
       })
       usage.promptTokens += completion.usage.promptTokens
