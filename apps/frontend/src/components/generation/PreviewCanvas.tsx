@@ -253,7 +253,7 @@ function PinMarker({
 }) {
   const resolved = Boolean(pin.resolvedLabel);
   return (
-    <div className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
+    <div data-pin-ui className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
       <button
         type="button"
         onClick={onToggle}
@@ -314,7 +314,7 @@ function DraftComposer({
     if (text.trim()) onSave(text.trim());
   };
   return (
-    <div className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
+    <div data-pin-ui className="pointer-events-auto absolute" style={{ left, top: top - 24 }}>
       <PinBubble label={number} active />
       <div
         role="dialog"
@@ -423,6 +423,25 @@ export function PreviewCanvas({
     setCursor(iframeRef.current?.contentDocument, pickMode);
   }, [pickMode, onPick]);
 
+  // An open pin popover closes on any click outside it: on this page, or
+  // inside the design (iframe clicks never reach this document).
+  const activePinRef = React.useRef(activePinId);
+  const onActivatePinRef = React.useRef(onActivatePin);
+  React.useEffect(() => {
+    activePinRef.current = activePinId;
+    onActivatePinRef.current = onActivatePin;
+  }, [activePinId, onActivatePin]);
+  React.useEffect(() => {
+    if (!activePinId) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest?.("[data-pin-ui]")) return;
+      onActivatePin(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [activePinId, onActivatePin]);
+
   const [positions, setPositions] = React.useState<Record<string, PinPosition>>({});
   const anchors = React.useMemo(() => {
     const list: Array<[string, PinAnchor]> = pins.map((p) => [p.id, p.anchor]);
@@ -476,6 +495,9 @@ export function PreviewCanvas({
       setHover({ kind: toPickedElement(el).kind, rect: { x: r.left, y: r.top, width: r.width, height: r.height } });
     });
     doc.addEventListener("mouseleave", () => setHover(null));
+    doc.addEventListener("pointerdown", () => {
+      if (activePinRef.current) onActivatePinRef.current(null);
+    });
     doc.addEventListener(
       "click",
       (e) => {
