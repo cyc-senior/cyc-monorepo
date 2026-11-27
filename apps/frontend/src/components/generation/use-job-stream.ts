@@ -35,7 +35,10 @@ export interface VariantTraceItem {
   endedAt?: number;
   receivedChars?: number;
   errors?: number;
+  /** Attempt number across restarts (the backend restarts each run at 1). */
   attempt?: number;
+  /** The attempt number as the backend sent it, within its run. */
+  rawAttempt?: number;
 }
 
 export interface JobStreamState {
@@ -86,23 +89,47 @@ function finalizeThinkingItem(
 }
 
 function finalizeOutputItem(item: VariantTraceItem, variantIndex: number): VariantTraceItem {
+  // The token count is shown next to the title, so it is not repeated in it.
   const tokens = item.outputTokens ?? estimateTokens(item.receivedChars);
-  const tokenSuffix = tokens > 0 ? ` (${tokens.toLocaleString()} tokens)` : "";
   const label = String.fromCharCode(64 + variantIndex);
-  if (item.phase === "repairing") {
-    return {
-      ...item,
-      status: "done",
-      endedAt: item.endedAt ?? Date.now(),
-      title: `Polished Variant ${label}${tokenSuffix}`,
-    };
-  }
-  return {
+  const done = {
     ...item,
-    status: "done",
+    status: "done" as const,
     endedAt: item.endedAt ?? Date.now(),
-    title: `Generated Variant ${label} HTML${tokenSuffix}`,
+    outputTokens: tokens > 0 ? tokens : item.outputTokens,
   };
+  if (item.phase === "repairing") return { ...done, title: `Polished Variant ${label}` };
+  if ((item.attempt ?? 1) > 1) return { ...done, title: `Rebuilt Variant ${label}` };
+  return { ...done, title: `Generated Variant ${label} HTML` };
+}
+
+/**
+ * The attempt number across restarts. When a design still fails after its
+ * repairs, the backend starts it over and counts attempts from 1 again; those
+ * steps must not collide with (and be ignored as) the finished first run.
+ */
+function effectiveAttempt(
+  items: VariantTraceItem[],
+  stage: GenerationProgress["stage"],
+  raw: number
+): number {
+  const lastThinking = items.filter((i) => i.phase === "thinking").at(-1);
+  if (!lastThinking) return raw;
+  const lastRaw = lastThinking.rawAttempt ?? lastThinking.attempt ?? 1;
+  const offset = (lastThinking.attempt ?? 1) - lastRaw;
+  const maxAttempt = Math.max(...items.map((i) => i.attempt ?? 1));
+  const lastOutputDone = items.some(
+    (i) =>
+      (i.phase === "generating" || i.phase === "repairing") &&
+      (i.attempt ?? 1) === maxAttempt &&
+      i.status === "done"
+  );
+  // A new run: thinking restarts at an attempt the previous run already
+  // finished, after that run's last output was built and checked.
+  if (stage === "thinking" && raw <= lastRaw && lastThinking.status === "done" && lastOutputDone) {
+    return maxAttempt + raw;
+  }
+  return raw + offset;
 }
 
 function finalizeVariantItems(
@@ -157,7 +184,8 @@ function updateTraces(
   }
 
   const currentItems = [...(next[currentVariant] ?? [])];
-  const attempt = progress.attempt ?? 1;
+  const rawAttempt = progress.attempt ?? 1;
+  const attempt = effectiveAttempt(currentItems, progress.stage, rawAttempt);
   const label = String.fromCharCode(64 + currentVariant);
 
   if (progress.stage === "thinking") {
@@ -203,6 +231,7 @@ function updateTraces(
         status: "running",
         attempt,
         title: "Thinking...",
+        rawAttempt,
         thought: progress.thought,
         thoughtTokens: tokens > 0 ? tokens : undefined,
         startedAt: Date.now(),
@@ -252,7 +281,9 @@ function updateTraces(
         title:
           progress.stage === "repairing"
             ? `Polishing Variant ${label}`
-            : `Generating Variant ${label} HTML`,
+            : attempt > 1
+              ? `Rebuilding Variant ${label}`
+              : `Generating Variant ${label} HTML`,
         receivedChars: progress.receivedChars,
         outputTokens: outputTokens > 0 ? outputTokens : undefined,
         startedAt: Date.now(),
