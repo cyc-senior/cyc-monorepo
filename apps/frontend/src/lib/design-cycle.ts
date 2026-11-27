@@ -53,7 +53,7 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
       // Approving the prompt again would start another round: open it before designs exist or if cancelled.
       href:
         !cycle || isCancelled || cycle.variantCount === 0
-          ? `/projects/${projectId}/rounds/new?storyId=${story.id}`
+          ? `/projects/${projectId}/stories/${story.id}/prompt`
           : undefined,
     },
     {
@@ -73,7 +73,7 @@ export function storySteps(projectId: string, story: UserStoryItem): CycleStep[]
 
 /** Where to continue a story: its designs once they exist, else the prompt. */
 export function storyContinueHref(projectId: string, story: UserStoryItem): string {
-  return designHref(projectId, story) ?? `/projects/${projectId}/rounds/new?storyId=${story.id}`;
+  return designHref(projectId, story) ?? `/projects/${projectId}/stories/${story.id}/prompt`;
 }
 
 /** "US1", "US2", … in creation order. */

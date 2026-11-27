@@ -190,7 +190,8 @@ export function ProjectsNav() {
           .slice(0, MAX_STORIES)
           .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
         // The story being worked on: from the route, else the newest one.
-        const routeStoryId = searchParams.get("storyId");
+        // /projects/{p}/stories/{storyId}(/prompt): the story in the path.
+        const routeStoryId = pathname.match(/\/stories\/([0-9a-f-]{36})(?:\/|$)/)?.[1] ?? null;
         const currentStory =
           list.find((s) => s.id === routeStoryId) ??
           list.find((s) => s.designCycle && pathname.includes(`/rounds/${s.designCycle.roundId}/`)) ??

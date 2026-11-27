@@ -9,10 +9,11 @@ import { designStepLabel, storyCode } from "@/lib/design-cycle";
  * The design-cycle step a page is. "design" is named like the sidebar step:
  * "Generate design" before the first designs exist, then "Refine UI".
  */
-export type StoryStage = "Review prompt" | "design";
+export type StoryStage = "story" | "Review prompt" | "design";
 
 /**
- * Breadcrumb of a design-cycle page: `Project › US1 › Generate design | Refine UI`.
+ * Breadcrumb of a story's pages: `Project › US1` (the story itself), or
+ * `Project › US1 › Review prompt | Generate design | Refine UI`.
  * Every level but the last links up; the story shows its key (as in Figma)
  * with the full title as a tooltip.
  */
@@ -37,6 +38,17 @@ export function useStoryBreadcrumbs(
 
   React.useEffect(() => {
     const story = stories.find((s) => s.id === storyId);
+    if (stage === "story") {
+      // A new story (no id yet) keeps the route's "New user story" trail.
+      if (!storyId) return;
+      setBreadcrumbs([
+        { label: project?.name ?? "Project", href: `/projects/${projectId}` },
+        story
+          ? { label: storyCode(stories, story), title: story.title }
+          : { label: "User story" },
+      ]);
+      return;
+    }
     setBreadcrumbs([
       { label: project?.name ?? "Project", href: `/projects/${projectId}` },
       ...(story

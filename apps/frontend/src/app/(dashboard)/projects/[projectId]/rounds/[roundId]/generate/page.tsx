@@ -765,7 +765,7 @@ function GeneratingContent() {
     } else if (status === "CANCELLED") {
       const storyId = job?.inputSnapshot?.stories?.[0]?.id;
       if (storyId) {
-        router.replace(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+        router.replace(`/projects/${projectId}/stories/${storyId}/prompt`);
       }
     }
   }, [status, router, projectId, roundId, job]);
@@ -782,7 +782,7 @@ function GeneratingContent() {
       }
       const storyId = job.inputSnapshot?.stories?.[0]?.id;
       if (storyId) {
-        router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+        router.push(`/projects/${projectId}/stories/${storyId}/prompt`);
       } else {
         router.push(`/projects/${projectId}`);
       }
@@ -926,7 +926,7 @@ function GeneratingContent() {
               onClick={() => {
                 const storyId = job.inputSnapshot?.stories?.[0]?.id;
                 if (storyId) {
-                  router.push(`/projects/${projectId}/rounds/new?storyId=${storyId}`);
+                  router.push(`/projects/${projectId}/stories/${storyId}/prompt`);
                 } else {
                   router.push(`/projects/${projectId}`);
                 }

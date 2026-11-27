@@ -89,15 +89,12 @@ export function SidebarHeader({ onToggleSidebar }: SidebarHeaderProps) {
           { label: "New user story" },
         ];
       }
-      if (subpath.startsWith("/stories")) {
+      if (subpath === "/stories") {
         return [projectCrumb, { label: "User stories" }];
       }
-      if (subpath.startsWith("/rounds/new")) {
-        // Screen 16: Review structured prompt
-        return [
-          { label: projectName, href: `/projects/${projectId}` },
-          { label: "Review structured prompt" },
-        ];
+      if (subpath.startsWith("/stories/")) {
+        // A story's pages set "US3 › …" once the story loads.
+        return [projectCrumb, { label: "User stories", href: `/projects/${projectId}/stories` }];
       }
 
       // Design-cycle pages set their own trail; never guess a page name.

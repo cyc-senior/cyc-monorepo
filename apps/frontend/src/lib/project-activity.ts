@@ -58,7 +58,7 @@ export function getActivityButton(log: AuditLogItem, projectId: string): Activit
         const job = await getGenerationJob(projectId, jobId);
         if (job.status === "CANCELLED") {
           const storyId = job.inputSnapshot?.stories?.[0]?.id;
-          return storyId ? `/projects/${projectId}/rounds/new?storyId=${storyId}` : `/projects/${projectId}`;
+          return storyId ? `/projects/${projectId}/stories/${storyId}/prompt` : `/projects/${projectId}`;
         }
         return job.status === "SUCCEEDED" || job.baseVariantId
           ? refine(job.roundId)
