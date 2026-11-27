@@ -79,7 +79,7 @@ export function StoryCard({ projectId, story, code, canEdit, onDeleted }: StoryC
   return (
     <>
       <Card
-        className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-[14px] border border-border bg-card p-0 shadow-2xs transition hover:border-foreground/30"
+        className="gap-0 group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-[14px] border border-border bg-card p-0 shadow-2xs transition hover:border-foreground/30"
         onClick={() => router.push(href)}
       >
         {/* Designs of the story: A and B once they exist. */}
