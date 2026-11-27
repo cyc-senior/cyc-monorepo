@@ -532,3 +532,34 @@
   background-image: none;
   animation: none;
 }
+
+/* 6. RAIL-MODE SIDEBAR OVERLAY: slide-in sidebar over a fading scrim */
+@theme inline {
+  --animate-sidebar-in: sidebar-in 200ms ease-out;
+  --animate-scrim-in: scrim-in 200ms ease-out;
+}
+
+@keyframes sidebar-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sidebar-in,
+  .animate-scrim-in {
+    animation: none;
+  }
+}

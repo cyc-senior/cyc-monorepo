@@ -81,20 +81,29 @@ function InnerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-background relative">
       {isRailMode ? (
-        // Figma "sidebar hover": hovering the rail floats the full sidebar
-        // over the page (shadow, no scrim); the toggle opens it too.
-        <div
-          onMouseEnter={() => setOverlayOpen(true)}
-          onMouseLeave={() => setOverlayOpen(false)}
-          className="relative shrink-0"
-        >
+        // Rail by default; the toggle slides the full sidebar over the page
+        // on a dimmed backdrop (like a sheet, but it is the sidebar itself).
+        // A click on the backdrop, Esc or navigating closes it.
+        <>
           <AppSidebar collapsed />
           {overlayOpen && (
-            <div className="fixed inset-y-0 left-0 z-50 shadow-lg">
-              <AppSidebar collapsed={false} />
-            </div>
+            <>
+              <div
+                onClick={() => setOverlayOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 animate-scrim-in"
+                aria-hidden="true"
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Sidebar"
+                className="fixed inset-y-0 left-0 z-50 shadow-lg animate-sidebar-in"
+              >
+                <AppSidebar collapsed={false} />
+              </div>
+            </>
           )}
-        </div>
+        </>
       ) : (
         <AppSidebar collapsed={sidebarCollapsed} />
       )}
