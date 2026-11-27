@@ -121,6 +121,19 @@ function ReviewStructuredPromptContent() {
   const [personaChoice, setSelectedPersonaId] = React.useState<string | null>(null);
   const selectedPersonaId = personaChoice ?? draftedPersonaId;
 
+  // Choices: designer-written personas. An AI-drafted persona shows only
+  // when it is already chosen (e.g. a saved draft) or the story targets it.
+  const personaOptions = React.useMemo(
+    () =>
+      personas.filter(
+        (p) =>
+          p.origin !== "AI" ||
+          p.id === selectedPersonaId ||
+          Boolean(story?.personaIds?.includes(p.id))
+      ),
+    [personas, selectedPersonaId, story?.personaIds]
+  );
+
   // The goal only shapes this prompt. It is not written back to the story:
   // the story's acceptance criteria are the designer's, not the AI's goal.
   const handleToggleGoal = () => setIsEditingGoal((editing) => !editing);
@@ -334,7 +347,7 @@ function ReviewStructuredPromptContent() {
                     <SelectValue placeholder="Select target persona" />
                   </SelectTrigger>
                   <SelectContent>
-                    {personas.map((p) => (
+                    {personaOptions.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.age ? `(${p.age})` : ""} - {p.shortDescription || "No description"}
                       </SelectItem>
