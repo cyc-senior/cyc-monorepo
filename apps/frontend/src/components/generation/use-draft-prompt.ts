@@ -106,6 +106,17 @@ export function useDraftPrompt(
         setIntent(intentData);
         setPersonas(personaList);
 
+        // The persona the prompt is written for: the story's own Scope
+        // persona first, then a designer-written one, then any.
+        const storyPersonaId = storyData.personaIds?.find((id) =>
+          personaList.some((p) => p.id === id)
+        );
+        const defaultPersonaId =
+          storyPersonaId ??
+          personaList.find((p) => p.origin !== "AI")?.id ??
+          personaList[0]?.id ??
+          "";
+
         const savedDraft =
           !refresh &&
           storyData.draftPrompt &&
@@ -114,8 +125,7 @@ export function useDraftPrompt(
             : null;
 
         if (savedDraft) {
-          const restoredPersonaId =
-            savedDraft.personaId || personaList[0]?.id || "";
+          const restoredPersonaId = savedDraft.personaId || defaultPersonaId;
           setDraftedPersonaId(restoredPersonaId);
           if (savedDraft.thought) {
             setThoughtText(savedDraft.thought);
@@ -152,8 +162,7 @@ export function useDraftPrompt(
           } catch {}
         }
 
-        const initialPersona = personaList[0];
-        const personaIdToUse = initialPersona?.id || "";
+        const personaIdToUse = defaultPersonaId;
         setDraftedPersonaId(personaIdToUse);
 
         // Start SSE stream from backend to draft prompt

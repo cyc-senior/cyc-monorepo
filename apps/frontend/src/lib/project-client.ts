@@ -132,6 +132,7 @@ export interface UserStoryItem {
   want?: string;
   benefit?: string;
   successMetric?: string;
+  /** Personas the story targets (its Scope), stored as story-persona links. */
   personaIds?: string[];
   screenScope?: string[];
   devices?: string[];
@@ -157,6 +158,8 @@ export interface CreateUserStoryPayload {
   acceptanceCriteria?: string | null;
   problemStatement?: string | null;
   status?: "DRAFT" | "READY" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
+  /** Personas the story targets; replaces the current list on update. */
+  personaIds?: string[];
 }
 
 export interface DesignRoundItem {

@@ -308,11 +308,27 @@ model UserPersona {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  generationJob GenerationJob? @relation("PersonaArtifact", fields: [generationJobId], references: [id], onDelete: SetNull)
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationJob GenerationJob?     @relation("PersonaArtifact", fields: [generationJobId], references: [id], onDelete: SetNull)
+  stories       UserStoryPersona[]
 
   @@index([projectId, createdAt])
   @@map("user_personas")
+}
+
+/// The personas a user story targets (its Scope). Deleting either side
+/// removes the link, so no dangling persona ids are left behind.
+model UserStoryPersona {
+  storyId   String   @db.Uuid
+  personaId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  story   UserStory   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  persona UserPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, personaId])
+  @@index([personaId])
+  @@map("story_personas")
 }
 
 /// A user's role in one project. `workspaceId` is repeated on purpose: two
@@ -373,13 +389,14 @@ model UserStory {
   draftStatus        PromptDraftStatus @default(IDLE)
   draftError         String?
   status             UserStoryStatus   @default(DRAFT)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  generation StoryGeneration? @relation(fields: [generationId], references: [id], onDelete: SetNull)
-  variants   UIVariant[]      @relation("VariantStories")
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generation StoryGeneration?   @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  variants   UIVariant[]        @relation("VariantStories")
   rounds     DesignRound[]
+  personas   UserStoryPersona[]
 
   @@index([projectId])
   @@index([generationId])

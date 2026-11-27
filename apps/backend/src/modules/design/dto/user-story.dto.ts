@@ -1,10 +1,13 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger'
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator'
 
@@ -44,6 +47,17 @@ export class CreateUserStoryDto {
   @IsOptional()
   @IsEnum(UserStoryStatus)
   status?: UserStoryStatus
+
+  /**
+   * The personas this story targets (its Scope); all must belong to the
+   * project. On update, the list replaces the current one.
+   */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('all', { each: true })
+  personaIds?: string[]
 }
 
 export class UpdateUserStoryDto extends PartialType(CreateUserStoryDto) {
@@ -122,6 +136,10 @@ export class UserStoryDto {
 
   @ApiProperty({ enum: UserStoryStatus, enumName: 'UserStoryStatus' })
   status: UserStoryStatus
+
+  /** The personas this story targets (its Scope). */
+  @ApiProperty({ type: [String], format: 'uuid' })
+  personaIds: string[]
 
   /** MANUAL, or AI for a draft written by the model (always starts as DRAFT). */
   @ApiProperty({ enum: StoryOrigin, enumName: 'StoryOrigin' })

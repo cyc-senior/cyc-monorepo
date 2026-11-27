@@ -67,12 +67,18 @@ function NewUserStoryContent() {
     async function loadData() {
       try {
         const [personaList, intentDetail, existingStory] = await Promise.all([
+          // Designer-written personas, plus AI-drafted ones only if this
+          // story already targets them (so editing never drops them).
           listPersonas(projectId).catch(() => []),
           getDesignIntent(projectId).catch(() => null),
           existingStoryId ? getUserStoryById(projectId, existingStoryId).catch(() => null) : Promise.resolve(null),
         ]);
-        setPersonas(personaList);
+        const targeted = new Set(existingStory?.personaIds ?? []);
+        setPersonas(personaList.filter((p) => p.origin !== "AI" || targeted.has(p.id)));
         setIntent(intentDetail);
+        if (existingStory?.personaIds?.length) {
+          setSelectedPersonaIds(existingStory.personaIds);
+        }
 
         if (existingStory) {
           if (existingStory.problemStatement) {
@@ -94,7 +100,7 @@ function NewUserStoryContent() {
             setWant(existingStory.title);
           }
 
-          // Parse description lines for Scope: Target Personas, Devices, Screens
+          // Parse description lines for Scope: Devices, Screens (personas are links)
           if (existingStory.description) {
             const lines = existingStory.description.split("\n");
             for (const line of lines) {
@@ -105,15 +111,6 @@ function NewUserStoryContent() {
                 setWant(trimmed.replace(/^Goal:\s*/, "").trim());
               } else if (trimmed.startsWith("Benefit:") && !formulaMatch) {
                 setBenefit(trimmed.replace(/^Benefit:\s*/, "").trim());
-              } else if (trimmed.startsWith("Target Personas:")) {
-                const personaIds = trimmed
-                  .replace(/^Target Personas:\s*/, "")
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                if (personaIds.length > 0) {
-                  setSelectedPersonaIds(personaIds);
-                }
               } else if (trimmed.startsWith("Devices:")) {
                 const devs = trimmed
                   .replace(/^Devices:\s*/, "")
@@ -194,7 +191,6 @@ function NewUserStoryContent() {
         `Role: ${role.trim()}`,
         `Goal: ${want.trim()}`,
         `Benefit: ${benefit.trim()}`,
-        selectedPersonaIds.length > 0 ? `Target Personas: ${selectedPersonaIds.join(", ")}` : "",
         devices.length > 0 ? `Devices: ${devices.join(", ")}` : "",
         screensList.length > 0 ? `Screens: ${screensList.join(", ")}` : "",
       ].filter(Boolean).join("\n");
@@ -204,6 +200,8 @@ function NewUserStoryContent() {
         description: descriptionParts,
         problemStatement: problemStatement.trim(),
         acceptanceCriteria: successMetric.trim() || undefined,
+        // Stored as real links, not in the description (which the LLM reads).
+        personaIds: selectedPersonaIds,
       };
 
       const storyId = existingStoryId
