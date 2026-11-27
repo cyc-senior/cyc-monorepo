@@ -692,6 +692,17 @@ function ReviewStructuredPromptContent() {
   );
 }
 
+/**
+ * One page instance per story. Switching stories from the sidebar only
+ * changes ?storyId=, which would otherwise keep this page's state, including
+ * the round made by an earlier "Approve & generate" (the next story's job
+ * then landed in the previous story's round).
+ */
+function ReviewStructuredPromptForStory() {
+  const storyId = useSearchParams().get("storyId");
+  return <ReviewStructuredPromptContent key={storyId ?? "none"} />;
+}
+
 export default function ReviewStructuredPromptPage() {
   return (
     <React.Suspense
@@ -701,7 +712,7 @@ export default function ReviewStructuredPromptPage() {
         </div>
       }
     >
-      <ReviewStructuredPromptContent />
+      <ReviewStructuredPromptForStory />
     </React.Suspense>
   );
 }

@@ -109,7 +109,7 @@ export class GenerationJobsService {
    * @throws ConflictException for an approved or archived round, or a
    *   project whose design intent is not defined yet.
    * @throws BadRequestException for personas, stories or a base variant
-   *   outside the project.
+   *   outside the project, or a new build for a story other than the round's.
    * @throws ServiceUnavailableException when generation is not configured or
    *   the queue cannot be reached (the job is then marked FAILED).
    */
@@ -140,6 +140,18 @@ export class GenerationJobsService {
       )
     }
     const stories = await this.stories(projectId, dto.storyIds)
+    // A round designs one user story: a new build for another story must
+    // not land in it (a stale client once sent US3's build to US4's round).
+    if (
+      !dto.baseVariantId &&
+      round.storyId &&
+      stories.length > 0 &&
+      !stories.some((story) => story.id === round.storyId)
+    ) {
+      throw new BadRequestException(
+        'This round belongs to another user story. Start a new round for this story.',
+      )
+    }
     if (!round.storyId && stories.length > 0) {
       // A round made without a story belongs to the first story it designs.
       await this.prisma.designRound.updateMany({
