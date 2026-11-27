@@ -533,9 +533,10 @@ export function PreviewCanvas({
   });
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col rounded-[14px] border border-border bg-card">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-[14px] border border-border bg-card">
       {/* Device toolbar */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      {/* Scrolls sideways when the live view is narrow instead of widening the page. */}
+      <div className="flex min-w-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-2 [&>*]:shrink-0">
         <IconButton label="Older version" onClick={onBack} disabled={!canGoBack}>
           <HugeIcon icon={ArrowLeft02Icon} size={16} />
         </IconButton>

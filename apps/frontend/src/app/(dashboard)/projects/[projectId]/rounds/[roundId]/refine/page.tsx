@@ -4,6 +4,16 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {
+  useDefaultLayout,
+  type GroupImperativeHandle,
+  type LayoutStorage,
+} from "react-resizable-panels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { HugeIcon } from "@/components/ui/huge-icon";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -209,6 +219,49 @@ function buildMessages(
   return messages;
 }
 
+/** Chat panel never narrower than this; the live view never below 50%. */
+const CHAT_MIN_PX = 320;
+
+/**
+ * First-visit chat width, like commercial AI builders: about a third of the
+ * screen, kept between 360px and 640px. The user's drag is remembered after.
+ */
+function defaultChatWidth(): number {
+  if (typeof window === "undefined") return 400;
+  return Math.round(Math.min(640, Math.max(360, window.innerWidth * 0.32)));
+}
+
+/** localStorage for the split layout; never throws (private mode, blocked storage). */
+const safeLocalStorage: LayoutStorage = {
+  getItem: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {}
+  },
+};
+
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+/** Split view from 1024px up; assumed on the server so desktop never flashes tabs. */
+function useIsDesktop(): boolean {
+  return React.useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(DESKTOP_QUERY);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => true
+  );
+}
+
 /**
  * `useState` mirrored to sessionStorage: survives a reload of this tab, and is
  * gone when the tab closes. Reads and writes never throw.
@@ -249,6 +302,19 @@ function RefineContent() {
   const [rightTab, setRightTab] = React.useState("preview");
   const [viewport, setViewport] = React.useState<ViewportState>(DEFAULT_VIEWPORT);
   const [pickMode, setPickMode] = React.useState(false);
+  const isDesktop = useIsDesktop();
+  /** Below 1024px chat and live view are tabs instead of a split. */
+  const [narrowTab, setNarrowTab] = React.useState<"chat" | "preview">("chat");
+  const splitRef = React.useRef<HTMLDivElement | null>(null);
+  const splitApi = React.useRef<GroupImperativeHandle | null>(null);
+  const splitLayout = useDefaultLayout({ id: "refine-split", storage: safeLocalStorage });
+  /** Double-click on the handle: back to the default chat width. */
+  const resetSplit = React.useCallback(() => {
+    const width = splitRef.current?.getBoundingClientRect().width;
+    if (!width || !splitApi.current) return;
+    const chat = Math.min(50, (defaultChatWidth() / width) * 100);
+    splitApi.current.setLayout({ chat, canvas: 100 - chat });
+  }, []);
   /** A pin dropped on the design whose comment is being written. */
   const [draftPin, setDraftPin] = React.useState<{ element: PickedElement; anchor: PinAnchor } | null>(null);
   const [activePinId, setActivePinId] = React.useState<string | null>(null);
@@ -615,21 +681,10 @@ function RefineContent() {
 
   const mobile = isMobileViewport(viewport);
 
-  return (
-    // Screen 18F: flush, full-height panels under the header; only the chat
-    // list and the canvas scroll, never the page.
-    <div className="flex min-h-full w-full flex-col lg:h-full">
-      {error && (
-        <Alert variant="destructive" className="m-4 mb-0 w-auto">
-          <HugeIcon icon={Alert02Icon} size={16} />
-          <AlertTitle>Something went wrong</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex min-h-0 w-full flex-1 flex-col items-stretch lg:flex-row">
-        {/* Refine panel: fixed 640px chat column */}
-        <section className="flex min-h-[560px] w-full shrink-0 flex-col gap-4 border-b border-border bg-background p-6 lg:min-h-0 lg:w-[640px] lg:border-r lg:border-b-0">
+  // Chat (refine) panel and live view, shared by the resizable split
+  // (desktop) and the Chat / Preview tabs (narrow screens).
+  const chatSection = (
+    <section className="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden bg-background p-6">
           {rightTab === "components" ? (
             <Tabs value="code" className="flex min-h-0 flex-1 flex-col gap-4">
               <TabsList variant="line" className="w-auto gap-0 border-b-0">
@@ -677,9 +732,11 @@ function RefineContent() {
                   onTogglePick={() => {
                     setPickMode((on) => !on);
                     setRightTab("preview");
+                    setNarrowTab("preview");
                   }}
                   onFocusPin={(id) => {
                     setRightTab("preview");
+                    setNarrowTab("preview");
                     setDraftPin(null);
                     setActivePinId(id);
                   }}
@@ -702,11 +759,10 @@ function RefineContent() {
               </TabsContent>
             </Tabs>
           )}
-        </section>
-
-        {/* Canvas column */}
-        {/* Canvas column: full-height card with 20px corners (Figma 18 · Canvas column) */}
-        <section className="flex min-h-[640px] min-w-0 flex-1 flex-col gap-4 bg-background p-4 lg:min-h-0 lg:rounded-[20px] lg:border lg:border-border">
+    </section>
+  );
+  const canvasSection = (
+    <section className="flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-hidden bg-background p-4">
           <Tabs value={rightTab} onValueChange={setRightTab} className="flex min-h-0 flex-1 flex-col gap-4">
             <TabsList variant="line" className="gap-0">
               <TabsTrigger value="preview" className={cn(TAB_TRIGGER, "flex-1")}>
@@ -720,7 +776,7 @@ function RefineContent() {
             </TabsList>
 
             {/* Toolbar */}
-            <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <Select
                 value={shown.variant.id}
                 onValueChange={(id) => {
@@ -838,8 +894,66 @@ function RefineContent() {
               <HugeIcon icon={ArrowRight02Icon} size={16} />
             </Button>
           </div>
-        </section>
-      </div>
+    </section>
+  );
+
+  return (
+    // Full-height panels under the header, never wider than the viewport;
+    // only the chat list and the canvas scroll.
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden">
+      {error && (
+        <Alert variant="destructive" className="m-4 mb-0 w-auto">
+          <HugeIcon icon={Alert02Icon} size={16} />
+          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isDesktop ? (
+        // Draggable split: chat 320px..50%, live view always at least 50%.
+        <ResizablePanelGroup
+          orientation="horizontal"
+          id="refine-split"
+          elementRef={splitRef}
+          groupRef={splitApi}
+          defaultLayout={splitLayout.defaultLayout}
+          onLayoutChanged={splitLayout.onLayoutChanged}
+          className="min-h-0 min-w-0 flex-1"
+        >
+          <ResizablePanel id="chat" defaultSize={defaultChatWidth()} minSize={CHAT_MIN_PX} maxSize="50" className="min-w-0">
+            {chatSection}
+          </ResizablePanel>
+          <ResizableHandle
+            withHandle
+            onDoubleClick={resetSplit}
+            title="Drag to resize. Double-click to reset."
+          />
+          <ResizablePanel id="canvas" minSize="50" className="min-w-0">
+            {canvasSection}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div role="tablist" aria-label="Refine view" className="flex shrink-0 gap-1 border-b border-border px-4 py-2">
+            {(["chat", "preview"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={narrowTab === tab}
+                onClick={() => setNarrowTab(tab)}
+                className={cn(
+                  "h-8 flex-1 cursor-pointer rounded-[10px] text-sm font-medium",
+                  narrowTab === tab ? "bg-primary-subtle text-primary-text" : "text-muted-foreground"
+                )}
+              >
+                {tab === "chat" ? "Chat" : "Preview"}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 min-w-0 flex-1">{narrowTab === "chat" ? chatSection : canvasSection}</div>
+        </div>
+      )}
 
     </div>
   );
