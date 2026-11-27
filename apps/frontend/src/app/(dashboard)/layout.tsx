@@ -34,16 +34,18 @@ function WorkspaceRedirectGuard() {
 function DashboardSidebarWrapper({
   collapsed,
   rail,
-  overlayOpen,
+  overlayFor,
   onCloseOverlay,
 }: {
   collapsed: boolean;
   /** Rail mode (refine): icon rail, full sidebar only as an overlay. */
   rail: boolean;
-  overlayOpen: boolean;
+  /** The page the overlay was opened on; it closes once you leave it. */
+  overlayFor: string | null;
   onCloseOverlay: () => void;
 }) {
   const pathname = usePathname();
+  const overlayOpen = overlayFor === pathname;
   const { workspaces, isLoading: workspaceLoading } = useWorkspace();
 
   const hasNoWorkspace = !workspaceLoading && workspaces.length === 0;
@@ -82,7 +84,7 @@ function DashboardSidebarWrapper({
 function DashboardHeaderWrapper({
   onToggleSidebar,
 }: {
-  onToggleSidebar: () => void;
+  onToggleSidebar: (pathname: string) => void;
 }) {
   const pathname = usePathname();
   const { workspaces, isLoading: workspaceLoading } = useWorkspace();
@@ -93,36 +95,38 @@ function DashboardHeaderWrapper({
   const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
 
   if (showSidebar) {
-    return <SidebarHeader onToggleSidebar={onToggleSidebar} />;
+    return <SidebarHeader onToggleSidebar={() => onToggleSidebar(pathname)} />;
   }
   return <MinimalNav />;
 }
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  // No URL hooks here (they must sit inside <Suspense> for prerendering):
+  // the wrappers below read the pathname.
   const { mode } = useSidebar();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [overlayOpen, setOverlayOpen] = useState(false);
+  /** Pathname the rail-mode overlay was opened on, or null when closed. */
+  const [overlayFor, setOverlayFor] = useState<string | null>(null);
   const rail = mode === "rail";
 
-  // The overlay closes when the page or the sidebar mode changes.
-  const [prev, setPrev] = useState({ pathname, mode });
-  if (prev.pathname !== pathname || prev.mode !== mode) {
-    setPrev({ pathname, mode });
-    setOverlayOpen(false);
+  // The overlay closes when the sidebar mode changes.
+  const [prevMode, setPrevMode] = useState(mode);
+  if (prevMode !== mode) {
+    setPrevMode(mode);
+    setOverlayFor(null);
   }
 
   useEffect(() => {
-    if (!overlayOpen) return;
+    if (overlayFor === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOverlayOpen(false);
+      if (e.key === "Escape") setOverlayFor(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [overlayOpen]);
+  }, [overlayFor]);
 
-  const toggleSidebar = () => {
-    if (rail) setOverlayOpen((open) => !open);
+  const toggleSidebar = (pathname: string) => {
+    if (rail) setOverlayFor((open) => (open === pathname ? null : pathname));
     else setSidebarCollapsed((collapsed) => !collapsed);
   };
 
@@ -133,8 +137,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <DashboardSidebarWrapper
           collapsed={sidebarCollapsed}
           rail={rail}
-          overlayOpen={overlayOpen}
-          onCloseOverlay={() => setOverlayOpen(false)}
+          overlayFor={overlayFor}
+          onCloseOverlay={() => setOverlayFor(null)}
         />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
