@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
 import { BreadcrumbProvider } from "@/contexts/breadcrumb-context";
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarHeader } from "@/components/layout/SidebarHeader";
 import { MinimalNav } from "@/components/layout/MinimalNav";
@@ -32,8 +33,15 @@ function WorkspaceRedirectGuard() {
 
 function DashboardSidebarWrapper({
   collapsed,
+  rail,
+  overlayOpen,
+  onCloseOverlay,
 }: {
   collapsed: boolean;
+  /** Rail mode (refine): icon rail, full sidebar only as an overlay. */
+  rail: boolean;
+  overlayOpen: boolean;
+  onCloseOverlay: () => void;
 }) {
   const pathname = usePathname();
   const { workspaces, isLoading: workspaceLoading } = useWorkspace();
@@ -44,7 +52,31 @@ function DashboardSidebarWrapper({
   const showSidebar = !hasNoWorkspace && !isPreWorkspaceRoute;
 
   if (!showSidebar) return null;
-  return <AppSidebar collapsed={collapsed} />;
+  if (!rail) return <AppSidebar collapsed={collapsed} />;
+  // Rail by default; the toggle slides the full sidebar over the page on a
+  // dimmed backdrop. Backdrop click, Esc or navigating closes it.
+  return (
+    <>
+      <AppSidebar collapsed />
+      {overlayOpen && (
+        <>
+          <div
+            onClick={onCloseOverlay}
+            className="fixed inset-0 z-40 bg-black/40 animate-scrim-in"
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sidebar"
+            className="fixed inset-y-0 left-0 z-50 shadow-lg animate-sidebar-in"
+          >
+            <AppSidebar collapsed={false} />
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 function DashboardHeaderWrapper({
@@ -67,21 +99,49 @@ function DashboardHeaderWrapper({
 }
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { mode } = useSidebar();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const rail = mode === "rail";
+
+  // The overlay closes when the page or the sidebar mode changes.
+  const [prev, setPrev] = useState({ pathname, mode });
+  if (prev.pathname !== pathname || prev.mode !== mode) {
+    setPrev({ pathname, mode });
+    setOverlayOpen(false);
+  }
+
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverlayOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlayOpen]);
+
+  const toggleSidebar = () => {
+    if (rail) setOverlayOpen((open) => !open);
+    else setSidebarCollapsed((collapsed) => !collapsed);
+  };
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       <Suspense fallback={null}>
         <WorkspaceRedirectGuard />
-        <DashboardSidebarWrapper collapsed={sidebarCollapsed} />
+        <DashboardSidebarWrapper
+          collapsed={sidebarCollapsed}
+          rail={rail}
+          overlayOpen={overlayOpen}
+          onCloseOverlay={() => setOverlayOpen(false)}
+        />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Suspense
           fallback={<div className="h-14 border-b bg-background shrink-0" />}
         >
-          <DashboardHeaderWrapper
-            onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
-          />
+          <DashboardHeaderWrapper onToggleSidebar={toggleSidebar} />
         </Suspense>
         <main className="flex-1 overflow-y-auto w-full">
           <Suspense
@@ -116,7 +176,9 @@ export default function DashboardLayout({
         <Suspense fallback={null}>
           <SessionGuard />
         </Suspense>
-        <DashboardShell>{children}</DashboardShell>
+        <SidebarProvider>
+          <DashboardShell>{children}</DashboardShell>
+        </SidebarProvider>
       </BreadcrumbProvider>
     </WorkspaceProvider>
   );
