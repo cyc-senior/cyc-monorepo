@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/workspace-context";
@@ -55,29 +55,118 @@ function DashboardSidebarWrapper({
 
   if (!showSidebar) return null;
   if (!rail) return <AppSidebar collapsed={collapsed} />;
-  // Rail by default; the toggle slides the full sidebar over the page on a
-  // dimmed backdrop. Backdrop click, Esc or navigating closes it.
   return (
-    <>
+    <RailSidebar
+      key={pathname}
+      pinned={overlayOpen}
+      onClosePinned={onCloseOverlay}
+    />
+  );
+}
+
+/** Hover must rest this long on the rail before the sidebar peeks out. */
+const PEEK_OPEN_DELAY_MS = 150;
+/** Grace period after the pointer leaves before the peek closes. */
+const PEEK_CLOSE_DELAY_MS = 250;
+
+/**
+ * Rail mode (refine): the icon rail, plus the full sidebar on top of the page
+ * - "peek": hovering (or tabbing into) the rail floats it without dimming,
+ *   and it closes shortly after the pointer leaves (Figma "sidebar hover").
+ * - "pinned": the header toggle keeps it open over a dimmed backdrop until a
+ *   backdrop click, Esc or navigation.
+ * Remounted per page (key), so navigating always starts closed.
+ */
+function RailSidebar({
+  pinned,
+  onClosePinned,
+}: {
+  pinned: boolean;
+  onClosePinned: () => void;
+}) {
+  const [peek, setPeek] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inside = useRef(false);
+
+  const clearTimer = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => clearTimer, []);
+
+  const scheduleClose = useCallback(() => {
+    clearTimer();
+    const tryClose = () => {
+      // A menu of the sidebar (workspace or account) renders outside it:
+      // stay open while one is open, and retry once it closes.
+      if (inside.current) return;
+      if (document.querySelector('[role="menu"]')) {
+        timer.current = setTimeout(tryClose, PEEK_CLOSE_DELAY_MS);
+        return;
+      }
+      setPeek(false);
+    };
+    timer.current = setTimeout(tryClose, PEEK_CLOSE_DELAY_MS);
+  }, []);
+
+  const onPointerEnter = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch") return; // no hover on touch: toggle only
+    inside.current = true;
+    clearTimer();
+    if (!peek) timer.current = setTimeout(() => setPeek(true), PEEK_OPEN_DELAY_MS);
+  };
+  const onPointerLeave = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    inside.current = false;
+    scheduleClose();
+  };
+
+  // Esc also closes a peek (the pinned overlay has its own Esc handler).
+  useEffect(() => {
+    if (!peek) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPeek(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [peek]);
+
+  const open = peek || pinned;
+  return (
+    <div
+      className="relative shrink-0"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onFocus={() => {
+        clearTimer();
+        setPeek(true);
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) scheduleClose();
+      }}
+    >
       <AppSidebar collapsed />
-      {overlayOpen && (
-        <>
-          <div
-            onClick={onCloseOverlay}
-            className="fixed inset-0 z-40 bg-black/40 animate-scrim-in"
-            aria-hidden="true"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Sidebar"
-            className="fixed inset-y-0 left-0 z-50 shadow-lg animate-sidebar-in"
-          >
-            <AppSidebar collapsed={false} />
-          </div>
-        </>
+      {pinned && (
+        <div
+          onClick={() => {
+            setPeek(false);
+            onClosePinned();
+          }}
+          className="fixed inset-0 z-40 bg-black/40 animate-scrim-in"
+          aria-hidden="true"
+        />
       )}
-    </>
+      {open && (
+        <div
+          role={pinned ? "dialog" : undefined}
+          aria-modal={pinned ? true : undefined}
+          aria-label="Sidebar"
+          className="fixed inset-y-0 left-0 z-50 shadow-lg animate-sidebar-in"
+        >
+          <AppSidebar collapsed={false} />
+        </div>
+      )}
+    </div>
   );
 }
 
