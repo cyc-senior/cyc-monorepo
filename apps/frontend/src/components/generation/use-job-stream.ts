@@ -94,7 +94,7 @@ function finalizeOutputItem(item: VariantTraceItem, variantIndex: number): Varia
       ...item,
       status: "done",
       endedAt: item.endedAt ?? Date.now(),
-      title: `Refined Variant ${label} HTML (Attempt ${item.attempt ?? 2})${tokenSuffix}`,
+      title: `Polished Variant ${label}${tokenSuffix}`,
     };
   }
   return {
@@ -123,7 +123,7 @@ function finalizeVariantItems(
         ...item,
         status: "done" as const,
         endedAt: item.endedAt ?? Date.now(),
-        title: "Validated WCAG 2.2 AA contrast & design system rules",
+        title: "Checked markup & UI kit rules",
       };
     }
     return { ...item, status: "done" as const };
@@ -134,7 +134,7 @@ function finalizeVariantItems(
       id: "ready",
       phase: "ready",
       status: "done",
-      title: "Variant markup verified & saved",
+      title: "Variant saved",
     });
   }
   return updated;
@@ -202,10 +202,7 @@ function updateTraces(
         phase: "thinking",
         status: "running",
         attempt,
-        title:
-          attempt > 1
-            ? `Thinking about fixes (Attempt ${attempt})...`
-            : "Thinking...",
+        title: "Thinking...",
         thought: progress.thought,
         thoughtTokens: tokens > 0 ? tokens : undefined,
         startedAt: Date.now(),
@@ -254,7 +251,7 @@ function updateTraces(
         attempt,
         title:
           progress.stage === "repairing"
-            ? `Refining Variant ${label} HTML (Attempt ${attempt})`
+            ? `Polishing Variant ${label}`
             : `Generating Variant ${label} HTML`,
         receivedChars: progress.receivedChars,
         outputTokens: outputTokens > 0 ? outputTokens : undefined,
@@ -282,28 +279,28 @@ function updateTraces(
     const existingIdx = currentItems.findIndex((i) => i.id === checkId);
     const hasErrors = progress.errors !== undefined && progress.errors > 0;
     const passed = progress.errors === 0;
-    const checkTitle = hasErrors
-      ? `Found ${progress.errors} accessibility/UI kit issue${progress.errors === 1 ? "" : "s"}`
-      : passed
-        ? "Validated WCAG 2.2 AA contrast & design system rules"
-        : "Validating WCAG 2.2 AA contrast & design system rules";
 
+    if (hasErrors) {
+      // A failed check starts another repair round: an internal step, not
+      // something to alarm the designer with. A design that still fails at
+      // the end shows its issues from the job result instead.
+      if (existingIdx >= 0) currentItems.splice(existingIdx, 1);
+      next[currentVariant] = currentItems;
+      return next;
+    }
+
+    const checkItem: VariantTraceItem = {
+      id: checkId,
+      phase: "checking",
+      status: passed ? "done" : "running",
+      attempt,
+      title: passed ? "Checked markup & UI kit rules" : "Checking markup & UI kit rules",
+      errors: progress.errors,
+    };
     if (existingIdx >= 0) {
-      currentItems[existingIdx] = {
-        ...currentItems[existingIdx],
-        status: hasErrors ? "error" : passed ? "done" : "running",
-        errors: progress.errors,
-        title: checkTitle,
-      };
+      currentItems[existingIdx] = { ...currentItems[existingIdx], ...checkItem };
     } else {
-      currentItems.push({
-        id: checkId,
-        phase: "checking",
-        status: hasErrors ? "error" : passed ? "done" : "running",
-        attempt,
-        title: checkTitle,
-        errors: progress.errors,
-      });
+      currentItems.push(checkItem);
     }
   } else if (progress.stage === "saving") {
     for (const v of Object.keys(next)) {
@@ -321,7 +318,18 @@ function loadCachedState(jobId: string | null): Partial<JobStreamState> {
   if (!jobId || typeof window === "undefined") return {};
   try {
     const raw = sessionStorage.getItem(`gen_trace:${jobId}`);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const cached = JSON.parse(raw) as Partial<JobStreamState>;
+      if (cached.tracesByVariant) {
+        cached.tracesByVariant = Object.fromEntries(
+          Object.entries(cached.tracesByVariant).map(([v, items]) => [
+            v,
+            items.filter((i) => !(i.phase === "checking" && i.status === "error")),
+          ])
+        );
+      }
+      return cached;
+    }
   } catch {}
   return {};
 }

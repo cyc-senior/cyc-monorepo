@@ -91,7 +91,7 @@ function variantStatus(
     }
     if (progress?.stage === "repairing") {
       return {
-        text: `Fixing ${progress.errors ?? "a few"} issue${progress.errors === 1 ? "" : "s"}…`,
+        text: "Polishing…",
         busy: true,
         done: false,
       };
@@ -208,7 +208,7 @@ function SharedIntentBanner({
       </div>
 
       {(isDone || job.inputSnapshot?.synthesizePersona) && (
-        <Trace className="ml-9 mt-1">
+        <Trace className="mt-1 pl-9">
           {isDone && (
             <TraceCollapsible>
               <TraceCollapsibleTrigger>
@@ -392,12 +392,22 @@ function getVariantTraces(
   const effectiveThought = thought ?? outputVariant?.thought;
 
   if (liveTraces.length > 0) {
-    return liveTraces.map((item) => {
+    const items = liveTraces.map((item) => {
       if (item.phase === "thinking" && (item.attempt ?? 1) === 1 && !item.thought && effectiveThought) {
         return { ...item, thought: effectiveThought };
       }
       return item;
     });
+    if (outputVariant && !outputVariant.passed) {
+      const failed: VariantTraceItem = {
+        id: "checking-final",
+        phase: "checking",
+        status: "error",
+        title: "Couldn't pass the markup & UI kit check",
+      };
+      return [...items.filter((i) => i.phase !== "checking" && i.phase !== "ready"), failed];
+    }
+    return items;
   }
 
   if (stepState === "done" || Boolean(outputVariant)) {
@@ -437,14 +447,17 @@ function getVariantTraces(
       phase: "checking",
       status: outputVariant && !outputVariant.passed ? "error" : "done",
       attempt: 1,
-      title: `Checked markup against ${standard} & the UI kit`,
+      title:
+        outputVariant && !outputVariant.passed
+          ? "Couldn't pass the markup & UI kit check"
+          : `Checked markup against ${standard} & the UI kit`,
     });
     if (outputVariant?.attempts && outputVariant.attempts > 1) {
       list.push({
         id: `repairing-${outputVariant.attempts}`,
         phase: "repairing",
         status: "done",
-        title: `Refined Variant ${label} HTML (Attempt ${outputVariant.attempts})`,
+        title: `Polished Variant ${label}`,
         attempt: outputVariant.attempts,
       });
     }
@@ -452,7 +465,7 @@ function getVariantTraces(
       id: "ready",
       phase: "ready",
       status: "done",
-      title: "Variant markup verified & saved",
+      title: "Variant saved",
     });
     return list;
   }
@@ -569,9 +582,7 @@ function VariantCard({
             if (item.phase === "thinking") {
               const running = state === "running";
               const title = running
-                ? (item.attempt ?? 1) > 1
-                  ? `Thinking about fixes (attempt ${item.attempt})…`
-                  : "Thinking…"
+                ? "Thinking…"
                 : item.title;
               const thoughtKey = `v${index}-${item.id}`;
               const tokens = running ? item.thoughtTokens : undefined;
@@ -833,7 +844,7 @@ function GeneratingContent() {
             Building {labels.join(" and ")} from {designSystem}
           </h1>
           <p className="text-base leading-6 text-muted-foreground">
-            This usually takes a few minutes. You can leave this page; the designs keep generating.
+            This takes a few minutes. Feel free to leave. We&apos;ll keep working on your designs in the background.
           </p>
         </div>
 
