@@ -300,7 +300,7 @@ export class UIVariantsService {
     }
     const unique = new Set(storyIds)
     const found = await this.prisma.userStory.count({
-      where: { id: { in: [...unique] }, projectId },
+      where: { id: { in: [...unique] }, projectId, deletedAt: null },
     })
     if (found !== unique.size) {
       throw new BadRequestException(

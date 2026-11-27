@@ -81,7 +81,7 @@ export class PromptDraftProcessor
 
     const [story, intent, persona] = await Promise.all([
       this.prisma.userStory.findFirst({
-        where: { id: storyId, projectId },
+        where: { id: storyId, projectId, deletedAt: null },
       }),
       this.prisma.designIntent.findFirst({
         where: { projectId },

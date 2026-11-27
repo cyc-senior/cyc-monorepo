@@ -4,7 +4,6 @@ import * as React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -34,7 +33,11 @@ import {
 } from "@/lib/project-activity";
 import { EditProjectDialog } from "./EditProjectDialog";
 import { useProjectOverview } from "./use-project-overview";
-import { storyCode, storyContinueHref } from "@/lib/design-cycle";
+import { storyCode } from "@/lib/design-cycle";
+import { StoryCard } from "@/components/projects/StoryCard";
+
+/** How many of the latest stories the Overview shows. */
+const OVERVIEW_STORY_COUNT = 3;
 
 export function ProjectMainLandingView({
   initialTab,
@@ -63,7 +66,7 @@ export function ProjectMainLandingView({
     }
   };
 
-  const { project, stories, sessions, reports, auditLogs, isLoading, projectUpdated } =
+  const { project, stories, sessions, reports, auditLogs, isLoading, projectUpdated, storyDeleted } =
     useProjectOverview(projectId);
 
   const [selectedActivity, setSelectedActivity] = React.useState<AuditLogItem | null>(null);
@@ -83,13 +86,18 @@ export function ProjectMainLandingView({
     }
   };
 
-  const orderedStories = React.useMemo(
+  // Newest first; story codes (US1, US2…) stay in creation order.
+  const newestStories = React.useMemo(
     () =>
       [...stories].sort((a, b) =>
-        (a.createdAt ?? "").localeCompare(b.createdAt ?? "")
+        (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
       ),
     [stories]
   );
+  /** The Overview shows only the latest stories; "View all" opens the tab. */
+  const latestStories = newestStories.slice(0, OVERVIEW_STORY_COUNT);
+  // Only designers can edit or delete stories (design:write).
+  const canEditStories = project?.role === "DESIGNER";
 
   const latestAuditLogs = React.useMemo(() => {
     return [...auditLogs]
@@ -287,85 +295,22 @@ export function ProjectMainLandingView({
                     onClick={() => setActiveTab("stories")}
                     className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                   >
-                    <span>View all</span>
+                    <span>View all ({stories.length})</span>
                   </Button>
                 </div>
 
                 {/* Gallery grid matching Figma Node 924:20995 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {orderedStories.map((story) => {
-                    const storyKey = story.storyKey || storyCode(stories, story);
-
-                    return (
-                      <Card
-                        key={story.id}
-                        className="rounded-[14px] border border-border hover:border-foreground/30 transition shadow-2xs overflow-hidden flex flex-col justify-between group cursor-pointer bg-card p-0"
-                        onClick={() => router.push(storyContinueHref(projectId, story))}
-                      >
-                        {/* Thumbnail matching Figma Node 924:20997: height 120px, bg #f5f5f5, pt-4 px-4, no bottom padding */}
-                        <div className="h-[120px] bg-[#f5f5f5] dark:bg-muted/30 border-b border-border/60 px-4 pt-4 pb-0 flex items-end justify-center gap-2 overflow-hidden select-none">
-                          {/* Mini Preview Screen A matching Figma Node 924:20998 */}
-                          <div className="flex-1 h-full rounded-t-[6px] bg-card border border-border border-b-0 shadow-2xs p-2 flex flex-col justify-between opacity-90 group-hover:opacity-100 transition-opacity">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[7px] font-semibold text-foreground/80 leading-none">Find a room</span>
-                              <span className="h-1.5 w-4 bg-muted rounded-xs" />
-                            </div>
-                            <div className="space-y-1 my-auto">
-                              <div className="grid grid-cols-4 gap-0.5">
-                                <div className="h-2 rounded-[2px] bg-muted/60" />
-                                <div className="h-2 rounded-[2px] bg-primary/20" />
-                                <div className="h-2 rounded-[2px] bg-muted/60" />
-                                <div className="h-2 rounded-[2px] bg-emerald-500/20" />
-                              </div>
-                              <div className="grid grid-cols-4 gap-0.5">
-                                <div className="h-2 rounded-[2px] bg-emerald-500/20" />
-                                <div className="h-2 rounded-[2px] bg-muted/60" />
-                                <div className="h-2 rounded-[2px] bg-primary/20" />
-                                <div className="h-2 rounded-[2px] bg-muted/60" />
-                              </div>
-                            </div>
-                            <div className="h-2.5 w-10 bg-primary/30 rounded-xs self-end" />
-                          </div>
-
-                          {/* Mini Preview Screen B matching Figma Node 924:21092 */}
-                          <div className="flex-1 h-full rounded-t-[6px] bg-card border border-border border-b-0 shadow-2xs p-2 flex flex-col justify-between opacity-90 group-hover:opacity-100 transition-opacity">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[7px] font-semibold text-foreground/80 leading-none">Time first</span>
-                              <span className="h-1.5 w-3 bg-muted rounded-xs" />
-                            </div>
-                            <div className="space-y-1 my-auto">
-                              <div className="h-2 w-full bg-muted/50 rounded-xs" />
-                              <div className="h-2 w-3/4 bg-primary/20 rounded-xs" />
-                              <div className="h-2 w-5/6 bg-muted/50 rounded-xs" />
-                            </div>
-                            <div className="h-2.5 w-10 bg-primary/30 rounded-xs self-end" />
-                          </div>
-                        </div>
-
-                        {/* Card Content matching Figma Node 924:21135: padding 20px (p-5), space-y-3 */}
-                        <div className="p-5 flex flex-col justify-between flex-1 gap-3">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="rounded-[10px] border border-border px-2 py-0.5 text-xs font-medium text-foreground">
-                                {storyKey}
-                              </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
-                                {story.status || "DRAFT"}
-                              </span>
-                            </div>
-                            <h3 className="text-base font-semibold text-foreground line-clamp-2 leading-snug">
-                              {story.title}
-                            </h3>
-                            {story.problemStatement && (
-                              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                                {story.problemStatement}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                  {latestStories.map((story) => (
+                    <StoryCard
+                      key={story.id}
+                      projectId={projectId}
+                      story={story}
+                      code={story.storyKey || storyCode(stories, story)}
+                      canEdit={canEditStories}
+                      onDeleted={storyDeleted}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -566,34 +511,15 @@ export function ProjectMainLandingView({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {orderedStories.map((story) => (
-                  <Card
+                {newestStories.map((story) => (
+                  <StoryCard
                     key={story.id}
-                    className="p-5 rounded-[14px] border-border hover:border-foreground/30 transition shadow-2xs flex flex-col justify-between gap-3 cursor-pointer"
-                    onClick={() => router.push(storyContinueHref(projectId, story))}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {story.storyKey || storyCode(stories, story)}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-medium text-muted-foreground">
-                          {story.status || "DRAFT"}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-foreground line-clamp-2">
-                        {story.title}
-                      </h3>
-                      {story.problemStatement && (
-                        <p className="text-xs text-muted-foreground line-clamp-3">
-                          {story.problemStatement}
-                        </p>
-                      )}
-                    </div>
-                    <Button variant="outline" size="sm" className="w-full text-xs">
-                      Draft structured prompt
-                    </Button>
-                  </Card>
+                    projectId={projectId}
+                    story={story}
+                    code={story.storyKey || storyCode(stories, story)}
+                    canEdit={canEditStories}
+                    onDeleted={storyDeleted}
+                  />
                 ))}
               </div>
             )}

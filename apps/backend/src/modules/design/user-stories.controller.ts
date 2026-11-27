@@ -12,6 +12,7 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 
 import { UuidParam } from '../../common/decorators/uuid-param.decorator'
+import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { ApiPaginatedResponse, Page } from '../../common/dto/pagination.dto'
 import { Authorize } from '../access/authorize.decorator'
 import { Permission } from '../access/permissions'
@@ -72,14 +73,18 @@ export class UserStoriesController {
     return this.service.update(projectId, id, dto)
   }
 
-  /** Delete a user story. */
+  /**
+   * Delete a user story (soft delete): it disappears from the project and
+   * its running generations stop; the data is kept for a future restore.
+   */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Authorize(Permission.DesignWrite)
   remove(
     @UuidParam('projectId') projectId: string,
     @UuidParam('id') id: string,
+    @CurrentUser('id') userId: string,
   ): Promise<void> {
-    return this.service.remove(projectId, id)
+    return this.service.remove(projectId, id, userId)
   }
 }

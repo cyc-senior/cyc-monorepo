@@ -114,5 +114,20 @@ export function useProjectOverview(projectId: string) {
     [projectId]
   );
 
-  return { project, stories, sessions, reports, auditLogs, isLoading, projectUpdated };
+  /** Drops a deleted story from the lists (and the cache). */
+  const storyDeleted = React.useCallback(
+    (storyId: string) => {
+      setStories((prev) => prev.filter((s) => s.id !== storyId));
+      const existing = projectDataCache.get(projectId);
+      if (existing) {
+        projectDataCache.set(projectId, {
+          ...existing,
+          stories: existing.stories.filter((s) => s.id !== storyId),
+        });
+      }
+    },
+    [projectId]
+  );
+
+  return { project, stories, sessions, reports, auditLogs, isLoading, projectUpdated, storyDeleted };
 }

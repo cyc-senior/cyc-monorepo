@@ -487,7 +487,7 @@ export class GenerationJobsService {
     }
     const unique = [...new Set(storyIds)]
     const stories = await this.prisma.userStory.findMany({
-      where: { id: { in: unique }, projectId },
+      where: { id: { in: unique }, projectId, deletedAt: null },
       select: {
         id: true,
         title: true,

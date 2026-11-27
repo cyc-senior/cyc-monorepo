@@ -389,6 +389,11 @@ model UserStory {
   draftStatus        PromptDraftStatus @default(IDLE)
   draftError         String?
   status             UserStoryStatus   @default(DRAFT)
+  /// Soft delete: hidden from the project (and its rounds from the design
+  /// pages) but kept, so a recycle bin can restore it later.
+  deletedAt          DateTime?
+  /// Who deleted it (no relation: the user may be removed later).
+  deletedById        String?           @db.Uuid
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -398,7 +403,7 @@ model UserStory {
   rounds     DesignRound[]
   personas   UserStoryPersona[]
 
-  @@index([projectId])
+  @@index([projectId, deletedAt])
   @@index([generationId])
   @@map("user_stories")
 }

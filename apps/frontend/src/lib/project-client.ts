@@ -344,6 +344,16 @@ export async function createUserStory(
   });
 }
 
+/**
+ * Deletes a user story (soft delete on the server: hidden from the project,
+ * its running generations stop; kept for a future recycle bin).
+ */
+export async function deleteUserStory(projectId: string, storyId: string): Promise<void> {
+  return apiFetch<void>(`/projects/${projectId}/user-stories/${storyId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateUserStory(
   projectId: string,
   storyId: string,

@@ -75,6 +75,7 @@ export class UserStoriesService {
     const where: Prisma.UserStoryWhereInput = {
       projectId,
       status: query.status,
+      deletedAt: null,
     }
 
     return paginate(
@@ -137,7 +138,7 @@ export class UserStoriesService {
   async get(projectId: string, id: string): Promise<UserStoryDto> {
     return toDto(
       await this.prisma.userStory.findFirstOrThrow({
-        where: { id, projectId },
+        where: { id, projectId, deletedAt: null },
         include: WITH_CYCLE,
       }),
     )
@@ -172,8 +173,26 @@ export class UserStoriesService {
     )
   }
 
-  async remove(projectId: string, id: string): Promise<void> {
+  /**
+   * Soft delete: the story (and its rounds, from the design pages) is hidden
+   * but kept for a future recycle bin. Its queued or running generations are
+   * cancelled so no more LLM work is done for it; the worker aborts on its
+   * next cancellation check.
+   */
+  async remove(projectId: string, id: string, userId: string): Promise<void> {
     await this.get(projectId, id)
-    await this.prisma.userStory.delete({ where: { id } })
+    await this.prisma.$transaction([
+      this.prisma.userStory.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedById: userId },
+      }),
+      this.prisma.generationJob.updateMany({
+        where: {
+          round: { storyId: id, projectId },
+          status: { in: ['QUEUED', 'RUNNING'] },
+        },
+        data: { status: 'CANCELLED', finishedAt: new Date() },
+      }),
+    ])
   }
 }

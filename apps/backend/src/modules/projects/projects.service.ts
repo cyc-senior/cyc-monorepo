@@ -23,6 +23,8 @@ import {
 const SUMMARY_INCLUDE = {
   designIntent: { select: { id: true } },
   rounds: {
+    // Rounds of a deleted (soft-deleted) story don't count for the summary.
+    where: { OR: [{ storyId: null }, { story: { deletedAt: null } }] },
     orderBy: { roundNumber: 'desc' },
     include: {
       _count: { select: { variants: true } },

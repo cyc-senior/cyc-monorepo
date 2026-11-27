@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { listWorkspaceProjects } from "@/services/project.service";
 import { listUserStories, UserStoryItem } from "@/lib/project-client";
+import { STORIES_CHANGED_EVENT } from "@/components/projects/StoryCard";
 import {
   CycleStep,
   storyCode,
@@ -124,6 +125,13 @@ export function ProjectsNav() {
   const [projects, setProjects] = React.useState<NavProject[]>([]);
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const [stories, setStories] = React.useState<Record<string, UserStoryItem[]>>({});
+  /** Bumped when a story is added or deleted elsewhere, to reload the lists. */
+  const [storiesVersion, setStoriesVersion] = React.useState(0);
+  React.useEffect(() => {
+    const onChanged = () => setStoriesVersion((v) => v + 1);
+    window.addEventListener(STORIES_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(STORIES_CHANGED_EVENT, onChanged);
+  }, []);
 
   const currentProjectId = pathname.match(/^\/projects\/([0-9a-f-]{36})/)?.[1] ?? null;
   const tab = searchParams.get("tab");
@@ -160,7 +168,7 @@ export function ProjectsNav() {
       active = false;
       if (timer) clearInterval(timer);
     };
-  }, [openKey, pathname, generating]);
+  }, [openKey, pathname, generating, storiesVersion]);
 
   const recent = React.useMemo(() => {
     const sorted = [...projects].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));

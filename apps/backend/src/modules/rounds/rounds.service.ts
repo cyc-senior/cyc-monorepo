@@ -53,6 +53,8 @@ export class RoundsService {
     const where: Prisma.DesignRoundWhereInput = {
       projectId,
       status: query.status,
+      // Rounds of a deleted story leave the design pages with it.
+      OR: [{ storyId: null }, { story: { deletedAt: null } }],
     }
 
     return paginate(
@@ -78,7 +80,7 @@ export class RoundsService {
     if (
       dto.storyId &&
       !(await this.prisma.userStory.findFirst({
-        where: { id: dto.storyId, projectId },
+        where: { id: dto.storyId, projectId, deletedAt: null },
         select: { id: true },
       }))
     ) {
@@ -243,7 +245,7 @@ export class RoundsService {
   }> {
     const [story, persona] = await Promise.all([
       this.prisma.userStory.findFirst({
-        where: { id: storyId, projectId },
+        where: { id: storyId, projectId, deletedAt: null },
       }),
       personaId
         ? this.prisma.userPersona.findFirst({
@@ -378,7 +380,7 @@ export class RoundsService {
     storyId: string,
   ): Promise<MessageEvent> {
     const story = await this.prisma.userStory.findFirst({
-      where: { id: storyId, projectId },
+      where: { id: storyId, projectId, deletedAt: null },
     })
     if (!story) {
       return { type: 'error', data: 'User story not found.' }
