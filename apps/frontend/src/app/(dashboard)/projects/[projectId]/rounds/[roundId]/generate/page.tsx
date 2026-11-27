@@ -770,7 +770,7 @@ function GeneratingContent() {
     }
   }, [status, router, projectId, roundId, job]);
 
-  useStoryBreadcrumbs(projectId, job?.inputSnapshot?.stories?.[0]?.id, "Generating");
+  useStoryBreadcrumbs(projectId, job?.inputSnapshot?.stories?.[0]?.id, "design");
 
   const handleCancel = async () => {
     if (!job) return;

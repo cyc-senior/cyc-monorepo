@@ -427,7 +427,7 @@ function RefineContent() {
   const shown = findVersion(lines, previewed[label]) ?? current;
   const shownIndex = shown ? line.indexOf(shown) : -1;
 
-  useStoryBreadcrumbs(projectId, jobs[0]?.inputSnapshot?.stories?.[0]?.id, "Refine UI");
+  useStoryBreadcrumbs(projectId, jobs[0]?.inputSnapshot?.stories?.[0]?.id, "design");
 
   const shownHtml = shown?.variant.html ?? null;
   const components = React.useMemo<DesignComponent[]>(

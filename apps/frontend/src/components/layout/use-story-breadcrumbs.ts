@@ -3,13 +3,16 @@
 import * as React from "react";
 import { useBreadcrumbs } from "@/contexts/breadcrumb-context";
 import { listUserStories, UserStoryItem } from "@/lib/project-client";
-import { storyCode } from "@/lib/design-cycle";
-
-/** The design-cycle step a page is, named as in the sidebar. */
-export type StoryStage = "Review prompt" | "Generating" | "Refine UI";
+import { designStepLabel, storyCode } from "@/lib/design-cycle";
 
 /**
- * Breadcrumb of a design-cycle page: `Project › US1 › Refine UI`.
+ * The design-cycle step a page is. "design" is named like the sidebar step:
+ * "Generate design" before the first designs exist, then "Refine UI".
+ */
+export type StoryStage = "Review prompt" | "design";
+
+/**
+ * Breadcrumb of a design-cycle page: `Project › US1 › Generate design | Refine UI`.
  * Every level but the last links up; the story shows its key (as in Figma)
  * with the full title as a tooltip.
  */
@@ -45,7 +48,14 @@ export function useStoryBreadcrumbs(
             },
           ]
         : []),
-      { label: stage },
+      {
+        label:
+          stage === "design"
+            ? story
+              ? designStepLabel(story)
+              : "Generate design"
+            : stage,
+      },
     ]);
   }, [setBreadcrumbs, project?.name, projectId, stories, storyId, stage]);
 }
