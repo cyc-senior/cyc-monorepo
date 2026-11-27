@@ -490,19 +490,10 @@ export function ProjectMainLandingView({
         <TabsContent value="stories" className="mt-0 outline-hidden">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
+              {/* "New user story" lives in the page header, above the tabs. */}
               <h2 className="text-xl font-heading font-medium text-foreground">
                 All User Stories ({stories.length})
               </h2>
-              <Button
-                asChild
-                size="sm"
-                className="rounded-[10px] bg-[#9ae600] text-[#35530e] hover:bg-[#8ee000] font-medium text-sm"
-              >
-                <Link href={`/projects/${projectId}/stories/new`}>
-                  <HugeIcon icon={Add01Icon} size={16} />
-                  <span>New story</span>
-                </Link>
-              </Button>
             </div>
 
             {stories.length === 0 ? (
